@@ -1,0 +1,26 @@
+{
+  "name": "fpl-draft-standings",
+  "version": "1.0.0",
+  "description": "Rank the league via custom rules",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theunisduminy/fpl-draft-standings.git"
+  },
+  "author": "TL Duminy",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/theunisduminy/fpl-draft-standings/issues"
+  },
+  "homepage": "https://github.com/theunisduminy/fpl-draft-standings#readme",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "express": "^4.17.1",
+    "fs": "0.0.1-security",
+    "node-fetch": "^2.6.1",
+    "nodemon": "^2.0.12"
+  }
+}
