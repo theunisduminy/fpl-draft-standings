@@ -23,6 +23,11 @@ a {
   padding: 10px;
   margin: 10px;
   position: relative;
+  background-color: #72d57d;
+  border-radius: 8px;
+}
+
+a:hover {
   background-color: #468753;
 }
 
