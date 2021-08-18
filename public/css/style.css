@@ -9,22 +9,55 @@ body {
 
 h1 {
   text-align: center;
-  font-size: 30px;
+  font-size: 25px;
   font-family: 'Lato', sans-serif;
   color: white;
+}
+
+a {
+  text-align: center;
+  font-size: 12px;
+  font-family: 'Lato', sans-serif;
+  color: white;
+  text-decoration: none;
+  padding: 10px;
+  margin: 10px;
+  position: relative;
+  background-color: #468753;
+}
+
+hr {
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 table {
   font-family: 'Lato', sans-serif;
   font-weight: 300;
   color: white;
-  margin-left: 0;
+  margin-left: auto;
   margin-right: auto;
   font-size: 14px;
 }
 
+p {
+  font-size: 16px;
+  text-align: left;
+  font-family: 'Lato', sans-serif;
+  color: white;
+  line-height: 20px;
+}
+
 .main {
   padding: 7%;
+}
+
+.buttons {
+  padding: 7%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 thead {

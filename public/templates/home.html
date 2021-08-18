@@ -4,10 +4,36 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Draft Kings Standings</title>
-    <link rel="favicon" type="image/jpg" href="/assets/images/favicon.png" />
+    <link rel="stylesheet" type="text/css" href="/css/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <img src="https://storage.googleapis.com/root-bank/dinoparks/dinoparks-logo.png" alt="pm-banner" />
-    <p>Hello worldz!</p>
+    <img class="banner" src="/images/premier-league-banner.png" />
+    <div class="main">
+      <h1>Draft League Standings</h1>
+      <div class="standings-table">
+        <table>
+          <thead>
+            <tr>
+              <th class="player">Player</th>
+              <th>Total Points</th>
+              <th>H2H Rank</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {%STANDINGS_TABLE%}
+          </tbody>
+        </table>
+      </div>
+      <hr />
+    </div>
+    <div class="buttons">
+      <a href="https://draft.premierleague.com" target="_blank">Fantasy draft</a>
+      <a href="/scoring" target="_self">Scoring rules</a>
+      <a href="/detail" target="_self">Detailed view</a>
+    </div>
   </body>
 </html>

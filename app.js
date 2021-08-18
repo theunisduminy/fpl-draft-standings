@@ -10,8 +10,10 @@ app.use(express.static(__dirname + '/public'));
 let playerDetails = [];
 
 const draftPath = 'https://draft.premierleague.com/api/league/25761/details';
-const homePage = fs.readFileSync(`${__dirname}/public/assets/templates/home.html`, 'utf-8');
-const tableInfo = fs.readFileSync(`${__dirname}/public/assets/templates/standings-table.html`, 'utf-8');
+const homePage = fs.readFileSync(`${__dirname}/public/templates/home.html`, 'utf-8');
+const tableInfo = fs.readFileSync(`${__dirname}/public/templates/standings-table.html`, 'utf-8');
+const scoringRules = fs.readFileSync(`${__dirname}/public/templates/scoring.html`, 'utf-8');
+const detailView = fs.readFileSync(`${__dirname}/public/templates/detailed-view.html`, 'utf-8');
 
 async function fetchData() {
   try {
@@ -49,13 +51,7 @@ function rankingPlayer(playerData) {
 
   // Assign head to head score
   for (const player of playerData) {
-    player.head_to_head_rank === 1
-      ? (player.head_to_head_score = 8.5)
-      : player.head_to_head_rank === 2
-      ? (player.head_to_head_score = 7)
-      : player.head_to_head_rank === 3
-      ? (player.head_to_head_score = 5.5)
-      : (player.head_to_head_score = 8 - player.head_to_head_rank);
+    player.head_to_head_score = 8 - player.head_to_head_rank;
   }
 
   playerData.sort(function (a, b) {
@@ -75,7 +71,7 @@ function rankingPlayer(playerData) {
 
   // Assign total point score
   for (const player of playerData) {
-    player.total_points_score = 10 - player.total_points_rank;
+    player.total_points_score = 8 - player.total_points_rank + (9 - player.total_points_rank) / 10;
   }
 
   // Assign combined score
@@ -111,6 +107,14 @@ app.get('/', (req, res) => {
   const output = homePage.replace('{%STANDINGS_TABLE%}', populatedTables);
   res.send(output);
   // res.send('hello world');
+});
+
+app.get('/scoring', (req, res) => {
+  res.send(scoringRules);
+});
+
+app.get('/detail', (req, res) => {
+  res.send(detailView);
 });
 
 const PORT = process.env.PORT || 3000;
