@@ -37,7 +37,8 @@ function createPlayersObject(players) {
 function sortPlayersObject(standingsData) {
   for (const rank of standingsData) {
     const thePlayer = playerDetails.find((p) => p.id === rank.league_entry);
-    thePlayer.head_to_head_rank = rank.rank_sort;
+    thePlayer.head_to_head_rank = standingsData.filter((s) => s.total === rank.total).sort((a, b) => a.rank - b.rank)[0].rank_sort;
+    thePlayer.head_to_head_points = rank.total
     thePlayer.total_points = rank.points_for;
     thePlayer.head_to_head_total = rank.total;
   }
@@ -95,7 +96,7 @@ async function buildPlayerTable() {
 function replaceTable(tableTemplate, playerData) {
   let output = tableTemplate.replace(/{%PLAYER_NAME%}/g, playerData.player);
   output = output.replace(/{%TOTAL_POINTS%}/g, playerData.total_points);
-  output = output.replace(/{%H2H_SCORE%}/g, playerData.head_to_head_rank);
+  output = output.replace(/{%H2H_SCORE%}/g, `${playerData.head_to_head_rank}(${playerData.head_to_head_points})`);
   output = output.replace(/{%SCORE%}/g, playerData.combined_score);
   return output;
 }
