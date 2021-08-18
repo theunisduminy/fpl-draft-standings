@@ -1,0 +1,54 @@
+.banner {
+  width: 100%;
+}
+
+body {
+  margin: 0px;
+  background-color: #310639;
+}
+
+h1 {
+  text-align: center;
+  font-size: 30px;
+  font-family: 'Lato', sans-serif;
+  color: white;
+}
+
+table {
+  font-family: 'Lato', sans-serif;
+  font-weight: 300;
+  color: white;
+  margin-left: 0;
+  margin-right: auto;
+  font-size: 14px;
+}
+
+.main {
+  padding: 7%;
+}
+
+thead {
+  text-align: left;
+}
+
+thead th {
+  border-bottom: 2px solid white;
+}
+
+th {
+  width: 27%;
+  text-align: center;
+}
+
+th.player {
+  width: 18%;
+  text-align: left;
+}
+
+td.player {
+  text-align: left;
+}
+
+td {
+  text-align: center;
+}
