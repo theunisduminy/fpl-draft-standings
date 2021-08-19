@@ -8,12 +8,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   </head>
   <body>
     <img class="banner" src="/images/premier-league-banner.png" />
+    <a class="back-button" href="/"><i class="material-icons">arrow_back</i>Back to home</a>
     <div class="main">
       <h1>Detailed View</h1>
-      <p>Under construction...</p>
+      <div class="detail-view">
+        {%DETAIL_TABLE%}
+      </div>
       </div>
     </div>
   </body>

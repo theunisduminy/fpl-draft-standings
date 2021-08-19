@@ -4,6 +4,8 @@ const fs = require('fs');
 const { builtinModules } = require('module');
 const fetch = require('node-fetch');
 
+const { replaceScoringTable, replaceDetailTable } = require('./helpers');
+
 const app = express();
 app.use(express.static(__dirname + '/public'));
 
@@ -14,6 +16,7 @@ const homePage = fs.readFileSync(`${__dirname}/public/templates/home.html`, 'utf
 const tableInfo = fs.readFileSync(`${__dirname}/public/templates/standings-table.html`, 'utf-8');
 const scoringRules = fs.readFileSync(`${__dirname}/public/templates/scoring.html`, 'utf-8');
 const detailView = fs.readFileSync(`${__dirname}/public/templates/detailed-view.html`, 'utf-8');
+const playerDetailView = fs.readFileSync(`${__dirname}/public/templates/player-detail-view.html`, 'utf-8');
 
 async function fetchData() {
   try {
@@ -27,8 +30,10 @@ async function fetchData() {
 function createPlayersObject(players) {
   for (const player of players) {
     let playerInfo = {
-      player: `${player.player_first_name}`,
+      player_name: player.player_first_name,
+      player_surname: player.player_last_name,
       id: player.id,
+      team_name: player.entry_name,
     };
     playerDetails.push(playerInfo);
   }
@@ -42,6 +47,7 @@ function sortPlayersObject(standingsData) {
       .sort((a, b) => a.rank - b.rank)[0].rank_sort;
     thePlayer.head_to_head_points = rank.total;
     thePlayer.total_points = rank.points_for;
+    thePlayer.points_against = rank.points_against;
     thePlayer.head_to_head_total = rank.total;
   }
   rankingPlayer(playerDetails);
@@ -95,21 +101,12 @@ async function buildPlayerTable() {
   sortPlayersObject(data.standings);
 }
 
-function replaceTable(tableTemplate, playerData) {
-  let output = tableTemplate.replace(/{%PLAYER_NAME%}/g, playerData.player);
-  output = output.replace(/{%TOTAL_POINTS%}/g, playerData.total_points);
-  output = output.replace(/{%H2H_SCORE%}/g, `${playerData.head_to_head_rank}(${playerData.head_to_head_points})`);
-  output = output.replace(/{%SCORE%}/g, playerData.combined_score);
-  return output;
-}
-
 buildPlayerTable();
 
 app.get('/', (req, res) => {
-  const populatedTables = playerDetails.map((el) => replaceTable(tableInfo, el)).join('');
-  const output = homePage.replace('{%STANDINGS_TABLE%}', populatedTables);
+  const pointsTables = playerDetails.map((el) => replaceScoringTable(tableInfo, el)).join('');
+  const output = homePage.replace('{%STANDINGS_TABLE%}', pointsTables);
   res.send(output);
-  // res.send('hello world');
 });
 
 app.get('/scoring', (req, res) => {
@@ -117,7 +114,10 @@ app.get('/scoring', (req, res) => {
 });
 
 app.get('/detail', (req, res) => {
-  res.send(detailView);
+  console.log(playerDetails);
+  const detailTables = playerDetails.map((el) => replaceDetailTable(playerDetailView, el)).join('');
+  const output = detailView.replace('{%DETAIL_TABLE%}', detailTables);
+  res.send(output);
 });
 
 const PORT = process.env.PORT || 3000;

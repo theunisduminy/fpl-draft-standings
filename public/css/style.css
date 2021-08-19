@@ -1,11 +1,6 @@
-.banner {
-  width: 100%;
-}
-
-body {
-  margin: 0px;
-  background-color: #310639;
-}
+/* 
+************ Fonts, headings, text ************
+*/
 
 h1 {
   text-align: center;
@@ -14,11 +9,45 @@ h1 {
   color: white;
 }
 
-a {
+h3 {
+  margin-top: 15%;
+  margin-bottom: 2px;
+  text-align: left;
+  font-size: 18px;
+  font-family: 'Lato', sans-serif;
+  color: #62d57d;
+}
+
+h4 {
+  margin: 0px 0px 5% 0px;
+  text-align: left;
+  font-size: 14px;
+  font-family: 'Lato', sans-serif;
+  color: #62d57d;
+}
+
+p {
+  font-size: 15px;
+  text-align: left;
+  font-family: 'Lato', sans-serif;
+  color: white;
+  line-height: 20px;
+  font-weight: 300;
+}
+
+/* 
+************ Specific classes *************** 
+*/
+
+.banner {
+  width: 100%;
+}
+
+.links {
   text-align: center;
   font-size: 12px;
   font-family: 'Lato', sans-serif;
-  color: white;
+  color: #2c0937;
   text-decoration: none;
   padding: 10px;
   margin: 10px;
@@ -27,8 +56,54 @@ a {
   border-radius: 8px;
 }
 
-a:hover {
+.links:hover {
   background-color: #468753;
+}
+
+.main {
+  padding: 7%;
+}
+
+.back-button {
+  font-size: 12px;
+  padding-left: 4%;
+  font-family: 'Lato', sans-serif;
+  text-decoration: none;
+  color: #62d57d;
+  padding-top: 20px;
+  margin: 10px;
+  position: relative;
+  border: 1px, solid #62d57d;
+  border-radius: 8px;
+}
+
+.material-icons {
+  top: 7px;
+  position: relative;
+  color: #62d57d;
+  padding-right: 5px;
+}
+
+.buttons {
+  padding: 7%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.copy {
+  position: fixed;
+  bottom: 0;
+  font-size: 7px;
+}
+
+/* 
+************ HTML elements ************
+*/
+
+body {
+  margin: 0px;
+  background-color: #310639;
 }
 
 hr {
@@ -46,23 +121,8 @@ table {
   font-size: 14px;
 }
 
-p {
-  font-size: 16px;
-  text-align: left;
-  font-family: 'Lato', sans-serif;
-  color: white;
-  line-height: 20px;
-}
-
-.main {
-  padding: 7%;
-}
-
-.buttons {
-  padding: 7%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+table.second-detail-table {
+  margin-top: 3%;
 }
 
 thead {
@@ -81,6 +141,10 @@ th {
 th.player {
   width: 18%;
   text-align: left;
+}
+
+th.table-head-detail {
+  width: 25%;
 }
 
 td.player {
