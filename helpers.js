@@ -2,8 +2,8 @@
 
 function replaceScoringTable(tableTemplate, playerData) {
   let output = tableTemplate.replace(/{%PLAYER_NAME%}/g, playerData.player_name);
-  output = output.replace(/{%TOTAL_POINTS%}/g, playerData.total_points);
-  output = output.replace(/{%H2H_SCORE%}/g, `${playerData.head_to_head_rank}(${playerData.head_to_head_points})`);
+  output = output.replace(/{%TOTAL_POINTS%}/g, `${playerData.total_points_rank} (${playerData.total_points})`);
+  output = output.replace(/{%H2H_SCORE%}/g, `${playerData.head_to_head_rank} (${playerData.head_to_head_points})`);
   output = output.replace(/{%SCORE%}/g, playerData.combined_score);
 
   return output;

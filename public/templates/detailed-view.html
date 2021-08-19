@@ -11,14 +11,29 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   </head>
   <body>
-    <img class="banner" src="/images/premier-league-banner.png" />
-    <a class="back-button" href="/"><i class="material-icons">arrow_back</i>Back to home</a>
+    <div class="header">
+      <img class="banner" src="/images/premier-league-banner.png" />
+      <a class="back-button" href="/"><i class="material-icons">arrow_back</i>Back to home</a>
+    </div>
+   
     <div class="main">
-      <h1>Detailed View</h1>
+      <h1 class="detail-view">Detailed View</h1>
       <div class="detail-view">
         {%DETAIL_TABLE%}
       </div>
       </div>
     </div>
   </body>
+  <script>
+    $(window).scroll(function(e){ 
+      var $el = $('.header'); 
+      var isPositionFixed = ($el.css('position') == 'fixed');
+      if ($(this).scrollTop() > 200 && !isPositionFixed){ 
+        $el.css({'position': 'fixed', 'top': '0px'}); 
+      }
+      if ($(this).scrollTop() < 200 && isPositionFixed){
+        $el.css({'position': 'static', 'top': '0px'}); 
+      } 
+    });
+  </script>
 </html>

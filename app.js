@@ -114,7 +114,6 @@ app.get('/scoring', (req, res) => {
 });
 
 app.get('/detail', (req, res) => {
-  console.log(playerDetails);
   const detailTables = playerDetails.map((el) => replaceDetailTable(playerDetailView, el)).join('');
   const output = detailView.replace('{%DETAIL_TABLE%}', detailTables);
   res.send(output);
