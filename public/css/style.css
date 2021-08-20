@@ -105,16 +105,17 @@ p {
 }
 
 .buttons {
-  padding: 7%;
+  padding: 0px 7%;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .copy {
-  position: fixed;
+  position: relative;
   bottom: 0;
   font-size: 7px;
+  padding-left: 7%;
 }
 
 /* 
@@ -140,6 +141,10 @@ table {
   margin-right: auto;
   font-size: 14px;
   width: 100%;
+}
+
+table.scoring-table td {
+  padding: 2px !important;
 }
 
 table.second-detail-table {

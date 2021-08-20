@@ -17,6 +17,7 @@ const tableInfo = fs.readFileSync(`${__dirname}/public/templates/standings-table
 const scoringRules = fs.readFileSync(`${__dirname}/public/templates/scoring.html`, 'utf-8');
 const detailView = fs.readFileSync(`${__dirname}/public/templates/detailed-view.html`, 'utf-8');
 const playerDetailView = fs.readFileSync(`${__dirname}/public/templates/player-detail-view.html`, 'utf-8');
+const scoringTable = fs.readFileSync(`${__dirname}/public/templates/scoring-table.html`, 'utf-8');
 
 async function fetchData() {
   try {
@@ -110,7 +111,8 @@ app.get('/', (req, res) => {
 });
 
 app.get('/scoring', (req, res) => {
-  res.send(scoringRules);
+  const output = scoringRules.replace('{%SCORING_TABLE%}', scoringTable);
+  res.send(output);
 });
 
 app.get('/detail', (req, res) => {

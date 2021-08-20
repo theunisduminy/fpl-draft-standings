@@ -8,20 +8,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
   </head>
   <body>
-    <img class="banner" src="/images/premier-league-banner.png" />
-    <a class="back-button" href="/"><i class="material-icons">arrow_back</i>Back to home</a>
+    <div class="header">
+      <img class="banner" src="/images/premier-league-banner.png" />
+      <a class="back-button" href="/"><i class="material-icons">arrow_back</i>Back to home</a>
+    </div>
     <div class="main">
       <h1>Scoring Rules</h1>
-      <p>The point of the scoring system is to also keep account of the total points to remove some randomness and luck and introduce more long-term strategic thinking. Scoring is calculated by following the formulas* below:
-        <br><br>H2H: 8 - Your H2H Rank
-        <br><br>TP: (8 - Your TP Rank) + (9 - Your TP Rank)/10
-        <br><br>The score on the home page is a summation of the two score calculated.
+      <p>
+        The point of the scoring system is to also keep account of the total points to remove some randomness and luck
+        and introduce more long-term strategic thinking. Scoring is calculated by following the formulas* below:
+        <br /><br /><strong>H2H Score:</strong> 8 - H2H Rank <br /><br /><strong>TP Score:</strong> (8 - TP Rank) + (9 -
+        TP Rank)/10 <br /><br />The score on the home page is a summation of the two scores calculated. The below table
+        gives a more detailed breakdown:
       </p>
-      <p class="copy">* © Johan Smal</p>
-      </div>
+      {%SCORING_TABLE%}
     </div>
+    <p class="copy">* © Johan Smal</p>
   </body>
 </html>
