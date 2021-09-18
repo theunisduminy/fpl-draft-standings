@@ -23,7 +23,8 @@ h3 {
   text-align: left;
   font-size: 18px;
   font-family: 'Lato', sans-serif;
-  color: #62d57d;
+  /* color: #62d57d; */
+  color: #e8ed4e;
 }
 
 h4 {
@@ -31,7 +32,8 @@ h4 {
   text-align: left;
   font-size: 14px;
   font-family: 'Lato', sans-serif;
-  color: #62d57d;
+  /* color: #62d57d; */
+  color: #e8ed4e;
 }
 
 p {
@@ -70,12 +72,14 @@ p {
   padding: 10px;
   margin: 10px;
   position: relative;
-  background-color: #62d57d;
+  /* background-color: #62d57d; */
+  background-color: #e8ed4e;
   border-radius: 8px;
 }
 
 .links:hover {
-  background-color: #468753;
+  /* background-color: #468753; */
+  background-color: #d7db5e;
 }
 
 .main {
@@ -87,7 +91,8 @@ p {
   padding-left: 2%;
   font-family: 'Lato', sans-serif;
   text-decoration: none;
-  color: #62d57d;
+  color: #e8ed4e;
+  /* color: #62d57d; */
   position: relative;
   border-radius: 8px;
 }
@@ -95,7 +100,8 @@ p {
 .material-icons {
   top: 7px;
   position: relative;
-  color: #62d57d;
+  /* color: #62d57d; */
+  color: #e8ed4e;
   padding-right: 5px;
 }
 
