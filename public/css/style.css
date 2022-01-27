@@ -1,11 +1,6 @@
-.banner {
-  width: 100%;
-}
-
-body {
-  margin: 0px;
-  background-color: #310639;
-}
+/* 
+************ Fonts, headings, text ************
+*/
 
 h1 {
   text-align: center;
@@ -14,16 +9,128 @@ h1 {
   color: white;
 }
 
-a {
+h1.detail-view {
+  text-align: center;
+  margin: -10px;
+  font-size: 25px;
+  font-family: 'Lato', sans-serif;
+  color: white;
+}
+
+h3 {
+  margin-top: 15%;
+  margin-bottom: 2px;
+  text-align: left;
+  font-size: 18px;
+  font-family: 'Lato', sans-serif;
+  /* color: #62d57d; */
+  color: #e8ed4e;
+}
+
+h4 {
+  margin: 0px 0px 5% 0px;
+  text-align: left;
+  font-size: 14px;
+  font-family: 'Lato', sans-serif;
+  /* color: #62d57d; */
+  color: #e8ed4e;
+}
+
+p {
+  font-size: 15px;
+  text-align: justify;
+  font-family: 'Lato', sans-serif;
+  color: white;
+  line-height: 20px;
+  font-weight: 300;
+}
+
+/* 
+************ Specific classes *************** 
+*/
+
+.header {
+  background-color: #310639;
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 100;
+  padding-bottom: 20px;
+}
+
+.banner {
+  width: 100%;
+  padding-bottom: 5px;
+}
+
+.links {
   text-align: center;
   font-size: 12px;
   font-family: 'Lato', sans-serif;
-  color: white;
+  color: #2c0937;
   text-decoration: none;
   padding: 10px;
   margin: 10px;
   position: relative;
-  background-color: #468753;
+  /* background-color: #62d57d; */
+  background-color: #e8ed4e;
+  border-radius: 8px;
+}
+
+.links:hover {
+  /* background-color: #468753; */
+  background-color: #d7db5e;
+}
+
+.main {
+  padding: 7%;
+}
+
+.back-button {
+  font-size: 15px;
+  padding-left: 2%;
+  font-family: 'Lato', sans-serif;
+  text-decoration: none;
+  color: #e8ed4e;
+  /* color: #62d57d; */
+  position: relative;
+  border-radius: 8px;
+}
+
+.material-icons {
+  top: 7px;
+  position: relative;
+  /* color: #62d57d; */
+  color: #e8ed4e;
+  padding-right: 5px;
+}
+
+.soccer {
+  font-size: 15px !important;
+  top: 2px !important;
+}
+
+.buttons {
+  padding: 0px 7%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.copy {
+  position: relative;
+  bottom: 0;
+  font-size: 7px;
+  padding-left: 7%;
+}
+
+/* 
+************ HTML elements ************
+*/
+
+body {
+  margin: 0px;
+  background-color: #310639;
 }
 
 hr {
@@ -39,25 +146,15 @@ table {
   margin-left: auto;
   margin-right: auto;
   font-size: 14px;
+  width: 100%;
 }
 
-p {
-  font-size: 16px;
-  text-align: left;
-  font-family: 'Lato', sans-serif;
-  color: white;
-  line-height: 20px;
+table.scoring-table td {
+  padding: 2px !important;
 }
 
-.main {
-  padding: 7%;
-}
-
-.buttons {
-  padding: 7%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+table.second-detail-table {
+  margin-top: 1%;
 }
 
 thead {
@@ -71,11 +168,17 @@ thead th {
 th {
   width: 27%;
   text-align: center;
+  padding-bottom: 3px;
 }
 
 th.player {
   width: 18%;
   text-align: left;
+  padding-bottom: 3px;
+}
+
+th.table-head-detail {
+  width: 25%;
 }
 
 td.player {
@@ -84,4 +187,69 @@ td.player {
 
 td {
   text-align: center;
+  padding: 5px;
+}
+
+/* For desktop */
+@media screen and (min-width: 800px) {
+  .header {
+    /* padding-left: 20%; */
+    position: relative;
+    background-color: #310639;
+    top: 0;
+    width: 100%;
+    z-index: 100;
+    padding-bottom: 20px;
+  }
+
+  .back-button {
+    font-size: 20px;
+    position: absolute;
+    left: 0px;
+    margin-top: 2%;
+  }
+
+  .copy {
+    padding-left: 20%;
+  }
+
+  .banner {
+    padding-left: 20%;
+    position: relative;
+    background-color: #310639;
+    top: 0;
+    width: 50%;
+    margin-bottom: 20px;
+  }
+
+  .main {
+    padding: 10px 20%;
+  }
+
+  h1.detail-view {
+    font-size: 30px;
+    padding: 20px 0px;
+  }
+
+  h3 {
+    margin-top: 2%;
+  }
+
+  td {
+    font-size: 20px;
+    padding: 1% 0px;
+  }
+
+  h1 {
+    font-size: 50px;
+  }
+
+  .buttons {
+    padding: 5% 0px;
+  }
+
+  .links {
+    font-size: 20px;
+    padding: 20px;
+  }
 }
