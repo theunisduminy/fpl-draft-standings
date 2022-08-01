@@ -23,8 +23,8 @@ h3 {
   text-align: left;
   font-size: 18px;
   font-family: 'Lato', sans-serif;
-  color: #62d57d;
-  /* color: #e8ed4e; */
+  /* color: #62d57d; */
+  color: #75fa95;
 }
 
 h4 {
@@ -32,8 +32,8 @@ h4 {
   text-align: left;
   font-size: 14px;
   font-family: 'Lato', sans-serif;
-  color: #62d57d;
-  /* color: #e8ed4e; */
+  /* color: #62d57d; */
+  color: #75fa95;
 }
 
 p {
@@ -50,7 +50,8 @@ p {
 */
 
 .header {
-  background-color: #310639;
+  /* background-color: #310639; */
+  /* background-color: #281b41; */
   position: sticky;
   top: 0;
   width: 100%;
@@ -72,13 +73,15 @@ p {
   padding: 10px;
   margin: 10px;
   position: relative;
-  background-color: #62d57d;
+  background-image: linear-gradient(to right, #6aeafc, #75fa95);
+  /* background-color: #62d57d; */
   /* background-color: #e8ed4e; */
   border-radius: 8px;
 }
 
 .links:hover {
-  background-color: #468753;
+  background-image: linear-gradient(to right, #75fa95, #6aeafc);
+  /* background-color: #468753; */
   /* background-color: #d7db5e; */
 }
 
@@ -91,8 +94,8 @@ p {
   padding-left: 2%;
   font-family: 'Lato', sans-serif;
   text-decoration: none;
-  /* color: #e8ed4e; */
-  color: #62d57d;
+  color: #75fa95;
+  /* color: #62d57d; */
   position: relative;
   border-radius: 8px;
 }
@@ -100,8 +103,8 @@ p {
 .material-icons {
   top: 7px;
   position: relative;
-  color: #62d57d;
-  /* color: #e8ed4e; */
+  /* color: #62d57d; */
+  color: #75fa95;
   padding-right: 5px;
 }
 
@@ -130,7 +133,9 @@ p {
 
 body {
   margin: 0px;
-  background-color: #310639;
+  /* background-color: #310639; */
+  background-image: linear-gradient(#310639, #00edfd);
+  /* background-color: #b1306b; */
 }
 
 hr {
