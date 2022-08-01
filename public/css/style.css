@@ -50,7 +50,7 @@ p {
 */
 
 .header {
-  /* background-color: #310639; */
+  background-color: #310639;
   /* background-color: #281b41; */
   position: sticky;
   top: 0;
@@ -61,6 +61,7 @@ p {
 
 .banner {
   width: 100%;
+  background-color: #310639;
   padding-bottom: 5px;
 }
 
@@ -95,7 +96,6 @@ p {
   font-family: 'Lato', sans-serif;
   text-decoration: none;
   color: #75fa95;
-  /* color: #62d57d; */
   position: relative;
   border-radius: 8px;
 }
@@ -134,8 +134,8 @@ p {
 body {
   margin: 0px;
   /* background-color: #310639; */
-  background-image: linear-gradient(#310639, #00edfd);
-  /* background-color: #b1306b; */
+  background-image: linear-gradient(#310639, 90%, #00edfd);
+  /* background-color: #1d395e; */
 }
 
 hr {
