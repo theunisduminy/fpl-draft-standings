@@ -11,7 +11,7 @@ app.use(express.static(__dirname + '/public'));
 
 let playerDetails = [];
 
-const draftPath = 'https://draft.premierleague.com/api/league/25761/details';
+const draftPath = 'https://draft.premierleague.com/api/league/39485/details';
 const homePage = fs.readFileSync(`${__dirname}/public/templates/home.html`, 'utf-8');
 const tableInfo = fs.readFileSync(`${__dirname}/public/templates/standings-table.html`, 'utf-8');
 const scoringRules = fs.readFileSync(`${__dirname}/public/templates/scoring.html`, 'utf-8');
