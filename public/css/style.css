@@ -23,8 +23,8 @@ h3 {
   text-align: left;
   font-size: 18px;
   font-family: 'Lato', sans-serif;
-  /* color: #62d57d; */
-  color: #75fa95;
+  color: #f8d675;
+  /* color: #75fa95; */
 }
 
 h4 {
@@ -32,8 +32,8 @@ h4 {
   text-align: left;
   font-size: 14px;
   font-family: 'Lato', sans-serif;
-  /* color: #62d57d; */
-  color: #75fa95;
+  color: #f8d675;
+  /* color: #75fa95; */
 }
 
 p {
@@ -95,7 +95,8 @@ p {
   padding-left: 2%;
   font-family: 'Lato', sans-serif;
   text-decoration: none;
-  color: #75fa95;
+  /* color: #75fa95; */
+  color: #f8d675;
   position: relative;
   border-radius: 8px;
 }
@@ -103,8 +104,8 @@ p {
 .material-icons {
   top: 7px;
   position: relative;
-  /* color: #62d57d; */
-  color: #75fa95;
+  color: #f8d675;
+  /* color: #75fa95; */
   padding-right: 5px;
 }
 
