@@ -1,5 +1,6 @@
 import styles from '@/../styles/Header.module.css';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 interface HeaderSectionProps {
   showTitle?: boolean;
@@ -13,9 +14,9 @@ export default function Header(props: HeaderSectionProps) {
   return (
     <div className={styles.homeNav}>
       {path !== '/' && (
-        <a className={styles.backButton} href='/'>
+        <Link href={'/'} className={styles.backButton}>
           <i className='fa fa-arrow-left'></i> Back to Home
-        </a>
+        </Link>
       )}
       <br></br>
       <div className={styles.description}>
