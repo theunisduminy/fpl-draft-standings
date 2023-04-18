@@ -1,30 +1,22 @@
 {
   "name": "fpl-draft-standings",
-  "version": "1.0.0",
-  "description": "Rank the league via custom rules",
-  "main": "app.js",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon app.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/theunisduminy/fpl-draft-standings.git"
-  },
-  "author": "TL Duminy",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/theunisduminy/fpl-draft-standings/issues"
-  },
-  "homepage": "https://github.com/theunisduminy/fpl-draft-standings#readme",
   "dependencies": {
-    "axios": "^0.21.1",
-    "express": "^4.17.1",
-    "fs": "0.0.1-security",
-    "node-fetch": "^2.6.1",
-    "nodemon": "^2.0.12"
-  },
-  "engines": {
-    "node": "14.17.4"
+    "@types/node": "18.15.11",
+    "@types/react": "18.0.37",
+    "@types/react-dom": "18.0.11",
+    "eslint": "8.38.0",
+    "eslint-config-next": "13.3.0",
+    "next": "13.3.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "typescript": "5.0.4"
   }
 }

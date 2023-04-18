@@ -1,0 +1,45 @@
+.standingsTable table {
+  font-family: 'Lato', sans-serif;
+  font-weight: 300;
+  color: white;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 14px;
+  width: 350px;
+}
+
+.standingsTable thead {
+  text-align: left;
+}
+
+.standingsTable thead th {
+  border-bottom: 2px solid white;
+}
+
+.standingsTable th {
+  width: 27%;
+  text-align: center;
+  padding-bottom: 3px;
+}
+
+.standingsTable th.player {
+  width: 18%;
+  text-align: left;
+  padding-bottom: 3px;
+}
+
+.standingsTable th.table-head-detail {
+  width: 25%;
+}
+
+.standingsTable td.player {
+  text-align: left;
+}
+
+.standingsTable td {
+  text-align: center;
+  padding: 5px;
+}
+
+@media only screen and (max-width: 700px) {
+}
