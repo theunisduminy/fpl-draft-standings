@@ -18,17 +18,6 @@ export default function Home() {
       <main className={styles.main}>
         <HeaderSection />
         <StandingsTable />
-        {/* <div class='buttons'>
-          <a class='links' href='https://draft.premierleague.com' target='_blank'>
-            Fantasy draft
-          </a>
-          <a class='links' href='/scoring' target='_self'>
-            Scoring rules
-          </a>
-          <a class='links' href='/detail' target='_self'>
-            Detailed view
-          </a>
-        </div> */}
       </main>
     </>
   );
