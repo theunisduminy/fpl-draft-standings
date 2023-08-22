@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 async function fetchData() {
   try {
-    let res = await fetch('https://draft.premierleague.com/api/league/39485/details');
+    let res = await fetch('https://draft.premierleague.com/api/league/3681/details');
     return await res.json();
   } catch (err) {
     console.log(err);
