@@ -1,10 +1,11 @@
 import styles from '@/../styles/Button.module.css';
 
-interface HeaderSectionProps {
-  showTitle?: boolean;
-}
+// If need in the future
+// interface ButtonSectionProps {
+//   foo: string
+// }
 
-export default function Buttons(props: HeaderSectionProps) {
+export default function Buttons() {
   return (
     <div className={styles.buttonLayout}>
       <a className={styles.buttonLeft} href='/detail'>
