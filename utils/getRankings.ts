@@ -1,5 +1,3 @@
-import { promises } from 'dns';
-
 /**
  * Fetch the standings details
  * @returns
