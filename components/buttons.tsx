@@ -1,4 +1,5 @@
 import styles from '@/../styles/Button.module.css';
+import Link from 'next/link';
 
 // If need in the future
 // interface ButtonSectionProps {
@@ -8,12 +9,12 @@ import styles from '@/../styles/Button.module.css';
 export default function Buttons() {
   return (
     <div className={styles.buttonLayout}>
-      <a className={styles.buttonLeft} href='/detail'>
+      <Link className={styles.buttonLeft} href={'/detail'}>
         Detail view
-      </a>
-      <a className={styles.buttonRight} href='https://draft.premierleague.com/team/my'>
+      </Link>
+      <Link className={styles.buttonRight} href={'https://draft.premierleague.com/team/my'}>
         Draft team
-      </a>
+      </Link>
     </div>
   );
 }
