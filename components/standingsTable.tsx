@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import styles from '@/../styles/Table.module.css';
+import { PlayerDetails } from '@/interfaces/players';
 import getStandings from '@/utils/getRankings';
 
 export default function StandingsTable() {
@@ -16,8 +16,8 @@ export default function StandingsTable() {
 
   return (
     <div className='flex flex-col justify-center items-center pt-2 '>
-      <div className='w-[337px] sm:w-[400px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl'>
-        <table className='text-white font-light text-sm'>
+      <div className='w-[337px] sm:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl'>
+        <table className='text-white w-[280px] sm:w-[400px] font-light text-sm'>
           <thead>
             <tr className='border-b-2 border-white'>
               <th className='font-medium w-1/4 py-2'>Player</th>
@@ -27,7 +27,7 @@ export default function StandingsTable() {
             </tr>
           </thead>
           <tbody>
-            {standings.map((player: Record<string, any>) => (
+            {standings.map((player: PlayerDetails) => (
               <tr key={player.id}>
                 <td className='py-2'>{player.player_name}</td>
                 <td className='py-2'>
