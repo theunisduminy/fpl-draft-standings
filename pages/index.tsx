@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import Layout from '@/components/Layout';
-import StandingsTable from '@/components/StandingsTable';
-import Buttons from '@/components/Buttons';
+import StandingsTable from '@/components/standingsTable';
+import Buttons from '@/components/buttons';
 import { NextPageWithLayout } from './_app';
 import type { ReactElement } from 'react';
 
