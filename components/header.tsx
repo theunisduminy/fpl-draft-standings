@@ -7,7 +7,7 @@ export default function Header() {
   const path = router.pathname;
 
   return (
-    <div className='text-white text-center font-semibold pb-5 mb-10 sticky top-0 z-20 bg-[#00edfd] sm:w-full pt-5'>
+    <div className='text-white text-center font-semibold pb-5 mb-10 sticky top-0 z-20 bg-cyan-500 sm:w-full pt-5'>
       <div className='flex flex-col justify-center items-center relative sm:sticky sm:top-0'>
         <img
           className='w-40 max-w-screen-lg sm:w-48'

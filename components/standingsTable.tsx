@@ -16,14 +16,14 @@ export default function StandingsTable() {
 
   return (
     <div className='flex flex-col justify-center items-center pt-2 '>
-      <div className='bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl'>
-        <table className='w-100 text-white font-light text-sm sm:w-[400px]'>
+      <div className='w-[337px] sm:w-[400px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl'>
+        <table className='text-white font-light text-sm'>
           <thead>
             <tr className='border-b-2 border-white'>
-              <th className='w-1/4 py-2'>Player</th>
-              <th className='w-1/4 py-2'>TP Rank</th>
-              <th className='w-1/4 py-2'>H2H Rank</th>
-              <th className='w-1/4 py-2'>Score</th>
+              <th className='font-medium w-1/4 py-2'>Player</th>
+              <th className='font-medium w-1/4 py-2'>TP Rank</th>
+              <th className='font-medium w-1/4 py-2'>H2H Rank</th>
+              <th className='font-medium w-1/4 py-2'>Score</th>
             </tr>
           </thead>
           <tbody>
@@ -44,33 +44,4 @@ export default function StandingsTable() {
       </div>
     </div>
   );
-
-  //   return (
-  //     <div className={styles.standingsTable}>
-  //       <table>
-  //         <thead>
-  //           <tr>
-  //             <th>Player</th>
-  //             <th>TP Rank</th>
-  //             <th>H2H Rank</th>
-  //             <th>Score</th>
-  //           </tr>
-  //         </thead>
-  //         <tbody>
-  //           {standings.map((player: Record<string, any>) => (
-  //             <tr key={player.id}>
-  //               <td>{player.player_name}</td>
-  //               <td>
-  //                 {player.total_points_rank} ({player.total_points})
-  //               </td>
-  //               <td>
-  //                 {player.head_to_head_rank} ({player.head_to_head_total})
-  //               </td>
-  //               <td>{player.combined_score}</td>
-  //             </tr>
-  //           ))}
-  //         </tbody>
-  //       </table>
-  //     </div>
-  //   );
 }
