@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Layout from '@/components/Layout';
-import Detail from '@/components/DetailView';
+import Detail from '@/components/detailView';
 import { NextPageWithLayout } from './_app';
 import type { ReactElement } from 'react';
 
