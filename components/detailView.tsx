@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import styles from '@/../styles/Detail.module.css';
+import { PlayerDetails } from '@/interfaces/players';
 import getStandings from '@/utils/getRankings';
 
 export default function Detail() {
@@ -15,18 +15,21 @@ export default function Detail() {
   }, []);
 
   return (
-    <div className={styles.standingsTable}>
-      {standings.map((player: Record<string, any>, index: number) => (
-        <>
-          <h3>{`${index + 1}. ${player.player_name}`}</h3>
-          <h4>{player.team_name}</h4>
-          <table>
+    <div className='text-white min-h-screen px-5 pb-2'>
+      {standings.map((player: PlayerDetails, index) => (
+        <div
+          key={player.id}
+          className='sm:w-[450px] mb-8 bg-gradient-to-r from-cyan-600 to-blue-500 p-4 rounded-lg shadow-2xl'
+        >
+          <h3 className='text-xl font-semibold'>{`${index + 1}. ${player.player_name}`}</h3>
+          {/* <h4 className='text-lg'>{player.team_name}</h4> */}
+          <table className='w-full text-white'>
             <thead>
-              <tr className={styles.tableHeadDetail}>
-                <th>Pts For</th>
-                <th>Pts Agst</th>
-                <th>H2H Pts</th>
-                <th>H2H Rank</th>
+              <tr className=''>
+                <th className='py-2 font-medium'>Pts For</th>
+                <th className='py-2 font-medium'>Pts Agst</th>
+                <th className='py-2 font-medium'>H2H Pts</th>
+                <th className='py-2 font-medium'>H2H Rank</th>
               </tr>
             </thead>
             <tbody>
@@ -38,15 +41,13 @@ export default function Detail() {
               </tr>
             </tbody>
           </table>
-          <table className={styles.secondDetailTable}>
+          <table className='w-full mt-4 text-white'>
             <thead>
-              <tr className={styles.tableHeadDetail}>
-                <th>TP Rank</th>
-                <th>H2H Score</th>
-                <th>TP Score</th>
-                <th>
-                  <i></i>Total
-                </th>
+              <tr className=''>
+                <th className='py-2 font-medium'>TP Rank</th>
+                <th className='py-2 font-medium'>H2H Score</th>
+                <th className='py-2 font-medium'>TP Score</th>
+                <th className='py-2 font-medium'>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -58,7 +59,7 @@ export default function Detail() {
               </tr>
             </tbody>
           </table>
-        </>
+        </div>
       ))}
     </div>
   );
