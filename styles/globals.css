@@ -1,29 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 html,
 body {
   height: 100%;
+  width: 100%;
   padding: 0;
   margin: 0;
-  font-family: 'Lato', sans-serif;
-}
-
-* {
-  box-sizing: border-box;
 }
 
 main {
-  padding: 5rem 0;
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-footer {
-  width: 100%;
-  height: 50px;
-  border-top: 1px solid #eaeaea;
-  display: flex;
   justify-content: center;
   align-items: center;
 }
@@ -41,7 +31,7 @@ h3 {
   font-size: 18px;
   color: #00edfd;
   /* color: #f8d675; */
-  /* color: #75fa95; */
+  color: #75fa95;
 }
 
 h4 {
@@ -51,30 +41,6 @@ h4 {
   /* color: #f8d675; */
   color: #00edfd;
   /* color: #75fa95; */
-}
-
-p {
-  font-size: 15px;
-  text-align: justify;
-  color: white;
-  line-height: 20px;
-  font-weight: 300;
-}
-
-.header {
-  background-color: #310639;
-  /* background-color: #281b41; */
-  position: sticky;
-  top: 0;
-  width: 100%;
-  z-index: 100;
-  padding-bottom: 20px;
-}
-
-.banner {
-  width: 100%;
-  background-color: #310639;
-  padding-bottom: 5px;
 }
 
 body {
@@ -98,31 +64,6 @@ hr {
 
   html body {
     position: absolute;
-  }
-
-  button {
-    width: 50%;
-    font-size: 15px;
-    margin: 10px auto;
-    display: block;
-    padding: 12px;
-    color: #000000;
-    font-family: Playfair Display;
-  }
-
-  img {
-    display: block;
-    margin: 0 auto;
-  }
-
-  footer {
-    margin-top: 30%;
-    width: 100%;
-    text-align: center;
-  }
-
-  footer p {
-    font-size: 9px;
   }
 }
 

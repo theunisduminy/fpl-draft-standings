@@ -1,12 +1,11 @@
 import Head from 'next/head';
-import { Inter } from 'next/font/google';
+import Layout from '@/components/Layout';
 import styles from '@/styles/Detail.module.css';
-import HeaderSection from '@/components/header';
-import Detail from '@/components/detailView';
+import Detail from '@/components/DetailView';
+import { NextPageWithLayout } from './_app';
+import type { ReactElement } from 'react';
 
-const inter = Inter({ subsets: ['latin'] });
-
-export default function DetailView() {
+const DetailView: NextPageWithLayout = () => {
   return (
     <div className={styles.detailViewLayout}>
       <Head>
@@ -16,12 +15,14 @@ export default function DetailView() {
         <link rel='icon' href='/favicon.ico' />
       </Head>
       <main className={styles.main}>
-        <HeaderSection title='Detailed Player Score' />
         <Detail />
-        <footer>
-          <p>Built by Theunis Duminy & Johan Smal.</p>
-        </footer>
       </main>
     </div>
   );
-}
+};
+
+DetailView.getLayout = function getLayout(page: ReactElement) {
+  return <Layout>{page}</Layout>;
+};
+
+export default DetailView;
