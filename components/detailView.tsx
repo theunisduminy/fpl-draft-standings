@@ -17,7 +17,11 @@ export default function Detail() {
   }, []);
 
   return (
-    <div className='text-white min-h-screen px-5 pb-2 flex flex-col items-center'>
+    <div
+      className={`text-white min-h-screen px-5 pb-2 ${
+        loading ? `flex flex-col items-center` : ''
+      } `}
+    >
       {loading ? (
         <i className='fa fa-circle-o-notch text-5xl animate-spin' aria-hidden='true'></i>
       ) : (
