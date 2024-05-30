@@ -1,20 +1,25 @@
-import Link from 'next/link';
+import { ReactNode, MouseEventHandler } from 'react';
 
-export default function Buttons() {
-  return (
-    <div className='mt-12 text-center m-10 sm:my-10'>
-      <Link
-        href={'/detail'}
-        className='inline-block px-7 py-3 mr-4 text-white bg-gradient-to-r from-cyan-600 to-blue-500 rounded-lg text-sm hover:text-black shadow-2xl'
-      >
-        Detail view
-      </Link>
-      <Link
-        href={'https://draft.premierleague.com/team/my'}
-        className='inline-block px-7 py-3 ml-4 text-white bg-gradient-to-r from-cyan-600 to-blue-500 rounded-lg text-sm hover:text-black shadow-2xl'
-      >
-        Draft team
-      </Link>
-    </div>
-  );
+const buttonStyle =
+  'px-7 py-3 border-2 rounded-lg text-sm shadow-2xl min-w-[9rem] border-premPurple duration-500';
+
+interface ButtonProps {
+  isActive: boolean;
+  onClick: MouseEventHandler<HTMLButtonElement>;
+  children: ReactNode;
 }
+
+const Button: React.FC<ButtonProps> = ({ isActive, onClick, children }) => (
+  <button
+    className={`${buttonStyle} ${
+      isActive
+        ? 'bg-gradient-to-r from-cyan-600 to-blue-500 text-white'
+        : 'bg-gradient-to-r from-premTurquoise to-premGreen'
+    }`}
+    onClick={onClick}
+  >
+    {children}
+  </button>
+);
+
+export default Button;

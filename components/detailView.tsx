@@ -1,6 +1,10 @@
+'use client';
 import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
-import getStandings from '@/utils/getRankings';
+import apiHelper from '@/utils/apiHelper';
+
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 export default function Detail() {
   const [standings, setStandings] = useState([]);
@@ -8,7 +12,7 @@ export default function Detail() {
 
   useEffect(() => {
     async function fetchStandings() {
-      const standingsData = await getStandings();
+      const standingsData = await apiHelper('standings');
       setStandings(standingsData);
       setLoading(false); // Data received, set loading to false
     }
@@ -18,23 +22,25 @@ export default function Detail() {
 
   return (
     <div
-      className={`text-white min-h-screen px-5 pb-2 ${
-        loading ? `flex flex-col items-center` : ''
+      className={`flex flex-col items-center text-white w-full px-5 pb-2 ${
+        loading ? `flex flex-col items-center min-h-[200vh]` : ''
       } `}
     >
       {loading ? (
-        <i className='fa fa-circle-o-notch text-5xl animate-spin' aria-hidden='true'></i>
+        <FontAwesomeIcon className='animate-spin text-5xl text-white' icon={faSpinner} />
       ) : (
         standings.map((player: PlayerDetails, index) => (
           <div
             key={player.id}
-            className='sm:w-[450px] mb-8 bg-gradient-to-r from-cyan-600 to-blue-500 p-4 rounded-lg shadow-2xl'
+            className='w-[100%] md:w-[50%] mb-8 bg-gradient-to-r from-cyan-600 to-blue-500 p-4 rounded-lg shadow-2xl border-2 border-black'
           >
-            <h3 className='text-xl font-semibold'>{`${index + 1}. ${player.player_name}`}</h3>
-            {/* <h4 className='text-lg'>{player.team_name}</h4> */}
-            <table className='w-full text-white'>
+            <h3 className='text-xl text-white font-semibold text-center'>{`${index + 1}. ${
+              player.player_name
+            } ${player.player_surname}`}</h3>
+            <h4 className='text-lg  mb-6 font-semibold text-center'>{player.team_name}</h4>
+            <table className=' text-white w-full'>
               <thead>
-                <tr className=''>
+                <tr>
                   <th className='py-2 font-medium'>Pts For</th>
                   <th className='py-2 font-medium'>Pts Agst</th>
                   <th className='py-2 font-medium'>H2H Pts</th>
@@ -50,7 +56,7 @@ export default function Detail() {
                 </tr>
               </tbody>
             </table>
-            <table className='w-full mt-4 text-white'>
+            <table className='mt-4 text-white w-full'>
               <thead>
                 <tr className=''>
                   <th className='py-2 font-medium'>TP Rank</th>

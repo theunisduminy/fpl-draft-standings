@@ -1,0 +1,11 @@
+meta {
+  name: league-choices
+  type: http
+  seq: 4
+}
+
+get {
+  url: https://draft.premierleague.com/api/draft/{{league_id}}/choices
+  body: none
+  auth: none
+}

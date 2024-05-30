@@ -1,3 +1,6 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+
 // Skeleton table structure
 export const skeletonTable = (
   <table className='text-white w-[280px] sm:w-[400px] font-light text-sm'>
@@ -12,17 +15,17 @@ export const skeletonTable = (
     <tbody>
       {/* Placeholder rows */}
       <tr>
-        <td className='py-2 bg-gray-300 animate-spin'>
-          <i className='fa fa-circle-o-notch animation-spin' aria-hidden='true'></i>
+        <td className='py-2'>
+          <FontAwesomeIcon className='animate-spin' icon={faSpinner} />
         </td>
-        <td className='py-2 bg-gray-300 animate-spin'>
-          <i className='fa fa-circle-o-notch animation-spin' aria-hidden='true'></i>
+        <td className='py-2'>
+          <FontAwesomeIcon className='animate-spin' icon={faSpinner} />
         </td>
-        <td className='py-2 bg-gray-300 animate-spin'>
-          <i className='fa fa-circle-o-notch animation-spin' aria-hidden='true'></i>
+        <td className='py-2'>
+          <FontAwesomeIcon className='animate-spin' icon={faSpinner} />
         </td>
-        <td className='py-2 bg-gray-300 animate-spin'>
-          <i className='fa fa-circle-o-notch animation-spin' aria-hidden='true'></i>
+        <td className='py-2'>
+          <FontAwesomeIcon className='animate-spin' icon={faSpinner} />
         </td>
       </tr>
     </tbody>
