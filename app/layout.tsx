@@ -40,9 +40,9 @@ export const metadata: Metadata = {
     siteName: 'Draft Standings',
   },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon.ico',
-    apple: '/favicon.ico',
+    icon: '/better-favicon.ico',
+    shortcut: '/better-favicon.ico',
+    apple: '/better-favicon.ico',
   },
 };
 
