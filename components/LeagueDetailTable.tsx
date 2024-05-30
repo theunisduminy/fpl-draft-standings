@@ -6,7 +6,7 @@ import apiHelper from '@/utils/apiHelper';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
-export default function Detail() {
+export default function LeagueDetailTable() {
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +22,7 @@ export default function Detail() {
 
   return (
     <div
-      className={`flex flex-col items-center text-white w-full px-5 pb-2 ${
+      className={`flex flex-col items-center text-white w-[80vw] px-5 pb-2 ${
         loading ? `flex flex-col items-center min-h-[200vh]` : ''
       } `}
     >

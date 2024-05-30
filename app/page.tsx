@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import StandingsTable from '@/components/StandingsTable';
+import LeagueStandingsTable from '@/components/LeagueStandingsTable';
 import DraftFixtures from '@/components/DraftFixtures';
-import Buttons from '@/components/Buttons';
+import ViewButton from '@/components/ViewButtons';
 import { bgGradient } from '@/utils/tailwindVars';
 
 export default function Home() {
@@ -11,15 +11,21 @@ export default function Home() {
   return (
     <main className={`md:min-h-[85vh] min-h-[80vh] ${bgGradient} justify-start pt-10 md:pt-20`}>
       <div className='space-x-4 md:space-x-10 pb-10'>
-        <Buttons isActive={activeTable === 'standings'} onClick={() => setActiveTable('standings')}>
+        <ViewButton
+          isActive={activeTable === 'standings'}
+          onClick={() => setActiveTable('standings')}
+        >
           Standings
-        </Buttons>
-        <Buttons isActive={activeTable === 'fixtures'} onClick={() => setActiveTable('fixtures')}>
+        </ViewButton>
+        <ViewButton
+          isActive={activeTable === 'fixtures'}
+          onClick={() => setActiveTable('fixtures')}
+        >
           Draft Fixtures
-        </Buttons>
+        </ViewButton>
       </div>
       <div className='mt-4'>
-        {activeTable === 'standings' && <StandingsTable />}
+        {activeTable === 'standings' && <LeagueStandingsTable />}
         {activeTable === 'fixtures' && <DraftFixtures />}
       </div>
     </main>

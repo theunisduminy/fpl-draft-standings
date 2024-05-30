@@ -37,7 +37,7 @@ const navigation = [
   { name: 'Draft', href: 'https://draft.premierleague.com/team/my', target: '_blank' },
 ];
 
-export default function Header() {
+export default function HeaderNav() {
   return (
     <header className='bg-gradient-to-t from-[#00edfd] to-[#75fa95]'>
       <nav className='mx-auto max-w-7xl px-6 lg:px-8' aria-label='Top'>

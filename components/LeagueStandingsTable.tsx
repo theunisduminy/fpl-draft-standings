@@ -4,7 +4,7 @@ import { PlayerDetails } from '@/interfaces/players';
 import apiHelper from '@/utils/apiHelper';
 import { skeletonTable } from '@/utils/skeletonTableHome';
 
-export default function StandingsTable() {
+export default function LeagueStandingsTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
   const [loading, setLoading] = useState(true);
 

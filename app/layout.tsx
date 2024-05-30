@@ -7,7 +7,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 // Components and Style
 import '../styles/globals.css';
 import Footer from '../components/Footer';
-import Header from '../components/Header';
+import HeaderNav from '../components/HeaderNav';
 import { bgGradient } from '@/utils/tailwindVars';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import { config } from '@fortawesome/fontawesome-svg-core';
@@ -57,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={clsx(`h-full ${bgGradient} from-30% antialiased scroll-smooth`, inter.variable)}
     >
       <body className='flex min-h-full flex-col font-inter'>
-        <Header />
+        <HeaderNav />
         <div className='flex flex-col'>{children}</div>
         <Analytics />
         <SpeedInsights />

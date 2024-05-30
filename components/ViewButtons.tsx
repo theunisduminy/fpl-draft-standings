@@ -9,7 +9,7 @@ interface ButtonProps {
   children: ReactNode;
 }
 
-const Button: React.FC<ButtonProps> = ({ isActive, onClick, children }) => (
+const ViewButton: React.FC<ButtonProps> = ({ isActive, onClick, children }) => (
   <button
     className={`${buttonStyle} ${
       isActive
@@ -22,4 +22,4 @@ const Button: React.FC<ButtonProps> = ({ isActive, onClick, children }) => (
   </button>
 );
 
-export default Button;
+export default ViewButton;
