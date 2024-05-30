@@ -46,9 +46,9 @@ export default function HeaderNav() {
             <Link href='/'>
               <span className='sr-only'>Draft League Standings</span>
               <img
-                className='max-w-screen-lg w-32'
-                src='../premier-league.png'
-                alt='premier league logo'
+                className='max-w-screen-lg w-40'
+                src='../better-draft.png'
+                alt='draft standings logo'
               />
             </Link>
             <div className='ml-10 hidden space-x-8 lg:block'>
