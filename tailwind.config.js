@@ -2,6 +2,7 @@
 module.exports = {
   content: [
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './utils/**/*.{js,ts,jsx,tsx,mdx}',
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
 
@@ -10,22 +11,15 @@ module.exports = {
   ],
   theme: {
     extend: {
-      keyframes: {
-        fadeUp: {
-          '0%': {
-            opacity: 0,
-            transform: 'translateY(-20px)',
-          },
-          '100%': {
-            opacity: 1,
-            transform: 'translateY(0)',
-          },
-        },
+      colors: {
+        premPurple: '#310639',
+        premGreen: '#75fa95',
+        premTurquoise: '#00edfd',
       },
-      animation: {
-        fadeUp: 'fadeUp 1s ease-in forwards',
+      fontFamily: {
+        montserrat: ['var(--font-inter)'],
       },
     },
-    plugins: [],
+    plugins: [require('tailwindcss-animated')],
   },
 };

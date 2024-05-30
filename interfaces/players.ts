@@ -29,3 +29,23 @@ export interface PlayerDetails {
   total_points_score?: number;
   combined_score?: number;
 }
+
+export interface Matches {
+  event: number;
+  finished: boolean;
+  league_entry_1: number | null;
+  league_entry_1_points: number | null;
+  league_entry_2: number | null;
+  league_entry_2_points: number | null;
+  started: boolean;
+  winning_league_entry: null;
+  winning_method: null;
+}
+
+export interface GameWeekStatus {
+  bonus_added: boolean;
+  date: string;
+  event: number;
+  leagues_updated: boolean;
+  points: string;
+}

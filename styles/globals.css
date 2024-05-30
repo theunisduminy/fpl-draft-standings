@@ -28,27 +28,9 @@ h3 {
   text-align: left;
   font-size: 18px;
   color: #310639;
-  /* color: #00edfd; */
-  /* color: #f8d675; */
-  /* color: #75fa95; */
-}
-
-body {
-  margin: 0px;
-  /* background-color: #310639; */
-  background-image: linear-gradient(#310639, 90%, #00edfd);
-  /* background-color: #1d395e; */
-}
-
-@media only screen and (max-width: 600px) {
-  main {
-    padding: 0;
-    display: block;
-  }
-
-  html body {
-    position: absolute;
-  }
+  /* color: #00edfd;
+  color: #f8d675;
+  color: #75fa95; */
 }
 
 table {

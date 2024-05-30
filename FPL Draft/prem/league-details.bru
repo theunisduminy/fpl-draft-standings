@@ -1,0 +1,11 @@
+meta {
+  name: league-details
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://draft.premierleague.com/api/league/{{league_id}}/details
+  body: none
+  auth: none
+}

@@ -1,0 +1,11 @@
+meta {
+  name: league-trades
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://draft.premierleague.com/api/draft/league/{{league_id}}/trades
+  body: none
+  auth: none
+}

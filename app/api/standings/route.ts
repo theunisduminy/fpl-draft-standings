@@ -1,4 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextResponse } from 'next/server';
 import { Player, StandingsData, PlayerDetails } from '@/interfaces/players';
 
 async function fetchData(): Promise<{ league_entries: Player[]; standings: StandingsData[] }> {
@@ -75,14 +75,14 @@ function rankingPlayer(playerData: PlayerDetails[]): PlayerDetails[] {
   return playerData;
 }
 
-export default async function standings(req: NextApiRequest, res: NextApiResponse) {
+export const GET = async (req: Request, res: Response) => {
   try {
     const { league_entries, standings } = await fetchData();
     const playerDetails = createPlayersObject(league_entries);
     const rankedPlayers = sortPlayersObject(standings, playerDetails);
     const trimmedPlayerRankings = rankedPlayers.slice(0, 8);
-    res.status(200).json(trimmedPlayerRankings);
+    return NextResponse.json(trimmedPlayerRankings);
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    return NextResponse.json({ message: error }, { status: 500 });
   }
-}
+};
