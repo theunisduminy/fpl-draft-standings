@@ -58,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className='flex min-h-full flex-col font-inter'>
         <HeaderNav />
-        <div className='flex flex-col'>{children}</div>
+        <div className='flex flex-1 flex-col'>{children}</div>
         <Analytics />
         <SpeedInsights />
         <Footer />
