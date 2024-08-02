@@ -1,40 +1,12 @@
+/* eslint-disable @next/next/no-img-element */
+
 'use client';
 import Link from 'next/link';
-/* eslint-disable @next/next/no-img-element */
-// import { usePathname } from 'next/navigation';
-
-// import Link from 'next/link';
-
-// export default function Header() {
-//   const path = usePathname();
-
-//   //  sticky top-0 z-20
-
-//   return (
-//     <div className='text-white text-center font-semibold pb-5 bg-[#00edfd] sm:w-full pt-5'>
-//       <div className='flex flex-col justify-center items-center relative sm:sticky sm:top-0'>
-//         <img
-//           className='max-w-screen-lg w-32'
-//           src='../premier-league.png'
-//           alt='premier league logo'
-//         />
-//         {path === '/' && <h1 className='pt-5 text-[#310639]'>Draft League Standings</h1>}
-//         {path === '/detail' && <h1 className='pt-5 text-[#310639]'>Detailed Points Breakdown</h1>}
-
-//         {path !== '/' && (
-//           <Link href={'/'} className='text-[#310639] hover:text-white'>
-//             Back to Home
-//           </Link>
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
 
 const navigation = [
-  { name: 'Home', href: '/', target: '_self' },
-  { name: 'Detail', href: '/detail', target: '_self' },
-  { name: 'Draft', href: 'https://draft.premierleague.com/team/my', target: '_blank' },
+  { name: 'Standings', href: '/', target: '_self' },
+  { name: 'Matches', href: '/detail', target: '_self' },
+  { name: 'Go to draft', href: 'https://draft.premierleague.com/team/my', target: '_blank' },
 ];
 
 export default function HeaderNav() {
@@ -57,7 +29,7 @@ export default function HeaderNav() {
                   target={link.target}
                   key={link.name}
                   href={link.href}
-                  className='text-md font-medium text-premPurple hover:text-indigo-50'
+                  className='text-md font-medium text-premPurple hover:text-indigo-50 hover:bg-premPurple border-2 border-premPurple px-4 py-2 rounded-2xl'
                 >
                   {link.name}
                 </a>
@@ -79,13 +51,13 @@ export default function HeaderNav() {
             </a>
           </div> */}
         </div>
-        <div className='flex flex-wrap justify-center gap-x-6 py-4 sticky top-0 z-20 lg:hidden'>
+        <div className='flex flex-wrap justify-center gap-x-6 py-4 sticky top-0 z-20  lg:hidden'>
           {navigation.map((link) => (
             <a
               target={link.target}
               key={link.name}
               href={link.href}
-              className='text-md font-medium text-premPurple hover:text-indigo-50'
+              className='text-md font-medium text-premPurple hover:text-indigo-50 hover:bg-premPurple border-2 border-premPurple px-4 py-2 rounded-2xl'
             >
               {link.name}
             </a>

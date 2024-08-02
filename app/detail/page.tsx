@@ -1,10 +1,33 @@
-import LeagueDetailTable from '@/components/LeagueDetailTable';
-import { bgGradient } from '@/utils/tailwindVars';
+'use client';
+import { useState } from 'react';
+import DraftFixtures from '@/components/DraftFixtures';
+import ViewButton from '@/components/ViewButtons';
+import DraftResults from '@/components/DraftResults';
 
 export default function DetailView() {
+  const [activeTableMatches, setActiveTableMatches] = useState('fixtures');
+
   return (
-    <div className={`flex flex-col items-center ${bgGradient} pt-10`}>
-      <LeagueDetailTable />
-    </div>
+    <main className={`justify-start py-10 md:py-20`}>
+      <h1 className='text-[#310639] text-4xl pb-5 font-semibold animate-fade-up text-center'>
+        Matches
+      </h1>
+      <div className='md:grid-cols-3 grid grid-cols-2 gap-4 pb-10'>
+        <ViewButton
+          isActive={activeTableMatches === 'fixtures'}
+          onClick={() => setActiveTableMatches('fixtures')}
+        >
+          GW Live
+        </ViewButton>
+        <ViewButton
+          isActive={activeTableMatches === 'results'}
+          onClick={() => setActiveTableMatches('results')}
+        >
+          Results
+        </ViewButton>
+      </div>
+      <div className='mt-4'>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
+      <div className='mt-4'>{activeTableMatches === 'results' && <DraftResults />}</div>
+    </main>
   );
 }
