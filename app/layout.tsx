@@ -29,15 +29,15 @@ import type { Viewport } from 'next';
 export const metadata: Metadata = {
   metadataBase: new URL('https://draftrank.vercel.app'),
   title: {
-    template: '%s - Salty Spur Draft Standings',
-    default: `FPL Standings`,
+    template: '%s - Better Draft | FPL Scoring',
+    default: `Better Draft`,
   },
-  description: `A better way to get who is the best`,
+  description: `A better FPL point system`,
   openGraph: {
     type: 'website',
     locale: 'en_GB',
     url: 'https://draftrank.vercel.app',
-    siteName: 'Draft Standings',
+    siteName: 'Better Draft',
   },
   icons: {
     icon: '/better-favicon.ico',

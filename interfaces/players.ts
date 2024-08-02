@@ -49,3 +49,13 @@ export interface GameWeekStatus {
   leagues_updated: boolean;
   points: string;
 }
+
+export interface F1PlayerDetails {
+  player_name: string;
+  player_surname: string;
+  id: number;
+  team_name: string;
+  f1_score: number;
+  f1_ranking: number;
+  total_wins: number;
+}

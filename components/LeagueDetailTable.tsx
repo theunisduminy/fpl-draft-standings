@@ -8,11 +8,13 @@ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 export default function LeagueDetailTable() {
   const [standings, setStandings] = useState([]);
+  const [formulaOneStandings, setFormulaOneStandings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchStandings() {
       const standingsData = await apiHelper('standings');
+      const formulaOneData = await apiHelper('formula-one-standings');
       setStandings(standingsData);
       setLoading(false); // Data received, set loading to false
     }
@@ -21,61 +23,37 @@ export default function LeagueDetailTable() {
   }, []);
 
   return (
-    <div
-      className={`flex flex-col items-center text-white w-[80vw] px-5 pb-2 ${
-        loading ? `flex flex-col items-center min-h-[200vh]` : ''
-      } `}
-    >
+    <div className='flex flex-col justify-center items-center'>
+      <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up text-center'>
+        Season Points
+      </h1>
       {loading ? (
         <FontAwesomeIcon className='animate-spin text-5xl text-white' icon={faSpinner} />
       ) : (
-        standings.map((player: PlayerDetails, index) => (
-          <div
-            key={player.id}
-            className='w-[100%] md:w-[50%] mb-8 bg-gradient-to-r from-cyan-600 to-blue-500 p-4 rounded-lg shadow-2xl border-2 border-black'
-          >
-            <h3 className='text-xl text-white font-semibold text-center'>{`${index + 1}. ${
-              player.player_name
-            } ${player.player_surname}`}</h3>
-            <h4 className='text-lg  mb-6 font-semibold text-center'>{player.team_name}</h4>
-            <table className=' text-white w-full'>
-              <thead>
-                <tr>
-                  <th className='py-2 font-medium'>Pts For</th>
-                  <th className='py-2 font-medium'>Pts Agst</th>
-                  <th className='py-2 font-medium'>H2H Pts</th>
-                  <th className='py-2 font-medium'>H2H Rank</th>
+        <div className='mb-8 bg-gradient-to-r from-cyan-600 to-blue-500 p-4 rounded-lg shadow-2xl border-2 border-black'>
+          <table className='text-white table-fixed w-[280px] sm:w-[400px]'>
+            <thead>
+              <tr>
+                <th className='py-2 font-medium w-1/6'>Player</th>
+                <th className='py-2 font-medium w-1/6'>Pts For</th>
+                <th className='py-2 font-medium w-1/6'>Pts Agst</th>
+                <th className='py-2 font-medium w-1/6'>H2H Pts</th>
+                <th className='py-2 font-medium w-1/6'>F1 score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {standings.map((player: PlayerDetails, index) => (
+                <tr key={player.id}>
+                  <td className='w-1/6'>{player.player_name}</td>
+                  <td className='w-1/6'>{player.total_points}</td>
+                  <td className='w-1/6'>{player.points_against}</td>
+                  <td className='w-1/6'>{player.head_to_head_points}</td>
+                  <td className='w-1/6'>{player.combined_score}</td>
                 </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{player.total_points}</td>
-                  <td>{player.points_against}</td>
-                  <td>{player.head_to_head_points}</td>
-                  <td>{player.head_to_head_rank}</td>
-                </tr>
-              </tbody>
-            </table>
-            <table className='mt-4 text-white w-full'>
-              <thead>
-                <tr className=''>
-                  <th className='py-2 font-medium'>TP Rank</th>
-                  <th className='py-2 font-medium'>H2H Score</th>
-                  <th className='py-2 font-medium'>TP Score</th>
-                  <th className='py-2 font-medium'>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{player.total_points_rank}</td>
-                  <td>{player.head_to_head_score}</td>
-                  <td>{player.total_points_score}</td>
-                  <td>{player.combined_score}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        ))
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

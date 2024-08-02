@@ -42,7 +42,9 @@ export default function DraftFixtures() {
 
   return (
     <div className='flex flex-col justify-center items-center'>
-      <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up'>{`GW ${currentGW} Fixtures`}</h1>
+      <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up'>{`GW ${
+        currentGW || ''
+      } Fixtures`}</h1>
       <div className='w-[337px] sm:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
         <table className={'text-white w-[280px] sm:w-[400px] font-light text-sm'}>
           <thead>
