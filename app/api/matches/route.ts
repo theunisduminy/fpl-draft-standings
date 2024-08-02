@@ -3,7 +3,7 @@ import { Matches } from '@/interfaces/players';
 
 async function fetchData(): Promise<{ matches: Matches[] }> {
   try {
-    const res = await fetch('https://draft.premierleague.com/api/league/3681/details');
+    const res = await fetch('https://draft.premierleague.com/api/league/5525/details');
     return await res.json();
   } catch (err) {
     console.error(err);

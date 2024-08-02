@@ -3,7 +3,7 @@ import { Player, StandingsData, PlayerDetails } from '@/interfaces/players';
 
 async function fetchData(): Promise<{ league_entries: Player[]; standings: StandingsData[] }> {
   try {
-    const res = await fetch('https://draft.premierleague.com/api/league/3681/details');
+    const res = await fetch('https://draft.premierleague.com/api/league/5525/details');
     // const res = await fetch('https://draft.premierleague.com/api/league/75278/details');
     return await res.json();
   } catch (err) {

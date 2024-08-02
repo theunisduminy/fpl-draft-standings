@@ -30,7 +30,7 @@ interface F1PlayerDetails {
 
 async function fetchData(): Promise<{ matches: Match[]; league_entries: Player[] }> {
   try {
-    const res = await fetch('https://draft.premierleague.com/api/league/3681/details');
+    const res = await fetch('https://draft.premierleague.com/api/league/5525/details');
     const data = await res.json();
     return {
       matches: data.matches,
