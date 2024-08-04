@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import DraftFixtures from '@/components/DraftFixtures';
+import DraftCurrentFixtures from './components/DraftCurrentFixtures';
 import ViewButton from '@/components/ViewButtons';
-import DraftResults from '@/components/DraftResults';
+import DraftResults from '@/app/detail/components/DraftResults';
 
 export default function DetailView() {
   const [activeTableMatches, setActiveTableMatches] = useState('fixtures');
@@ -26,7 +26,7 @@ export default function DetailView() {
           Results
         </ViewButton>
       </div>
-      <div className='mt-4'>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
+      <div className='mt-4'>{activeTableMatches === 'fixtures' && <DraftCurrentFixtures />}</div>
       <div className='mt-4'>{activeTableMatches === 'results' && <DraftResults />}</div>
     </main>
   );

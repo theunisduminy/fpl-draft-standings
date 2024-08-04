@@ -1,11 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { PlayerDetails, Matches } from '@/interfaces/players';
+import { PlayerDetails } from '@/interfaces/players';
+import { Match } from '@/interfaces/match';
 import apiHelper from '@/utils/apiHelper';
 
 export default function AllGameWeekResults() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
-  const [matches, setMatches] = useState<Matches[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
   const [currentPosition, setCurrentPosition] = useState(0); // Track the current position in the list of game weeks
   const resultsPerPage = 5; // Number of game weeks to show per page
 
@@ -30,7 +31,7 @@ export default function AllGameWeekResults() {
     }
     acc[match.event].push(match);
     return acc;
-  }, {} as Record<number, Matches[]>);
+  }, {} as Record<number, Match[]>);
 
   // Sort Game Week numbers in descending order
   const sortedEventKeys = Object.keys(matchesByEvent)

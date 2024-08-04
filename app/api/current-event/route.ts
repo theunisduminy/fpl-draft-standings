@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { GameWeekStatus } from '@/interfaces/players';
+import { GameWeekStatus } from '@/interfaces/match';
 
 async function fetchData(): Promise<{ status: GameWeekStatus[]; leagues: string }> {
   try {

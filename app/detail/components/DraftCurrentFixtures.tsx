@@ -1,12 +1,13 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { PlayerDetails, GameWeekStatus, Matches } from '@/interfaces/players';
+import { PlayerDetails } from '@/interfaces/players';
+import { Match, GameWeekStatus } from '@/interfaces/match';
 import apiHelper from '@/utils/apiHelper';
 
-export default function DraftFixtures() {
+export default function DraftCurrentFixtures() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
   const [event, setEvent] = useState<GameWeekStatus>();
-  const [matches, setMatches] = useState<Matches[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
 
   useEffect(() => {
     async function fetchStandings() {
