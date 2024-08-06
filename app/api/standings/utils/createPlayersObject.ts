@@ -1,3 +1,4 @@
+// utils/createPlayersObject.ts
 import { Player, PlayerDetails } from '@/interfaces/players';
 
 export function createPlayersObject(players: Player[]): PlayerDetails[] {
@@ -17,5 +18,15 @@ export function createPlayersObject(players: Player[]): PlayerDetails[] {
     total_wins: 0,
     total_losses: 0,
     total_draws: 0,
+    position_placed: {
+      first: 0,
+      second: 0,
+      third: 0,
+      fourth: 0,
+      fifth: 0,
+      sixth: 0,
+      seventh: 0,
+      eighth: 0,
+    },
   }));
 }
