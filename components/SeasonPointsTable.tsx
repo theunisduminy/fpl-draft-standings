@@ -17,7 +17,7 @@ export default function SeasonPointsTable() {
       const duration = Date.now() - start; // Calculate the duration taken by the API call
 
       // Ensure the operation takes at least 2 seconds
-      const minimumDuration = 500; // 2 seconds in milliseconds
+      const minimumDuration = 300; // 2 seconds in milliseconds
       const delay = Math.max(minimumDuration - duration, 0);
 
       setTimeout(() => {
@@ -38,7 +38,7 @@ export default function SeasonPointsTable() {
         <FontAwesomeIcon className='animate-spin text-6xl text-blue-500' icon={faSpinner} />
       ) : (
         <div className='mb-8 bg-gradient-to-r from-cyan-600 to-blue-500 p-5 rounded-lg shadow-2xl border-2 border-black'>
-          <table className='text-white table-fixed w-[290px] md:w-[400px]'>
+          <table className='text-white table-fixed w-[290px] md:w-[500px]'>
             <thead>
               <tr>
                 <th className='py-2 font-medium w-1/4 border-r-2 border-white'>Player</th>

@@ -4,12 +4,13 @@ import DraftCurrentFixtures from './components/DraftCurrentFixtures';
 import ViewButton from '@/components/ViewButtons';
 import DraftResults from '@/app/detail/components/DraftResults';
 import DraftFixtures from '@/app/detail/components/DraftFixtures';
+import Layout from '@/components/Layout/PageLayout';
 
 export default function DetailView() {
   const [activeTableMatches, setActiveTableMatches] = useState('currentFixtures');
 
   return (
-    <main className={`justify-start py-10 md:py-20`}>
+    <Layout>
       <h1 className='text-[#310639] text-4xl pb-5 font-semibold animate-fade-up text-center'>
         Matches
       </h1>
@@ -24,13 +25,13 @@ export default function DetailView() {
           isActive={activeTableMatches === 'results'}
           onClick={() => setActiveTableMatches('results')}
         >
-          Results
+          H2H Results
         </ViewButton>
         <ViewButton
           isActive={activeTableMatches === 'fixtures'}
           onClick={() => setActiveTableMatches('fixtures')}
         >
-          Fixtures
+          H2H Fixtures
         </ViewButton>
       </div>
       <div className='mt-4'>
@@ -38,6 +39,6 @@ export default function DetailView() {
       </div>
       <div className='mt-4'>{activeTableMatches === 'results' && <DraftResults />}</div>
       <div className='mt-4'>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
-    </main>
+    </Layout>
   );
 }

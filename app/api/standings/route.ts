@@ -2,13 +2,23 @@ import { NextResponse } from 'next/server';
 import { fetchData } from './utils/fetchData';
 import { createPlayersObject } from './utils/createPlayersObject';
 import { calculateCustomStandings } from './utils/calculateCustomStandings';
+import { calculatePositions } from './utils/calculatePosition';
 import { sortPlayersObject } from './utils/sortPlayersObject';
 
 export const GET = async (req: Request, res: Response) => {
   try {
     const { matches, league_entries, standings } = await fetchData();
+
+    // Create player objects
     const playerDetails = createPlayersObject(league_entries);
+
+    // Calculate position placements
+    calculatePositions(matches, playerDetails);
+
+    // Calculate custom standings
     const customStandings = calculateCustomStandings(matches, playerDetails);
+
+    // Sort players based on standings and custom calculations
     const rankedPlayers = sortPlayersObject(standings, customStandings);
 
     // Sort by F1 score and assign F1 ranking

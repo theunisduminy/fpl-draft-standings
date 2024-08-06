@@ -1,4 +1,4 @@
-import { PlayerDetails } from '../../../../interfaces/players';
+import { PlayerDetails } from '@/interfaces/players';
 
 export function rankingPlayer(playerData: PlayerDetails[]): PlayerDetails[] {
   playerData.sort(

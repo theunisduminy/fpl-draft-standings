@@ -1,6 +1,6 @@
-import { Player } from '../../../../interfaces/players';
-import { Match } from '../../../../interfaces/match';
-import { StandingsData } from '../../../../interfaces/standings';
+import { Player } from '@/interfaces/players';
+import { Match } from '@/interfaces/match';
+import { StandingsData } from '@/interfaces/standings';
 import standing from '@/data/league-details.json';
 
 export async function fetchData(): Promise<{

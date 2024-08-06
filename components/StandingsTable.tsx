@@ -16,7 +16,7 @@ export default function FormulaOneTable() {
       const duration = Date.now() - start; // Calculate the duration taken by the API call
 
       // Ensure the operation takes at least 2 seconds
-      const minimumDuration = 500; // 2 seconds in milliseconds
+      const minimumDuration = 300; // 2 seconds in milliseconds
       const delay = Math.max(minimumDuration - duration, 0);
 
       setTimeout(() => {
@@ -37,7 +37,7 @@ export default function FormulaOneTable() {
         <FontAwesomeIcon className='animate-spin text-6xl text-blue-500' icon={faSpinner} />
       ) : (
         <div className='bg-gradient-to-r from-cyan-600 to-blue-500 p-5 rounded-lg shadow-2xl border-2 border-black'>
-          <table className={'text-white w-[290px] md:w-[400px] font-light text-sm'}>
+          <table className={'text-white w-[290px] md:w-[500px] font-light text-sm'}>
             <thead>
               <tr className='border-b-2 border-white'>
                 <th className='font-medium w-1/4 py-2 border-r-2 border-white'>Player</th>

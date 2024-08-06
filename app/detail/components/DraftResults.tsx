@@ -58,7 +58,7 @@ export default function AllGameWeekResults() {
   return (
     <div className='flex flex-col justify-center items-center'>
       <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up'>
-        All Game Week Results
+        Head-to-Head Results
       </h1>
       {/* Navigation Buttons */}
       <div className='flex justify-between mt-4 gap-x-5 pb-10'>
@@ -108,7 +108,7 @@ export default function AllGameWeekResults() {
           return (
             <div key={eventKey} className='mb-6'>
               <h2 className='text-white text-lg pb-3 font-medium'>{`GW ${eventKey} Results`}</h2>
-              <table className='text-white w-full font-light text-sm'>
+              <table className='text-white font-light w-[290px] md:w-full text-sm'>
                 <thead>
                   <tr className='border-b-2 border-white'>
                     <th className='font-medium py-2'>Home</th>

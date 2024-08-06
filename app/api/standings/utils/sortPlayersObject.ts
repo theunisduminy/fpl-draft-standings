@@ -1,5 +1,5 @@
-import { StandingsData } from '../../../../interfaces/standings';
-import { PlayerDetails } from '../../../../interfaces/players';
+import { StandingsData } from '@/interfaces/standings';
+import { PlayerDetails } from '@/interfaces/players';
 import { rankingPlayer } from './rankingPlayer';
 
 export function sortPlayersObject(

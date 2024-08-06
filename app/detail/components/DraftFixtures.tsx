@@ -42,10 +42,8 @@ export default function DraftFixtures() {
 
   return (
     <div className='flex flex-col justify-center items-center'>
-      <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up'>
-        Upcoming Fixtures
-      </h1>
-      <div className='w-full sm:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
+      <h1 className='text-[#310639] text-2xl pb-5 font-semibold'>Upcoming Fixtures</h1>
+      <div className='w-full md:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
         {visibleEvents.map((eventKey) => {
           const currentMatches = matchesByEvent[eventKey];
           const formattedMatches = currentMatches.map((match) => {
@@ -66,7 +64,7 @@ export default function DraftFixtures() {
           return (
             <div key={eventKey} className='mb-6'>
               <h2 className='text-white text-lg pb-3 font-medium'>{`GW ${eventKey} Fixtures`}</h2>
-              <table className='text-white w-full font-light text-sm'>
+              <table className='text-white w-[290px] md:w-full font-light text-sm'>
                 <thead>
                   <tr className='border-b-2 border-white'>
                     <th className='font-medium py-2'>Home</th>

@@ -22,7 +22,7 @@ export function calculateCustomStandings(
   const events = Array.from(new Set(matches.map((match) => match.event)));
 
   // Define points for ranks 1 to 8
-  const rankPoints = [20, 15, 12, 10, 8, 6, 4, 0];
+  const rankPoints = [20, 15, 12, 10, 8, 6, 4, 2];
 
   events.forEach((event) => {
     const eventMatches = matches.filter((match) => match.event === event);
@@ -30,11 +30,11 @@ export function calculateCustomStandings(
 
     eventMatches.forEach((match) => {
       if (match.league_entry_1_points > match.league_entry_2_points) {
-        playerMap[match.league_entry_1].win_points += 10;
+        playerMap[match.league_entry_1].win_points += 0;
         playerMap[match.league_entry_1].total_wins += 1;
         playerMap[match.league_entry_2].total_losses += 1;
       } else if (match.league_entry_1_points < match.league_entry_2_points) {
-        playerMap[match.league_entry_2].win_points += 10;
+        playerMap[match.league_entry_2].win_points += 0;
         playerMap[match.league_entry_2].total_wins += 1;
         playerMap[match.league_entry_1].total_losses += 1;
       } else {

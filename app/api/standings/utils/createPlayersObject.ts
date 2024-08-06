@@ -1,4 +1,4 @@
-import { Player, PlayerDetails } from '../../../../interfaces/players';
+import { Player, PlayerDetails } from '@/interfaces/players';
 
 export function createPlayersObject(players: Player[]): PlayerDetails[] {
   return players.map((player) => ({
@@ -12,7 +12,7 @@ export function createPlayersObject(players: Player[]): PlayerDetails[] {
     points_against: 0,
     head_to_head_total: 0,
     total_points_rank: 0,
-    f1_score: 0, // Initialize with 0
+    f1_score: 0,
     f1_ranking: 0,
     total_wins: 0,
     total_losses: 0,

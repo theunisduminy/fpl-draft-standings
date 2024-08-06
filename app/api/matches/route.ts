@@ -20,7 +20,6 @@ async function fetchData(): Promise<{ matches: Match[] }> {
 export const GET = async (req: Request, res: Response) => {
   try {
     const { matches } = await fetchData();
-
     return NextResponse.json(matches);
   } catch (error) {
     return NextResponse.json({ message: error }, { status: 500 });
