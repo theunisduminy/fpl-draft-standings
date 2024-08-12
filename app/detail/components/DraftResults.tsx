@@ -1,11 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { PlayerDetails, Matches } from '@/interfaces/players';
+import { PlayerDetails } from '@/interfaces/players';
+import { Match } from '@/interfaces/match';
 import apiHelper from '@/utils/apiHelper';
 
 export default function AllGameWeekResults() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
-  const [matches, setMatches] = useState<Matches[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
   const [currentPosition, setCurrentPosition] = useState(0); // Track the current position in the list of game weeks
   const resultsPerPage = 5; // Number of game weeks to show per page
 
@@ -30,7 +31,7 @@ export default function AllGameWeekResults() {
     }
     acc[match.event].push(match);
     return acc;
-  }, {} as Record<number, Matches[]>);
+  }, {} as Record<number, Match[]>);
 
   // Sort Game Week numbers in descending order
   const sortedEventKeys = Object.keys(matchesByEvent)
@@ -57,7 +58,7 @@ export default function AllGameWeekResults() {
   return (
     <div className='flex flex-col justify-center items-center'>
       <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up'>
-        All Game Week Results
+        Head-to-Head Results
       </h1>
       {/* Navigation Buttons */}
       <div className='flex justify-between mt-4 gap-x-5 pb-10'>
@@ -107,7 +108,7 @@ export default function AllGameWeekResults() {
           return (
             <div key={eventKey} className='mb-6'>
               <h2 className='text-white text-lg pb-3 font-medium'>{`GW ${eventKey} Results`}</h2>
-              <table className='text-white w-full font-light text-sm'>
+              <table className='text-white font-light w-[290px] md:w-full text-sm'>
                 <thead>
                   <tr className='border-b-2 border-white'>
                     <th className='font-medium py-2'>Home</th>

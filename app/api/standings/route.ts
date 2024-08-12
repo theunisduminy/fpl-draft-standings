@@ -1,87 +1,36 @@
 import { NextResponse } from 'next/server';
-import { Player, StandingsData, PlayerDetails } from '@/interfaces/players';
-
-async function fetchData(): Promise<{ league_entries: Player[]; standings: StandingsData[] }> {
-  try {
-    const res = await fetch('https://draft.premierleague.com/api/league/5525/details');
-    // const res = await fetch('https://draft.premierleague.com/api/league/75278/details');
-    return await res.json();
-  } catch (err) {
-    console.error(err);
-    throw err;
-  }
-}
-
-function createPlayersObject(players: Player[]): PlayerDetails[] {
-  return players.map((player) => ({
-    player_name: player.player_first_name,
-    player_surname: player.player_last_name,
-    id: player.id,
-    team_name: player.entry_name,
-  }));
-}
-
-function sortPlayersObject(
-  standingsData: StandingsData[],
-  playerDetails: PlayerDetails[],
-): PlayerDetails[] {
-  const playerMap: { [id: number]: PlayerDetails } = {};
-
-  playerDetails.forEach((player) => {
-    playerMap[player.id] = player;
-  });
-
-  standingsData.forEach((rank) => {
-    const thePlayer = playerMap[rank.league_entry];
-    if (thePlayer) {
-      thePlayer.head_to_head_rank = standingsData
-        .filter((s) => s.total === rank.total)
-        .sort((a, b) => b.rank - a.rank)[0].rank_sort;
-      thePlayer.head_to_head_points = rank.total;
-      thePlayer.total_points = rank.points_for;
-      thePlayer.points_against = rank.points_against;
-      thePlayer.head_to_head_total = rank.total;
-    } else {
-      throw new Error('Player not found');
-    }
-  });
-
-  return rankingPlayer(playerDetails);
-}
-
-function rankingPlayer(playerData: PlayerDetails[]): PlayerDetails[] {
-  playerData.sort(
-    (a: Record<string, any>, b: Record<string, any>) => a.head_to_head_rank - b.head_to_head_rank,
-  );
-
-  playerData.forEach((player: Record<string, any>, index) => {
-    player.head_to_head_score = 8 - player.head_to_head_rank;
-  });
-
-  playerData.sort(
-    (a: Record<string, any>, b: Record<string, any>) => b.total_points - a.total_points,
-  );
-
-  playerData.forEach((player: Record<string, any>, index) => {
-    player.total_points_rank = index + 1;
-    player.total_points_score = 8 - player.total_points_rank + (9 - player.total_points_rank) / 10;
-    player.combined_score = player.head_to_head_score + player.total_points_score;
-  });
-
-  playerData.sort(
-    (a: Record<string, any>, b: Record<string, any>) => b.combined_score - a.combined_score,
-  );
-
-  return playerData;
-}
+import { fetchData } from './utils/fetchData';
+import { createPlayersObject } from './utils/createPlayersObject';
+import { calculateCustomStandings } from './utils/calculateCustomStandings';
+import { calculatePositions } from './utils/calculatePosition';
+import { sortPlayersObject } from './utils/sortPlayersObject';
 
 export const GET = async (req: Request, res: Response) => {
   try {
-    const { league_entries, standings } = await fetchData();
+    const { matches, league_entries, standings } = await fetchData();
+
+    // Create player objects
     const playerDetails = createPlayersObject(league_entries);
-    const rankedPlayers = sortPlayersObject(standings, playerDetails);
-    const trimmedPlayerRankings = rankedPlayers.slice(0, 8);
-    return NextResponse.json(trimmedPlayerRankings);
+
+    // Calculate position placements
+    calculatePositions(matches, playerDetails);
+
+    // Calculate custom standings
+    const customStandings = calculateCustomStandings(matches, playerDetails);
+
+    // Sort players based on standings and custom calculations
+    const rankedPlayers = sortPlayersObject(standings, customStandings);
+
+    // Sort by F1 score and assign F1 ranking
+    rankedPlayers.sort((a, b) => (b.f1_score || 0) - (a.f1_score || 0)); // Ensure sorting comparison with defaults
+    rankedPlayers.forEach((player, index) => {
+      player.f1_ranking = index + 1;
+    });
+
+    // Return the F1 standings with the top 8 players
+    const topPlayers = rankedPlayers.slice(0, 8);
+
+    return NextResponse.json(topPlayers);
   } catch (error) {
     return NextResponse.json({ message: error }, { status: 500 });
   }

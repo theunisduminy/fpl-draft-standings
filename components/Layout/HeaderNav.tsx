@@ -23,7 +23,7 @@ export default function HeaderNav() {
                 alt='draft standings logo'
               />
             </Link>
-            <div className='ml-10 hidden space-x-8 lg:block'>
+            <div className='ml-10 hidden space-x-6 lg:block'>
               {navigation.map((link) => (
                 <a
                   target={link.target}
@@ -36,28 +36,14 @@ export default function HeaderNav() {
               ))}
             </div>
           </div>
-          {/* <div className='ml-10 space-x-4'>
-            <a
-              href='#'
-              className='inline-block rounded-md border border-transparent bg-indigo-500 px-4 py-2 text-base font-medium text-white hover:bg-opacity-75'
-            >
-              Sign in
-            </a>
-            <a
-              href='#'
-              className='inline-block rounded-md border border-transparent bg-white px-4 py-2 text-base font-medium text-indigo-600 hover:bg-indigo-50'
-            >
-              Sign up
-            </a>
-          </div> */}
         </div>
-        <div className='flex flex-wrap justify-center gap-x-6 py-4 sticky top-0 z-20  lg:hidden'>
+        <div className='flex flex-wrap justify-center gap-x-2 py-4 sticky top-0 z-20  lg:hidden'>
           {navigation.map((link) => (
             <a
               target={link.target}
               key={link.name}
               href={link.href}
-              className='text-md font-medium text-premPurple hover:text-indigo-50 hover:bg-premPurple border-2 border-premPurple px-4 py-2 rounded-2xl'
+              className='text-sm font-medium text-premPurple hover:text-indigo-50 hover:bg-premPurple border-2 border-premPurple px-4 py-2 rounded-2xl'
             >
               {link.name}
             </a>

@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server';
+import { Player } from '@/interfaces/players';
 import { Match } from '@/interfaces/match';
+import { StandingsData } from '@/interfaces/standings';
 import standing from '@/data/league-details.json';
 
-async function fetchData(): Promise<{ matches: Match[] }> {
+export async function fetchData(): Promise<{
+  matches: Match[];
+  league_entries: Player[];
+  standings: StandingsData[];
+}> {
   try {
     if (process.env.NODE_ENV === 'development') {
       const res = standing;
@@ -16,12 +21,3 @@ async function fetchData(): Promise<{ matches: Match[] }> {
     throw err;
   }
 }
-
-export const GET = async (req: Request, res: Response) => {
-  try {
-    const { matches } = await fetchData();
-    return NextResponse.json(matches);
-  } catch (error) {
-    return NextResponse.json({ message: error }, { status: 500 });
-  }
-};

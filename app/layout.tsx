@@ -6,8 +6,8 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // Components and Style
 import '../styles/globals.css';
-import Footer from '../components/Footer';
-import HeaderNav from '../components/HeaderNav';
+import Footer from '@/components/Layout/Footer';
+import HeaderNav from '@/components/Layout/HeaderNav';
 import { bgGradient } from '@/utils/tailwindVars';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import { config } from '@fortawesome/fontawesome-svg-core';

@@ -1,21 +1,23 @@
 'use client';
 import { useState } from 'react';
-import DraftFixtures from '@/components/DraftFixtures';
+import DraftCurrentFixtures from './components/DraftCurrentFixtures';
 import ViewButton from '@/components/ViewButtons';
-import DraftResults from '@/components/DraftResults';
+import DraftResults from '@/app/detail/components/DraftResults';
+import DraftFixtures from '@/app/detail/components/DraftFixtures';
+import Layout from '@/components/Layout/PageLayout';
 
 export default function DetailView() {
-  const [activeTableMatches, setActiveTableMatches] = useState('fixtures');
+  const [activeTableMatches, setActiveTableMatches] = useState('currentFixtures');
 
   return (
-    <main className={`justify-start py-10 md:py-20`}>
+    <Layout>
       <h1 className='text-[#310639] text-4xl pb-5 font-semibold animate-fade-up text-center'>
         Matches
       </h1>
-      <div className='md:grid-cols-3 grid grid-cols-2 gap-4 pb-10'>
+      <div className='grid grid-cols-2 gap-4 pb-10'>
         <ViewButton
-          isActive={activeTableMatches === 'fixtures'}
-          onClick={() => setActiveTableMatches('fixtures')}
+          isActive={activeTableMatches === 'currentFixtures'}
+          onClick={() => setActiveTableMatches('currentFixtures')}
         >
           GW Live
         </ViewButton>
@@ -23,11 +25,20 @@ export default function DetailView() {
           isActive={activeTableMatches === 'results'}
           onClick={() => setActiveTableMatches('results')}
         >
-          Results
+          H2H Results
+        </ViewButton>
+        <ViewButton
+          isActive={activeTableMatches === 'fixtures'}
+          onClick={() => setActiveTableMatches('fixtures')}
+        >
+          H2H Fixtures
         </ViewButton>
       </div>
-      <div className='mt-4'>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
+      <div className='mt-4'>
+        {activeTableMatches === 'currentFixtures' && <DraftCurrentFixtures />}
+      </div>
       <div className='mt-4'>{activeTableMatches === 'results' && <DraftResults />}</div>
-    </main>
+      <div className='mt-4'>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
+    </Layout>
   );
 }
