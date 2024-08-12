@@ -23,7 +23,7 @@ export function calculatePositions(matches: Match[], players: PlayerDetails[]): 
   const events = Array.from(new Set(matches.map((match) => match.event)));
   events.forEach((event) => {
     // Gather all matches for the current event
-    const eventMatches = matches.filter((m) => m.event === event);
+    const eventMatches = matches.filter((m) => m.event === event && m.finished);
 
     // Combine and sort players by points within the event
     const sortedPlayers = eventMatches
