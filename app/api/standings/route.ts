@@ -7,6 +7,10 @@ import { sortPlayersObject } from './utils/sortPlayersObject';
 
 export const GET = async (req: Request, res: Response) => {
   try {
+    const data = await fetchData();
+
+    console.log(data);
+
     const { matches, league_entries, standings } = await fetchData();
 
     // Create player objects
