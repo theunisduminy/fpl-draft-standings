@@ -43,7 +43,7 @@ export default function DraftCurrentFixtures() {
 
   return (
     <div className='flex flex-col justify-center items-center'>
-      <h1 className='text-[#310639] text-2xl pb-5 font-semibold'>{`GW ${currentGW || ''} Live`}</h1>
+      <h1 className='text-[#310639] text-2xl pb-5 font-semibold'>{`GW ${currentGW || ''} LIVE`}</h1>
       <div className='w-[337px] sm:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
         <table className={'text-white w-[280px] sm:w-[400px] font-light text-sm'}>
           <thead>
@@ -55,7 +55,7 @@ export default function DraftCurrentFixtures() {
           </thead>
           <tbody>
             {formattedCurrentMatches.map((match: any, index: number) => (
-              <tr key={index}>
+              <tr key={index} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
                 <td className='py-2'>{`${match.home_player_name} (${match.home_player_points})`}</td>
                 <td className='py-2'>vs.</td>
                 <td className='py-2'>{`${match.away_player_name} (${match.away_player_points})`}</td>

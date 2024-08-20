@@ -118,7 +118,7 @@ export default function AllGameWeekResults() {
                 </thead>
                 <tbody>
                   {formattedMatches.map((match, index) => (
-                    <tr key={index}>
+                    <tr key={index} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
                       <td
                         className={`py-2 ${match.home_wins ? 'font-bold' : ''}`}
                       >{`${match.home_player_name} (${match.home_player_points})`}</td>

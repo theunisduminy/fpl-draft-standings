@@ -4,7 +4,7 @@
 
 // async function fetchData(): Promise<{ league_entries: Player[]; standings: StandingsData[] }> {
 //   try {
-//     if (process.env.NODE_ENV === 'development') {
+//     if (process.env.NODE_ENV !== 'development') {
 //       const res = standing;
 //       return await res;
 //     } else {
