@@ -9,7 +9,11 @@ export async function fetchData(): Promise<{
   standings: StandingsData[];
 }> {
   try {
-    const res = await fetch('https://draft.premierleague.com/api/league/5525/details');
+    const res = await fetch('https://draft.premierleague.com/api/league/5525/details', {
+      next: {
+        revalidate: 3600, // 1 hour
+      },
+    });
     return await res.json();
   } catch (err) {
     console.error(err);

@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 
 async function fetchData() {
   try {
-    const res = await fetch('https://fantasy.premierleague.com/api/fixtures');
+    const res = await fetch('https://fantasy.premierleague.com/api/fixtures', {
+      next: {
+        revalidate: 3600, // 1 hour
+      },
+    });
     return await res.json();
   } catch (err) {
     console.error(err);
