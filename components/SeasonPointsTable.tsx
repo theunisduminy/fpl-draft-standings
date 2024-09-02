@@ -1,29 +1,21 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
-import apiHelper from '@/utils/apiHelper';
+import { fetchWithDelay } from '@/utils/fetchWithDelay';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 export default function SeasonPointsTable() {
-  const [standings, setStandings] = useState([]);
+  const [standings, setStandings] = useState<PlayerDetails[]>([]); // Define type for standings
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchStandings() {
-      const start = Date.now(); // Record the start time
-      const standingsData = await apiHelper('standings');
-      const duration = Date.now() - start; // Calculate the duration taken by the API call
-
-      // Ensure the operation takes at least 2 seconds
-      const minimumDuration = 300; // 2 seconds in milliseconds
-      const delay = Math.max(minimumDuration - duration, 0);
-
-      setTimeout(() => {
-        setStandings(standingsData);
-        setLoading(false); // Data received, set loading to false
-      }, delay);
+      const response = (await fetchWithDelay(['standings'])) as [PlayerDetails[]];
+      const standingsData = response[0];
+      setStandings(standingsData);
+      setLoading(false); // Data received, set loading to false
     }
 
     fetchStandings();

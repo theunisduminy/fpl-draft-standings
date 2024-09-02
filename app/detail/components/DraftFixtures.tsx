@@ -2,19 +2,26 @@
 import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
 import { Match } from '@/interfaces/match';
-import apiHelper from '@/utils/apiHelper';
+import { fetchWithDelay } from '@/utils/fetchWithDelay';
+
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 export default function DraftFixtures() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true); // Add loading state
   const fixturesToShow = 8; // Number of upcoming fixtures to show
 
   useEffect(() => {
     async function fetchData() {
-      const standingsData = await apiHelper('standings');
-      const matchesData = await apiHelper('matches');
+      const [standingsData, matchesData] = (await fetchWithDelay(['standings', 'matches'])) as [
+        PlayerDetails[],
+        Match[],
+      ];
       setStandings(standingsData);
       setMatches(matchesData);
+      setLoading(false); // Data received, set loading to false
     }
 
     fetchData();
@@ -43,49 +50,53 @@ export default function DraftFixtures() {
   return (
     <div className='flex flex-col justify-center items-center'>
       <h1 className='text-[#310639] text-2xl pb-5 font-semibold'>Upcoming Fixtures</h1>
-      <div className='w-full md:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
-        {visibleEvents.map((eventKey) => {
-          const currentMatches = matchesByEvent[eventKey];
-          const formattedMatches = currentMatches.map((match) => {
-            const homePlayer = standings.find(
-              (player: PlayerDetails) => player.id === match.league_entry_1,
-            );
-            const awayPlayer = standings.find(
-              (player: PlayerDetails) => player.id === match.league_entry_2,
-            );
+      {loading ? (
+        <FontAwesomeIcon className='animate-spin text-6xl text-blue-500' icon={faSpinner} />
+      ) : (
+        <div className='w-full md:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
+          {visibleEvents.map((eventKey) => {
+            const currentMatches = matchesByEvent[eventKey];
+            const formattedMatches = currentMatches.map((match) => {
+              const homePlayer = standings.find(
+                (player: PlayerDetails) => player.id === match.league_entry_1,
+              );
+              const awayPlayer = standings.find(
+                (player: PlayerDetails) => player.id === match.league_entry_2,
+              );
 
-            return {
-              home_player_name: homePlayer ? `${homePlayer.player_name}` : 'Unknown',
-              away_player_name: awayPlayer ? `${awayPlayer.player_name}` : 'Unknown',
-              event: match.event,
-            };
-          });
+              return {
+                home_player_name: homePlayer ? `${homePlayer.player_name}` : 'Unknown',
+                away_player_name: awayPlayer ? `${awayPlayer.player_name}` : 'Unknown',
+                event: match.event,
+              };
+            });
 
-          return (
-            <div key={eventKey} className='mb-6'>
-              <h2 className='text-white text-lg pb-3 font-medium'>{`GW ${eventKey} Fixtures`}</h2>
-              <table className='text-white w-[290px] md:w-full font-light text-sm'>
-                <thead>
-                  <tr className='border-b-2 border-white'>
-                    <th className='font-medium py-2'>Home</th>
-                    <th></th>
-                    <th className='font-medium py-2'>Away</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formattedMatches.map((match, index) => (
-                    <tr key={index} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
-                      <td className='py-2'>{`${match.home_player_name}`}</td>
-                      <td className='py-2'>vs.</td>
-                      <td className='py-2'>{`${match.away_player_name}`}</td>
+            return (
+              <div key={eventKey} className='mb-20'>
+                <h2 className='text-white text-lg pb-3 font-medium'>{`GW ${eventKey} Fixtures`}</h2>
+                <table className='text-white w-[290px] md:w-full font-light text-sm'>
+                  <thead>
+                    <tr className='border-b-2 border-white'>
+                      <th className='font-medium py-2'>Home</th>
+                      <th></th>
+                      <th className='font-medium py-2'>Away</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        })}
-      </div>
+                  </thead>
+                  <tbody>
+                    {formattedMatches.map((match, index) => (
+                      <tr key={index} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
+                        <td className='py-4'>{`${match.home_player_name}`}</td>
+                        <td className='py-4'>vs.</td>
+                        <td className='py-4'>{`${match.away_player_name}`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
