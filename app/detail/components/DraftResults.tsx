@@ -3,8 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
 import { Match } from '@/interfaces/match';
 import { fetchWithDelay } from '@/utils/fetchWithDelay';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { SkeletonCard } from '@/components/SkeletonTable';
 
 export default function AllGameWeekResults() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
@@ -15,10 +14,10 @@ export default function AllGameWeekResults() {
 
   useEffect(() => {
     async function fetchData() {
-      const [standingsData, matchesData] = (await fetchWithDelay(['standings', 'matches'])) as [
-        PlayerDetails[],
-        Match[],
-      ];
+      const [standingsData, matchesData] = (await fetchWithDelay([
+        'standings',
+        'matches',
+      ])) as [PlayerDetails[], Match[]];
       setStandings(standingsData);
       setMatches(matchesData);
       setLoading(false); // Data received, set loading to false
@@ -31,13 +30,16 @@ export default function AllGameWeekResults() {
   const finishedMatches = matches.filter((match) => match.finished);
 
   // Group finished matches by event (Game Week)
-  const matchesByEvent = finishedMatches.reduce((acc, match) => {
-    if (!acc[match.event]) {
-      acc[match.event] = [];
-    }
-    acc[match.event].push(match);
-    return acc;
-  }, {} as Record<number, Match[]>);
+  const matchesByEvent = finishedMatches.reduce(
+    (acc, match) => {
+      if (!acc[match.event]) {
+        acc[match.event] = [];
+      }
+      acc[match.event].push(match);
+      return acc;
+    },
+    {} as Record<number, Match[]>,
+  );
 
   // Sort Game Week numbers in descending order
   const sortedEventKeys = Object.keys(matchesByEvent)
@@ -46,50 +48,39 @@ export default function AllGameWeekResults() {
 
   // Determine the range of events to display based on the current position
   const startIndex = currentPosition;
-  const endIndex = Math.min(startIndex + resultsPerPage, sortedEventKeys.length);
+  const endIndex = Math.min(
+    startIndex + resultsPerPage,
+    sortedEventKeys.length,
+  );
   const visibleEvents = sortedEventKeys.slice(startIndex, endIndex);
 
   // Function to handle the "See Older" button click
   const handleSeeOlder = () => {
     setCurrentPosition((prevPosition) =>
-      Math.min(prevPosition + resultsPerPage, sortedEventKeys.length - resultsPerPage),
+      Math.min(
+        prevPosition + resultsPerPage,
+        sortedEventKeys.length - resultsPerPage,
+      ),
     );
   };
 
   // Function to handle the "See Newer" button click
   const handleSeeNewer = () => {
-    setCurrentPosition((prevPosition) => Math.max(prevPosition - resultsPerPage, 0));
+    setCurrentPosition((prevPosition) =>
+      Math.max(prevPosition - resultsPerPage, 0),
+    );
   };
 
   return (
-    <div className='flex flex-col justify-center items-center'>
-      <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up'>
+    <div className='flex flex-col'>
+      <h1 className='pb-5 text-2xl font-semibold text-[#310639]'>
         Head-to-Head Results
       </h1>
       {loading ? (
-        <FontAwesomeIcon className='animate-spin text-6xl text-blue-500' icon={faSpinner} />
+        <SkeletonCard />
       ) : (
         <>
-          {/* Navigation Buttons */}
-          <div className='flex justify-between mt-4 gap-x-5 pb-10'>
-            {currentPosition > 0 && (
-              <button
-                onClick={handleSeeNewer}
-                className='px-7 py-3 border-2 rounded-lg text-sm shadow-2xl min-w-[9rem] border-premPurple duration-500 bg-gradient-to-r to-premTurquoise from-premGreen'
-              >
-                See Newer
-              </button>
-            )}
-            {endIndex < sortedEventKeys.length && (
-              <button
-                onClick={handleSeeOlder}
-                className='px-7 py-3 border-2 rounded-lg text-sm shadow-2xl min-w-[9rem] border-premPurple duration-500 bg-gradient-to-r to-premTurquoise from-premGreen'
-              >
-                See Older
-              </button>
-            )}
-          </div>
-          <div className='w-full sm:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
+          <div className='w-full rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-8 shadow-2xl sm:w-[450px]'>
             {visibleEvents.map((eventKey) => {
               const currentMatches = matchesByEvent[eventKey];
               const formattedMatches = currentMatches.map((match) => {
@@ -105,8 +96,12 @@ export default function AllGameWeekResults() {
                 const awayPoints = match.league_entry_2_points ?? 0;
 
                 return {
-                  home_player_name: homePlayer ? `${homePlayer.player_name}` : 'Unknown',
-                  away_player_name: awayPlayer ? `${awayPlayer.player_name}` : 'Unknown',
+                  home_player_name: homePlayer
+                    ? `${homePlayer.player_name}`
+                    : 'Unknown',
+                  away_player_name: awayPlayer
+                    ? `${awayPlayer.player_name}`
+                    : 'Unknown',
                   home_player_points: match.league_entry_1_points,
                   away_player_points: match.league_entry_2_points,
                   event: match.event,
@@ -117,18 +112,21 @@ export default function AllGameWeekResults() {
 
               return (
                 <div key={eventKey} className='mb-20'>
-                  <h2 className='text-white text-lg pb-3 font-medium'>{`GW ${eventKey} Results`}</h2>
-                  <table className='text-white font-light w-[300px] md:w-full text-sm'>
+                  <h2 className='pb-3 text-lg font-medium text-white'>{`GW ${eventKey} Results`}</h2>
+                  <table className='w-[300px] text-sm font-light text-white md:w-full'>
                     <thead>
                       <tr className='border-b-2 border-white'>
-                        <th className='font-medium py-2'>Home</th>
+                        <th className='py-2 font-medium'>Home</th>
                         <th></th>
-                        <th className='font-medium py-2'>Away</th>
+                        <th className='py-2 font-medium'>Away</th>
                       </tr>
                     </thead>
                     <tbody>
                       {formattedMatches.map((match, index) => (
-                        <tr key={index} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
+                        <tr
+                          key={index}
+                          className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                        >
                           <td
                             className={`py-4 ${match.home_wins ? 'font-bold' : ''}`}
                           >{`${match.home_player_name} (${match.home_player_points})`}</td>
@@ -145,11 +143,11 @@ export default function AllGameWeekResults() {
             })}
           </div>
           {/* Navigation Buttons */}
-          <div className='flex justify-between mt-4 gap-x-5 pt-10'>
+          <div className='mt-4 flex justify-between gap-x-5 pt-10'>
             {currentPosition > 0 && (
               <button
                 onClick={handleSeeNewer}
-                className='px-7 py-3 border-2 rounded-lg text-sm shadow-2xl min-w-[9rem] border-premPurple duration-500 bg-gradient-to-r to-premTurquoise from-premGreen'
+                className='min-w-[9rem] rounded-lg border-2 border-premPurple bg-gradient-to-r from-premGreen to-premTurquoise px-7 py-3 text-sm shadow-2xl duration-500'
               >
                 See Newer
               </button>
@@ -157,7 +155,7 @@ export default function AllGameWeekResults() {
             {endIndex < sortedEventKeys.length && (
               <button
                 onClick={handleSeeOlder}
-                className='px-7 py-3 border-2 rounded-lg text-sm shadow-2xl min-w-[9rem] border-premPurple duration-500 bg-gradient-to-r to-premTurquoise from-premGreen'
+                className='min-w-[9rem] rounded-lg border-2 border-premPurple bg-gradient-to-r from-premGreen to-premTurquoise px-7 py-3 text-sm shadow-2xl duration-500'
               >
                 See Older
               </button>

@@ -25,7 +25,9 @@ export function calculateCustomStandings(
   const rankPoints = [20, 15, 12, 10, 8, 6, 4, 2];
 
   events.forEach((event) => {
-    const eventMatches = matches.filter((match) => match.event === event && match.finished);
+    const eventMatches = matches.filter(
+      (match) => match.event === event && match.finished,
+    );
     const points: [number, number][] = [];
 
     eventMatches.forEach((match) => {

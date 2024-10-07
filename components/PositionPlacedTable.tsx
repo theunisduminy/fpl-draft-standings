@@ -2,9 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
 import { fetchWithDelay } from '@/utils/fetchWithDelay';
-
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { SkeletonCard } from './SkeletonTable';
 
 export default function PositionPlacedTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
@@ -12,7 +10,9 @@ export default function PositionPlacedTable() {
 
   useEffect(() => {
     async function fetchStandings() {
-      const [standingsData] = (await fetchWithDelay(['standings'])) as [PlayerDetails[]];
+      const [standingsData] = (await fetchWithDelay(['standings'])) as [
+        PlayerDetails[],
+      ];
       setStandings(standingsData);
       setLoading(false); // Data received, set loading to false
     }
@@ -21,35 +21,42 @@ export default function PositionPlacedTable() {
   }, []);
 
   return (
-    <div className='flex flex-col justify-center items-center'>
-      <h1 className='text-[#310639] text-2xl pb-5 font-semibold animate-fade-up text-center'>
+    <div className='flex flex-col'>
+      <h1 className='pb-5 text-2xl font-semibold text-[#310639]'>
         Position Placed <br />
         <span className='text-sm md:hidden'>(scroll right)</span>
       </h1>
 
       {loading ? (
-        <FontAwesomeIcon className='animate-spin text-6xl text-blue-500' icon={faSpinner} />
+        <SkeletonCard />
       ) : (
-        <div className='mb-8 bg-gradient-to-r from-cyan-600 to-blue-500 p-5 rounded-lg shadow-2xl border-2 border-black'>
-          <div className='w-[290px] md:w-[600px] overflow-x-auto'>
-            <table className='text-white table-fixed min-w-[600px]'>
+        <div className='mb-8 rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-5 shadow-2xl'>
+          <div className='w-[290px] overflow-x-auto md:w-[600px]'>
+            <table className='min-w-[600px] table-fixed text-white'>
               <thead>
                 <tr>
-                  <th className='py-2 w-1/6 font-medium border-r-2 border-white'>Player</th>
-                  <th className='py-2 w-auto  font-medium'>1st</th>
-                  <th className='py-2 w-auto  font-medium'>2nd</th>
-                  <th className='py-2 w-auto  font-medium'>3rd</th>
-                  <th className='py-2 w-auto  font-medium'>4th</th>
-                  <th className='py-2 w-auto  font-medium'>5th</th>
-                  <th className='py-2 w-auto  font-medium'>6th</th>
-                  <th className='py-2 w-auto  font-medium'>7th</th>
-                  <th className='py-2 w-auto  font-medium'>8th</th>
+                  <th className='w-1/6 border-r-2 border-white py-2 font-medium'>
+                    Player
+                  </th>
+                  <th className='w-auto py-2 font-medium'>1st</th>
+                  <th className='w-auto py-2 font-medium'>2nd</th>
+                  <th className='w-auto py-2 font-medium'>3rd</th>
+                  <th className='w-auto py-2 font-medium'>4th</th>
+                  <th className='w-auto py-2 font-medium'>5th</th>
+                  <th className='w-auto py-2 font-medium'>6th</th>
+                  <th className='w-auto py-2 font-medium'>7th</th>
+                  <th className='w-auto py-2 font-medium'>8th</th>
                 </tr>
               </thead>
               <tbody>
                 {standings.map((player: PlayerDetails, index) => (
-                  <tr key={player.id} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
-                    <td className='py-4 border-r-2 border-white'>{player.player_name}</td>
+                  <tr
+                    key={player.id}
+                    className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                  >
+                    <td className='border-r-2 border-white py-4'>
+                      {player.player_name}
+                    </td>
                     <td className='py-4'>{player.position_placed.first}</td>
                     <td className='py-4'>{player.position_placed.second}</td>
                     <td className='py-4'>{player.position_placed.third}</td>

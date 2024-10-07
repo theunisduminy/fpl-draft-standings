@@ -3,9 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
 import { Match } from '@/interfaces/match';
 import { fetchWithDelay } from '@/utils/fetchWithDelay';
-
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { SkeletonCard } from '@/components/SkeletonTable';
 
 export default function DraftFixtures() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
@@ -15,10 +13,10 @@ export default function DraftFixtures() {
 
   useEffect(() => {
     async function fetchData() {
-      const [standingsData, matchesData] = (await fetchWithDelay(['standings', 'matches'])) as [
-        PlayerDetails[],
-        Match[],
-      ];
+      const [standingsData, matchesData] = (await fetchWithDelay([
+        'standings',
+        'matches',
+      ])) as [PlayerDetails[], Match[]];
       setStandings(standingsData);
       setMatches(matchesData);
       setLoading(false); // Data received, set loading to false
@@ -31,13 +29,16 @@ export default function DraftFixtures() {
   const upcomingMatches = matches.filter((match) => !match.finished);
 
   // Group upcoming matches by event (Game Week)
-  const matchesByEvent = upcomingMatches.reduce((acc, match) => {
-    if (!acc[match.event]) {
-      acc[match.event] = [];
-    }
-    acc[match.event].push(match);
-    return acc;
-  }, {} as Record<number, Match[]>);
+  const matchesByEvent = upcomingMatches.reduce(
+    (acc, match) => {
+      if (!acc[match.event]) {
+        acc[match.event] = [];
+      }
+      acc[match.event].push(match);
+      return acc;
+    },
+    {} as Record<number, Match[]>,
+  );
 
   // Sort Game Week numbers in ascending order for future events
   const sortedEventKeys = Object.keys(matchesByEvent)
@@ -48,12 +49,14 @@ export default function DraftFixtures() {
   const visibleEvents = sortedEventKeys.slice(0, fixturesToShow);
 
   return (
-    <div className='flex flex-col justify-center items-center'>
-      <h1 className='text-[#310639] text-2xl pb-5 font-semibold'>Upcoming Fixtures</h1>
+    <div className='flex flex-col'>
+      <h1 className='pb-5 text-2xl font-semibold text-[#310639]'>
+        Upcoming Fixtures
+      </h1>
       {loading ? (
-        <FontAwesomeIcon className='animate-spin text-6xl text-blue-500' icon={faSpinner} />
+        <SkeletonCard />
       ) : (
-        <div className='w-full md:w-[450px] bg-gradient-to-r from-cyan-600 to-blue-500 p-8 rounded-lg shadow-2xl border-2 border-black'>
+        <div className='w-full rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-8 shadow-2xl md:w-[450px]'>
           {visibleEvents.map((eventKey) => {
             const currentMatches = matchesByEvent[eventKey];
             const formattedMatches = currentMatches.map((match) => {
@@ -65,26 +68,33 @@ export default function DraftFixtures() {
               );
 
               return {
-                home_player_name: homePlayer ? `${homePlayer.player_name}` : 'Unknown',
-                away_player_name: awayPlayer ? `${awayPlayer.player_name}` : 'Unknown',
+                home_player_name: homePlayer
+                  ? `${homePlayer.player_name}`
+                  : 'Unknown',
+                away_player_name: awayPlayer
+                  ? `${awayPlayer.player_name}`
+                  : 'Unknown',
                 event: match.event,
               };
             });
 
             return (
               <div key={eventKey} className='mb-20'>
-                <h2 className='text-white text-lg pb-3 font-medium'>{`GW ${eventKey} Fixtures`}</h2>
-                <table className='text-white w-[290px] md:w-full font-light text-sm'>
+                <h2 className='pb-3 text-lg font-medium text-white'>{`GW ${eventKey} Fixtures`}</h2>
+                <table className='w-[290px] text-sm font-light text-white md:w-full'>
                   <thead>
                     <tr className='border-b-2 border-white'>
-                      <th className='font-medium py-2'>Home</th>
+                      <th className='py-2 font-medium'>Home</th>
                       <th></th>
-                      <th className='font-medium py-2'>Away</th>
+                      <th className='py-2 font-medium'>Away</th>
                     </tr>
                   </thead>
                   <tbody>
                     {formattedMatches.map((match, index) => (
-                      <tr key={index} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
+                      <tr
+                        key={index}
+                        className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                      >
                         <td className='py-4'>{`${match.home_player_name}`}</td>
                         <td className='py-4'>vs.</td>
                         <td className='py-4'>{`${match.away_player_name}`}</td>

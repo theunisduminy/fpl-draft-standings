@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { GameWeekStatus } from '@/interfaces/match';
 
-async function fetchData(): Promise<{ status: GameWeekStatus[]; leagues: string }> {
+async function fetchData(): Promise<{
+  status: GameWeekStatus[];
+  leagues: string;
+}> {
   try {
-    const res = await fetch('https://draft.premierleague.com/api/pl/event-status', {
-      next: {
-        revalidate: 3600, // 1 hour
+    const res = await fetch(
+      'https://draft.premierleague.com/api/pl/event-status',
+      {
+        next: {
+          revalidate: 3600, // 1 hour
+        },
       },
-    });
+    );
     return await res.json();
   } catch (err) {
     console.error(err);

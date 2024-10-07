@@ -3,8 +3,12 @@ import { F1PlayerDetails } from '@/interfaces/standings';
 
 export function formatMatches(matches: Match[], standings: F1PlayerDetails[]) {
   return matches.map((match) => {
-    const homePlayer = standings.find((player) => player.id === match.league_entry_1);
-    const awayPlayer = standings.find((player) => player.id === match.league_entry_2);
+    const homePlayer = standings.find(
+      (player) => player.id === match.league_entry_1,
+    );
+    const awayPlayer = standings.find(
+      (player) => player.id === match.league_entry_2,
+    );
 
     return {
       home_player_name: homePlayer ? `${homePlayer.player_name}` : 'Unknown',
