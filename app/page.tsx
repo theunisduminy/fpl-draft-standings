@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import SeasonPointsTable from '@/components/SeasonPointsTable';
-import FormulaOneTable from '@/components/StandingsTable';
-import PositionPlacedTable from '@/components/PositionPlacedTable';
+import SeasonPointsTable from '@/components/TableView/SeasonPointsTable';
+import FormulaOneTable from '@/components/TableView/StandingsTable';
+import PositionPlacedTable from '@/components/TableView/PositionPlacedTable';
 import Layout from '@/components/Layout/PageLayout';
 import { SelectTable } from '@/components/Select';
 
@@ -16,7 +16,7 @@ export default function Home() {
 
   // Define options for the select dropdown
   const selectOptions: SelectOption[] = [
-    { value: 'standings', label: 'Standings' },
+    { value: 'standings', label: 'Draft Standings' },
     { value: 'points', label: 'Season Points' },
     { value: 'position-placed', label: 'Position Placed' },
   ];
@@ -32,17 +32,11 @@ export default function Home() {
         placeholder='Select an option'
       />
 
-      <hr className='mt-6 border border-b border-gray-600' />
+      <hr className='my-6 border border-b border-gray-600' />
 
-      <div className='mt-4'>
-        {activeTable === 'standings' && <FormulaOneTable />}
-      </div>
-      <div className='mt-4'>
-        {activeTable === 'points' && <SeasonPointsTable />}
-      </div>
-      <div className='mt-4'>
-        {activeTable === 'position-placed' && <PositionPlacedTable />}
-      </div>
+      <div>{activeTable === 'standings' && <FormulaOneTable />}</div>
+      <div>{activeTable === 'points' && <SeasonPointsTable />}</div>
+      <div>{activeTable === 'position-placed' && <PositionPlacedTable />}</div>
     </Layout>
   );
 }

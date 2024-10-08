@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import DraftCurrentFixtures from './components/DraftCurrentFixtures';
-import DraftResults from '@/app/detail/components/DraftResults';
-import DraftFixtures from '@/app/detail/components/DraftFixtures';
+import DraftCurrentFixtures from '@/components/TableView/DraftCurrentFixturesTable';
+import DraftResults from '@/components/TableView/DraftResultsTable';
+import DraftFixtures from '@/components/TableView/DraftFixturesTable';
 import Layout from '@/components/Layout/PageLayout';
 import { SelectTable } from '@/components/Select';
 
@@ -32,17 +32,13 @@ export default function DetailView() {
         placeholder='Select an option'
       />
 
-      <hr className='mt-6 border border-b border-gray-600' />
+      <hr className='my-6 border border-b border-gray-600' />
 
-      <div className='mt-4'>
+      <div>
         {activeTableMatches === 'currentFixtures' && <DraftCurrentFixtures />}
       </div>
-      <div className='mt-4'>
-        {activeTableMatches === 'results' && <DraftResults />}
-      </div>
-      <div className='mt-4'>
-        {activeTableMatches === 'fixtures' && <DraftFixtures />}
-      </div>
+      <div>{activeTableMatches === 'results' && <DraftResults />}</div>
+      <div>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
     </Layout>
   );
 }

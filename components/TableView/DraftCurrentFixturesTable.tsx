@@ -47,40 +47,37 @@ export default function DraftCurrentFixtures() {
     };
   });
 
+  if (loading) return <SkeletonCard />;
+
   return (
-    <div className='flex flex-col'>
-      <h1 className='pb-5 text-2xl font-semibold text-[#310639]'>{`Gameweek ${
-        currentGW || ''
-      } `}</h1>
-      {loading ? (
-        <SkeletonCard />
-      ) : (
-        <div className='w-[370px] rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-8 shadow-2xl sm:w-[450px]'>
-          <table
-            className={'w-[300px] text-sm font-light text-white sm:w-[400px]'}
-          >
-            <thead>
-              <tr className='border-b-2 border-white'>
-                <th className='w-1/4 py-2 font-medium'>Home</th>
-                <th></th>
-                <th className='w-1/4 py-2 font-medium'>Away</th>
+    <div className='flex w-[350px] flex-col md:w-[600px]'>
+      <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+        ⚽️{` Gameweek ${currentGW || ''} `}
+      </h1>
+      <p className='pb-5 text-sm'>
+        Latest gameweek live scores for head-to-head matches.
+      </p>
+
+      <div className='rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-8 shadow-2xl'>
+        <table className={'w-full text-sm font-light text-white'}>
+          <thead>
+            <tr className='border-b-2 border-white'>
+              <th className='w-2/5 py-2 font-medium'>Home</th>
+              <th className='w-1/5 py-2 font-medium'></th>
+              <th className='w-2/5 py-2 font-medium'>Away</th>
+            </tr>
+          </thead>
+          <tbody>
+            {formattedCurrentMatches.map((match: any, index: number) => (
+              <tr key={index} className={index % 2 === 0 ? '' : 'bg-blue-400'}>
+                <td className='py-4'>{`${match.home_player_name} (${match.home_player_points})`}</td>
+                <td className='py-4'>vs.</td>
+                <td className='py-4'>{`${match.away_player_name} (${match.away_player_points})`}</td>
               </tr>
-            </thead>
-            <tbody>
-              {formattedCurrentMatches.map((match: any, index: number) => (
-                <tr
-                  key={index}
-                  className={index % 2 === 0 ? '' : 'bg-blue-400'}
-                >
-                  <td className='py-4'>{`${match.home_player_name} (${match.home_player_points})`}</td>
-                  <td className='py-4'>vs.</td>
-                  <td className='py-4'>{`${match.away_player_name} (${match.away_player_points})`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
