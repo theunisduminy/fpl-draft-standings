@@ -24,3 +24,10 @@ export interface GameWeekStatus {
   leagues_updated: boolean;
   points: string;
 }
+
+export interface GameweekData {
+  gameweek: number;
+  points: number;
+  entry_names: string[];
+  player_names: string[];
+}
