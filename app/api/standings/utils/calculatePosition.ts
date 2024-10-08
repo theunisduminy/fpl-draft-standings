@@ -2,7 +2,10 @@
 import { Match } from '@/interfaces/match';
 import { PlayerDetails } from '@/interfaces/players';
 
-export function calculatePositions(matches: Match[], players: PlayerDetails[]): void {
+export function calculatePositions(
+  matches: Match[],
+  players: PlayerDetails[],
+): void {
   const positionCounts: { [key: number]: { [key: string]: number } } = {};
 
   // Initialize position counts for each player
@@ -32,15 +35,18 @@ export function calculatePositions(matches: Match[], players: PlayerDetails[]): 
         { id: m.league_entry_2, points: m.league_entry_2_points },
       ])
       .flat()
-      .reduce((acc, curr) => {
-        // Sum points for each player
-        if (!acc[curr.id]) {
-          acc[curr.id] = curr.points;
-        } else {
-          acc[curr.id] += curr.points;
-        }
-        return acc;
-      }, {} as { [key: number]: number });
+      .reduce(
+        (acc, curr) => {
+          // Sum points for each player
+          if (!acc[curr.id]) {
+            acc[curr.id] = curr.points;
+          } else {
+            acc[curr.id] += curr.points;
+          }
+          return acc;
+        },
+        {} as { [key: number]: number },
+      );
 
     // Convert to array and sort by points descending
     const rankedPlayers = Object.entries(sortedPlayers)
@@ -50,7 +56,10 @@ export function calculatePositions(matches: Match[], players: PlayerDetails[]): 
     // Assign positions based on sorted rankings
     let currentRank = 1;
     rankedPlayers.forEach((entry, index) => {
-      if (index > 0 && rankedPlayers[index].points < rankedPlayers[index - 1].points) {
+      if (
+        index > 0 &&
+        rankedPlayers[index].points < rankedPlayers[index - 1].points
+      ) {
         currentRank = index + 1;
       }
       switch (currentRank) {

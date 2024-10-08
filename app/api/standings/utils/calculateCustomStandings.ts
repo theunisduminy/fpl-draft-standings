@@ -25,16 +25,18 @@ export function calculateCustomStandings(
   const rankPoints = [20, 15, 12, 10, 8, 6, 4, 2];
 
   events.forEach((event) => {
-    const eventMatches = matches.filter((match) => match.event === event && match.finished);
+    const eventMatches = matches.filter(
+      (match) => match.event === event && match.finished,
+    );
     const points: [number, number][] = [];
 
     eventMatches.forEach((match) => {
       if (match.league_entry_1_points > match.league_entry_2_points) {
-        playerMap[match.league_entry_1].win_points += 1;
+        playerMap[match.league_entry_1].win_points += 3;
         playerMap[match.league_entry_1].total_wins += 1;
         playerMap[match.league_entry_2].total_losses += 1;
       } else if (match.league_entry_1_points < match.league_entry_2_points) {
-        playerMap[match.league_entry_2].win_points += 1;
+        playerMap[match.league_entry_2].win_points += 3;
         playerMap[match.league_entry_2].total_wins += 1;
         playerMap[match.league_entry_1].total_losses += 1;
       } else {

@@ -50,13 +50,20 @@ export const viewport: Viewport = {
   themeColor: 'white',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang='en'
-      className={clsx(`h-full ${bgGradient} from-30% antialiased scroll-smooth`, inter.variable)}
+      className={clsx(
+        `h-full ${bgGradient} scroll-smooth from-30% antialiased`,
+        inter.variable,
+      )}
     >
-      <body className='flex min-h-full flex-col font-inter'>
+      <body className={`font-inter flex min-h-full flex-col bg-transparent`}>
         <HeaderNav />
         <div className='flex flex-1 flex-col'>{children}</div>
         <Analytics />

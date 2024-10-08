@@ -6,7 +6,13 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  return <main className={`${bgGradient} justify-start pt-10 pb-20`}>{children}</main>;
+  return (
+    <main
+      className={`mx-auto flex h-[100%] flex-col justify-start pb-20 pt-10`}
+    >
+      {children}
+    </main>
+  );
 };
 
 export default Layout;
