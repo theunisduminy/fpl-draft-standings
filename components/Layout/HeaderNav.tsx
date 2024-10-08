@@ -6,11 +6,7 @@ import Link from 'next/link';
 const navigation = [
   { name: 'Standings', href: '/', target: '_self' },
   { name: 'Matches', href: '/detail', target: '_self' },
-  {
-    name: 'Go to draft',
-    href: 'https://draft.premierleague.com/team/my',
-    target: '_blank',
-  },
+  { name: 'Rumblers', href: '/rumblers', target: '_self' },
 ];
 
 export default function HeaderNav() {
