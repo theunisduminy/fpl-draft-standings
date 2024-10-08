@@ -15,7 +15,8 @@ const navigation = [
 
 export default function HeaderNav() {
   return (
-    <header className='bg-gradient-to-t from-[#00edfd] to-[#75fa95]'>
+    <header className='bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95]'>
+      {/* <header className='bg-[#75fa95]'> */}
       <nav className='mx-auto max-w-7xl px-6 lg:px-8' aria-label='Top'>
         <div className='flex w-full flex-col items-center justify-between border-b-2 border-premPurple py-6'>
           <div className='flex items-center'>
@@ -33,7 +34,7 @@ export default function HeaderNav() {
                   target={link.target}
                   key={link.name}
                   href={link.href}
-                  className='text-md rounded-2xl border-2 border-premPurple px-4 py-2 font-medium text-premPurple hover:bg-premPurple hover:text-indigo-50'
+                  className='text-md rounded-lg border border-premPurple px-4 py-2 font-medium text-premPurple hover:bg-premPurple hover:text-indigo-50'
                 >
                   {link.name}
                 </a>
@@ -47,7 +48,7 @@ export default function HeaderNav() {
               target={link.target}
               key={link.name}
               href={link.href}
-              className='rounded-2xl border-2 border-premPurple px-4 py-2 text-sm font-medium text-premPurple hover:bg-premPurple hover:text-indigo-50'
+              className='rounded-lg border border-premPurple px-4 py-2 text-sm font-medium text-premPurple hover:bg-premPurple hover:text-indigo-50'
             >
               {link.name}
             </a>

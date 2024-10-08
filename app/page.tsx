@@ -32,7 +32,7 @@ export default function Home() {
         placeholder='Select an option'
       />
 
-      <hr className='my-6 border border-b border-gray-600' />
+      <hr className='my-6 border border-b border-transparent' />
 
       <div>{activeTable === 'standings' && <FormulaOneTable />}</div>
       <div>{activeTable === 'points' && <SeasonPointsTable />}</div>
