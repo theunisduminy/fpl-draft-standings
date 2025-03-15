@@ -6,7 +6,7 @@ import { fetchWithDelay } from '@/utils/fetchWithDelay';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
-import { GameweekSummaryCard } from '@/components/DetailView/GameWeekSummaryCard';
+import { GameweekSummaryCard } from '@/components/DetailView/GameweekSummaryCard';
 import { GameweekScoreChart } from '@/components/DetailView/GameweekScoreChart';
 import { tableGradient } from '@/utils/tailwindVars';
 export default function DraftResultsTable() {
