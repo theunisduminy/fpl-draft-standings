@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { GameweekData } from '@/interfaces/match';
-import { MessageSquare, Beer, TrendingDown, Calendar } from 'lucide-react';
+import { Beer, TrendingDown, Calendar } from 'lucide-react';
 
 export default function RumblerDataCards(): JSX.Element {
   const [gameweekData, setGameweekData] = useState<GameweekData[]>([]);
@@ -61,7 +61,7 @@ export default function RumblerDataCards(): JSX.Element {
     if (gameweeks.length > 0) {
       setCurrentBlurb(getRandomBlurb());
     }
-  }, [selectedGameweek]);
+  }, [selectedGameweek, gameweeks.length]);
 
   const handleRetry = () => {
     setLoading(true);
