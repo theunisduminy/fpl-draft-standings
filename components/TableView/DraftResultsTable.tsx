@@ -4,167 +4,190 @@ import { PlayerDetails } from '@/interfaces/players';
 import { Match } from '@/interfaces/match';
 import { fetchWithDelay } from '@/utils/fetchWithDelay';
 import { SkeletonCard } from '@/components/SkeletonTable';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { GameweekSelector } from '@/components/GameweekSelector';
+import { GameweekSummaryCard } from '@/components/DetailView/GameWeekSummaryCard';
+import { GameweekScoreChart } from '@/components/DetailView/GameweekScoreChart';
 
-export default function AllGameWeekResults() {
+export default function DraftResultsTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [currentPosition, setCurrentPosition] = useState(0); // Track the current position in the list of game weeks
-  const [loading, setLoading] = useState(true); // Add loading state
-  const resultsPerPage = 5; // Number of game weeks to show per page
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [gameweeks, setGameweeks] = useState<number[]>([]);
+  const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
 
   useEffect(() => {
     async function fetchData() {
-      const [standingsData, matchesData] = (await fetchWithDelay([
-        'standings',
-        'matches',
-      ])) as [PlayerDetails[], Match[]];
-      setStandings(standingsData);
-      setMatches(matchesData);
-      setLoading(false); // Data received, set loading to false
+      try {
+        setLoading(true);
+        const [standingsData, matchesData] = (await fetchWithDelay([
+          'standings',
+          'matches',
+        ])) as [PlayerDetails[], Match[]];
+
+        setStandings(standingsData);
+        setMatches(matchesData);
+
+        // Extract all completed gameweeks
+        const completedGameweeks = Array.from(
+          new Set(
+            matchesData
+              .filter((match) => match.finished)
+              .map((match) => match.event),
+          ),
+        ).sort((a, b) => b - a); // Sort in descending order (latest first)
+
+        setGameweeks(completedGameweeks);
+
+        // Set the default selected gameweek to the most recent one
+        if (completedGameweeks.length > 0) {
+          setSelectedGameweek(completedGameweeks[0]);
+        }
+
+        setError(null);
+      } catch (err) {
+        setError('Failed to load data. Please try again later.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     }
 
     fetchData();
   }, []);
 
-  // Filter matches to include only those that are finished
-  const finishedMatches = matches.filter((match) => match.finished);
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    fetchWithDelay(['standings', 'matches'])
+      .then((data: unknown) => {
+        const [standingsData, matchesData] = data as [PlayerDetails[], Match[]];
+        setStandings(standingsData);
+        setMatches(matchesData);
 
-  // Group finished matches by event (Game Week)
-  const matchesByEvent = finishedMatches.reduce(
-    (acc, match) => {
-      if (!acc[match.event]) {
-        acc[match.event] = [];
-      }
-      acc[match.event].push(match);
-      return acc;
-    },
-    {} as Record<number, Match[]>,
-  );
+        const completedGameweeks = Array.from(
+          new Set(
+            matchesData
+              .filter((match: Match) => match.finished)
+              .map((match: Match) => match.event),
+          ),
+        ).sort((a: number, b: number) => b - a);
 
-  // Sort Game Week numbers in descending order
-  const sortedEventKeys = Object.keys(matchesByEvent)
-    .map(Number)
-    .sort((a, b) => b - a);
+        setGameweeks(completedGameweeks);
 
-  // Determine the range of events to display based on the current position
-  const startIndex = currentPosition;
-  const endIndex = Math.min(
-    startIndex + resultsPerPage,
-    sortedEventKeys.length,
-  );
-  const visibleEvents = sortedEventKeys.slice(startIndex, endIndex);
-
-  // Function to handle the "See Older" button click
-  const handleSeeOlder = () => {
-    setCurrentPosition((prevPosition) =>
-      Math.min(
-        prevPosition + resultsPerPage,
-        sortedEventKeys.length - resultsPerPage,
-      ),
-    );
-  };
-
-  // Function to handle the "See Newer" button click
-  const handleSeeNewer = () => {
-    setCurrentPosition((prevPosition) =>
-      Math.max(prevPosition - resultsPerPage, 0),
-    );
+        if (completedGameweeks.length > 0) {
+          setSelectedGameweek(completedGameweeks[0]);
+        }
+      })
+      .catch((err) => {
+        setError('Failed to load data. Please try again later.');
+        console.error(err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   if (loading) return <SkeletonCard />;
+  if (error) return <ErrorDisplay message={error} onRetry={handleRetry} />;
+  if (gameweeks.length === 0) {
+    return (
+      <div className='flex w-[350px] flex-col md:w-[600px]'>
+        <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+          ⚔️ Head-to-Head Results
+        </h1>
+        <p className='pb-5 text-sm'>No results available yet.</p>
+      </div>
+    );
+  }
+
+  // Filter matches for the selected gameweek
+  const gameweekMatches = matches.filter(
+    (match) => match.event === selectedGameweek && match.finished,
+  );
+
+  const formattedMatches = gameweekMatches.map((match) => {
+    const homePlayer = standings.find(
+      (player) => player.id === match.league_entry_1,
+    );
+    const awayPlayer = standings.find(
+      (player) => player.id === match.league_entry_2,
+    );
+
+    return {
+      home_player_name: homePlayer ? homePlayer.player_name : 'Unknown',
+      away_player_name: awayPlayer ? awayPlayer.player_name : 'Unknown',
+      home_player_points: match.league_entry_1_points,
+      away_player_points: match.league_entry_2_points,
+      home_wins: match.league_entry_1_points > match.league_entry_2_points,
+      away_wins: match.league_entry_2_points > match.league_entry_1_points,
+    };
+  });
 
   return (
-    <div className='lex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-5 text-2xl font-semibold text-[#310639]'>
+    <div className='flex w-[350px] flex-col md:w-[600px]'>
+      <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
         ⚔️ Head-to-Head Results
       </h1>
       <p className='pb-5 text-sm'>
         Previous gameweeks head-to-head results for the Draft league.
       </p>
 
-      <>
+      <GameweekSelector
+        gameweeks={gameweeks}
+        selectedGameweek={selectedGameweek}
+        onSelectGameweek={setSelectedGameweek}
+        label='Select Gameweek'
+      />
+
+      <div className='mt-6 space-y-6'>
+        {/* Gameweek Summary Card */}
+        <GameweekSummaryCard
+          gameweek={selectedGameweek}
+          matches={matches}
+          players={standings}
+        />
+
+        {/* Results Table */}
         <div className='rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-6 shadow-2xl'>
-          {visibleEvents.map((eventKey) => {
-            const currentMatches = matchesByEvent[eventKey];
-            const formattedMatches = currentMatches.map((match) => {
-              const homePlayer = standings.find(
-                (player: PlayerDetails) => player.id === match.league_entry_1,
-              );
-              const awayPlayer = standings.find(
-                (player: PlayerDetails) => player.id === match.league_entry_2,
-              );
-
-              // Use nullish coalescing operator to handle possible null values
-              const homePoints = match.league_entry_1_points ?? 0;
-              const awayPoints = match.league_entry_2_points ?? 0;
-
-              return {
-                home_player_name: homePlayer
-                  ? `${homePlayer.player_name}`
-                  : 'Unknown',
-                away_player_name: awayPlayer
-                  ? `${awayPlayer.player_name}`
-                  : 'Unknown',
-                home_player_points: match.league_entry_1_points,
-                away_player_points: match.league_entry_2_points,
-                event: match.event,
-                home_wins: homePoints > awayPoints,
-                away_wins: awayPoints > homePoints,
-              };
-            });
-
-            return (
-              <div key={eventKey} className='mb-20'>
-                <h2 className='pb-3 text-lg font-medium text-white'>{`GW ${eventKey} Results`}</h2>
-                <table className='w-full text-sm font-light text-white'>
-                  <thead>
-                    <tr className='border-b-2 border-white'>
-                      <th className='py-2 font-medium'>Home</th>
-                      <th></th>
-                      <th className='py-2 font-medium'>Away</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formattedMatches.map((match, index) => (
-                      <tr
-                        key={index}
-                        className={index % 2 === 0 ? '' : 'bg-blue-400'}
-                      >
-                        <td
-                          className={`py-4 ${match.home_wins ? 'font-bold text-yellow-300' : ''}`}
-                        >{`${match.home_player_name} (${match.home_player_points})`}</td>
-                        <td className='py-4'>vs.</td>
-                        <td
-                          className={`py-4 ${match.away_wins ? 'font-bold text-yellow-300' : ''}`}
-                        >{`${match.away_player_name} (${match.away_player_points})`}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
+          <h2 className='pb-3 text-lg font-medium text-white'>
+            Gameweek {selectedGameweek} Results
+          </h2>
+          <table className='w-full text-sm font-light text-white'>
+            <thead>
+              <tr className='border-b-2 border-white'>
+                <th className='py-2 font-medium'>Home</th>
+                <th></th>
+                <th className='py-2 font-medium'>Away</th>
+              </tr>
+            </thead>
+            <tbody>
+              {formattedMatches.map((match, index) => (
+                <tr
+                  key={index}
+                  className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                >
+                  <td
+                    className={`py-4 ${match.home_wins ? 'font-bold text-yellow-300' : ''}`}
+                  >{`${match.home_player_name} (${match.home_player_points})`}</td>
+                  <td className='py-4'>vs.</td>
+                  <td
+                    className={`py-4 ${match.away_wins ? 'font-bold text-yellow-300' : ''}`}
+                  >{`${match.away_player_name} (${match.away_player_points})`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        {/* Navigation Buttons */}
-        <div className='mt-4 flex justify-between gap-x-5 pt-10'>
-          {currentPosition > 0 && (
-            <button
-              onClick={handleSeeNewer}
-              className='min-w-[9rem] rounded-lg border-2 border-premPurple bg-gradient-to-r from-premGreen to-premTurquoise px-7 py-3 text-sm shadow-2xl duration-500'
-            >
-              See Newer
-            </button>
-          )}
-          {endIndex < sortedEventKeys.length && (
-            <button
-              onClick={handleSeeOlder}
-              className='min-w-[9rem] rounded-lg border-2 border-premPurple bg-gradient-to-r from-premGreen to-premTurquoise px-7 py-3 text-sm shadow-2xl duration-500'
-            >
-              See Older
-            </button>
-          )}
-        </div>
-      </>
+
+        {/* Score Chart */}
+        <GameweekScoreChart
+          gameweek={selectedGameweek}
+          matches={matches}
+          players={standings}
+        />
+      </div>
     </div>
   );
 }

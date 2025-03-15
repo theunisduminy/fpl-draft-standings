@@ -108,7 +108,7 @@ export default function PlayerStatistics() {
   return (
     <div className='w-full max-w-6xl space-y-8'>
       <div className='flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0'>
-        <div className='flex items-center space-x-2 pb-6 md:pb-0'>
+        <div className='flex items-center space-x-2 md:pb-0'>
           <Link
             href='/'
             className='rounded-lg bg-premPurple p-2 text-white hover:bg-opacity-90'
@@ -116,9 +116,11 @@ export default function PlayerStatistics() {
             <ChevronLeft className='h-5 w-5' />
           </Link>
           <h1 className='text-4xl font-semibold text-[#310639]'>
-            {playerData.player_name}&apos;s Stats
+            {playerData.player_name}
           </h1>
         </div>
+
+        <p className='text-lg font-medium'>Season performance</p>
         <div className='rounded-lg bg-cyan-600 px-4 py-2 text-lg font-medium text-white'>
           {playerData.team_name}
         </div>

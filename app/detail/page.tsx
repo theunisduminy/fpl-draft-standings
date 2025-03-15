@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import DraftCurrentFixtures from '@/components/TableView/DraftCurrentFixturesTable';
 import DraftResults from '@/components/TableView/DraftResultsTable';
 import DraftFixtures from '@/components/TableView/DraftFixturesTable';
 import { SelectTable } from '@/components/Select';
@@ -13,11 +12,10 @@ type SelectOption = {
 
 export default function DetailView() {
   const [activeTableMatches, setActiveTableMatches] =
-    useState<string>('currentFixtures');
+    useState<string>('fixtures');
 
   // Define options for the select dropdown
   const selectOptions: SelectOption[] = [
-    { value: 'currentFixtures', label: 'GW Live' },
     { value: 'results', label: 'H2H Results' },
     { value: 'fixtures', label: 'H2H Fixtures' },
   ];
@@ -33,9 +31,6 @@ export default function DetailView() {
 
       <hr className='my-6 border border-b border-transparent' />
 
-      <div>
-        {activeTableMatches === 'currentFixtures' && <DraftCurrentFixtures />}
-      </div>
       <div>{activeTableMatches === 'results' && <DraftResults />}</div>
       <div>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
     </div>
