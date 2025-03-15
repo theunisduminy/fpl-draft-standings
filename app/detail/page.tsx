@@ -3,7 +3,6 @@ import { useState } from 'react';
 import DraftCurrentFixtures from '@/components/TableView/DraftCurrentFixturesTable';
 import DraftResults from '@/components/TableView/DraftResultsTable';
 import DraftFixtures from '@/components/TableView/DraftFixturesTable';
-import Layout from '@/components/Layout/PageLayout';
 import { SelectTable } from '@/components/Select';
 
 // Define the type for select options
@@ -24,7 +23,7 @@ export default function DetailView() {
   ];
 
   return (
-    <Layout>
+    <div>
       <h1 className='pb-5 text-4xl font-semibold text-[#310639]'>Matches</h1>
       <SelectTable
         options={selectOptions}
@@ -39,6 +38,6 @@ export default function DetailView() {
       </div>
       <div>{activeTableMatches === 'results' && <DraftResults />}</div>
       <div>{activeTableMatches === 'fixtures' && <DraftFixtures />}</div>
-    </Layout>
+    </div>
   );
 }

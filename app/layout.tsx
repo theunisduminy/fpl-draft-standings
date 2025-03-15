@@ -5,7 +5,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // Components and Style
-import '../styles/globals.css';
+import './globals.css';
 import Footer from '@/components/Layout/Footer';
 import HeaderNav from '@/components/Layout/HeaderNav';
 import { bgGradient } from '@/utils/tailwindVars';
@@ -68,7 +68,9 @@ export default function RootLayout({
       >
         <HeaderNav />
         <div className='mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8'>
-          <main className='flex flex-col items-center'>{children}</main>
+          <main className='flex min-h-[80vh] flex-col items-center pb-20 pt-10'>
+            {children}
+          </main>
         </div>
         <Analytics />
         <SpeedInsights />

@@ -1,5 +1,5 @@
 'use client';
-import Layout from '@/components/Layout/PageLayout';
+
 import { SelectTable } from '@/components/Select';
 import { useState } from 'react';
 import RumblerDataCards from '@/components/RumblerView/RumblerCards';
@@ -21,7 +21,7 @@ export default function Rumblers() {
   ];
 
   return (
-    <Layout>
+    <div>
       <h1 className='pb-5 text-4xl font-semibold text-[#310639]'>Rumblers</h1>
       <SelectTable
         options={selectOptions}
@@ -35,6 +35,6 @@ export default function Rumblers() {
       <div>
         {activeTableMatches === 'rumblerFrequency' && <RumblerDashboard />}
       </div>
-    </Layout>
+    </div>
   );
 }

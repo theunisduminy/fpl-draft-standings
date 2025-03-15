@@ -61,8 +61,11 @@ export function PlayerPerformanceChart({
         </CardTitle>
       </CardHeader>
       <CardContent className='p-2'>
-        <div className='w-full md:h-full'>
-          <ChartContainer config={chartConfig}>
+        <div className='w-full'>
+          <ChartContainer
+            config={chartConfig}
+            className='aspect-[2/1] min-h-[300px] w-full'
+          >
             <ResponsiveContainer width='100%' height='100%'>
               <LineChart
                 data={chartData}

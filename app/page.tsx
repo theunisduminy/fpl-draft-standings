@@ -3,7 +3,6 @@ import { useState } from 'react';
 import SeasonPointsTable from '@/components/TableView/SeasonPointsTable';
 import FormulaOneTable from '@/components/TableView/StandingsTable';
 import PositionPlacedTable from '@/components/TableView/PositionPlacedTable';
-import Layout from '@/components/Layout/PageLayout';
 import { SelectTable } from '@/components/Select';
 
 export default function Home() {
@@ -22,7 +21,7 @@ export default function Home() {
   ];
 
   return (
-    <Layout>
+    <div>
       <h1 className='pb-5 text-left text-4xl font-semibold text-[#310639]'>
         Standings
       </h1>
@@ -37,6 +36,6 @@ export default function Home() {
       <div>{activeTable === 'standings' && <FormulaOneTable />}</div>
       <div>{activeTable === 'points' && <SeasonPointsTable />}</div>
       <div>{activeTable === 'position-placed' && <PositionPlacedTable />}</div>
-    </Layout>
+    </div>
   );
 }
