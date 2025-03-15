@@ -252,15 +252,15 @@ export function MatchOddsCard({
           {matchOdds.map((matchup, index) => (
             <div
               key={index}
-              className='overflow-hidden rounded-lg border border-gray-700 bg-blue-500'
+              className='bg-ruddyBlue overflow-hidden rounded-lg border border-gray-700'
             >
-              <div className='bg-blue-600 p-3 text-center font-medium text-white'>
+              <div className='bg-blackOlive p-3 text-center font-medium text-white'>
                 {matchup.home.name} vs {matchup.away.name}
               </div>
 
               <div className='grid grid-cols-1 gap-3 p-4 md:grid-cols-2'>
                 {/* Home player */}
-                <div className='rounded-lg bg-blue-400 p-4'>
+                <div className='bg-ruddyBlue rounded-lg p-4'>
                   <div className='flex items-center justify-between'>
                     <div>
                       <p className='font-medium text-white'>
@@ -270,12 +270,12 @@ export function MatchOddsCard({
                         Avg: {matchup.home.averageScore.toFixed(1)} pts
                       </p>
                     </div>
-                    <div className='flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-xl font-bold text-white'>
+                    <div className='bg-ruddyBlue flex h-14 w-14 items-center justify-center rounded-full text-xl font-bold text-white'>
                       {matchup.home.winProbability.toFixed(0)}%
                     </div>
                   </div>
 
-                  <div className='mt-3 h-2 w-full overflow-hidden rounded-full bg-blue-600'>
+                  <div className='bg-blackOlive mt-3 h-2 w-full overflow-hidden rounded-full'>
                     <div
                       className='h-full bg-premGreen'
                       style={{ width: `${matchup.home.winProbability}%` }}
@@ -284,7 +284,7 @@ export function MatchOddsCard({
                 </div>
 
                 {/* Away player */}
-                <div className='rounded-lg bg-blue-400 p-4'>
+                <div className='bg-ruddyBlue rounded-lg p-4'>
                   <div className='flex items-center justify-between'>
                     <div>
                       <p className='font-medium text-white'>
@@ -294,12 +294,12 @@ export function MatchOddsCard({
                         Avg: {matchup.away.averageScore.toFixed(1)} pts
                       </p>
                     </div>
-                    <div className='flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-xl font-bold text-white'>
+                    <div className='bg-ruddyBlue flex h-14 w-14 items-center justify-center rounded-full text-xl font-bold text-white'>
                       {matchup.away.winProbability.toFixed(0)}%
                     </div>
                   </div>
 
-                  <div className='mt-3 h-2 w-full overflow-hidden rounded-full bg-blue-600'>
+                  <div className='bg-blackOlive mt-3 h-2 w-full overflow-hidden rounded-full'>
                     <div
                       className='h-full bg-premTurquoise'
                       style={{ width: `${matchup.away.winProbability}%` }}
@@ -308,15 +308,15 @@ export function MatchOddsCard({
                 </div>
               </div>
 
-              <div className='hidden items-center justify-center bg-blue-500 p-2 md:flex'>
+              <div className='bg-ruddyBlue flex items-center justify-center px-2 pb-6'>
                 {matchup.home.winProbability > matchup.away.winProbability ? (
                   <div className='flex items-center text-sm text-white'>
                     <ArrowLeft className='mr-1 h-4 w-4' />
-                    Favoured to win
+                    {matchup.home.name} is favoured to win
                   </div>
                 ) : (
                   <div className='flex items-center text-sm text-white'>
-                    Favoured to win
+                    {matchup.away.name} is favoured to win
                     <ArrowRight className='ml-1 h-4 w-4' />
                   </div>
                 )}

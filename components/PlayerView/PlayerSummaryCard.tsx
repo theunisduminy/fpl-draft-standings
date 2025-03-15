@@ -20,12 +20,12 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
   return (
     <Card className='h-full'>
       <CardHeader>
-        <CardTitle className='text-2xl'>Player Stats</CardTitle>
+        <CardTitle className='text-xl'>Player Stats</CardTitle>
       </CardHeader>
       <CardContent>
         <div className='flex h-full flex-col justify-between space-y-6'>
           <div className='grid grid-cols-2 gap-6'>
-            <div className='rounded-lg bg-blue-400 p-4'>
+            <div className='bg-ruddyBlue rounded-lg p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <Trophy className='h-6 w-6 text-yellow-400' />
@@ -39,7 +39,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
               </div>
             </div>
 
-            <div className='rounded-lg bg-blue-400 p-4'>
+            <div className='bg-ruddyBlue rounded-lg p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <Users className='h-6 w-6 text-white' />
@@ -56,7 +56,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
           </div>
 
           <div className='grid grid-cols-2 gap-6'>
-            <div className='rounded-lg bg-blue-400 p-4'>
+            <div className='bg-ruddyBlue rounded-lg p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <Zap className='h-6 w-6 text-amber-400' />
@@ -70,7 +70,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
               </div>
             </div>
 
-            <div className='rounded-lg bg-blue-400 p-4'>
+            <div className='bg-ruddyBlue rounded-lg p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <Award className='h-6 w-6 text-emerald-400' />
@@ -87,7 +87,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
           </div>
 
           <div className='grid grid-cols-2 gap-6'>
-            <div className='rounded-lg bg-blue-400 p-4'>
+            <div className='bg-ruddyBlue rounded-lg p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <Frown className='h-6 w-6 text-red-600' />
@@ -102,7 +102,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
               </div>
             </div>
 
-            <div className='rounded-lg bg-blue-400 p-4'>
+            <div className='bg-ruddyBlue rounded-lg p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <BeerIcon className='h-6 w-6 text-yellow-400' />
@@ -118,7 +118,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
           </div>
 
           <div className='grid grid-cols-1 gap-6'>
-            <div className='rounded-lg bg-blue-400 p-4'>
+            <div className='bg-ruddyBlue rounded-lg p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <BarChart3 className='h-6 w-6 text-purple-800' />

@@ -1,5 +1,5 @@
 import * as React from 'react';
-
+import { tableGradient } from '@/utils/tailwindVars';
 import { cn } from '@/lib/utils';
 
 const Card = React.forwardRef<
@@ -9,7 +9,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'flex w-[350px] flex-col rounded-xl border border-black bg-gradient-to-br from-cyan-600 to-blue-500 text-card-foreground shadow md:w-full',
+      `flex w-[350px] flex-col rounded-xl border border-black ${tableGradient} text-card-foreground shadow md:w-full`,
       className,
     )}
     {...props}
@@ -36,7 +36,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-2xl font-semibold leading-none tracking-tight text-gray-100',
+      'text-xl font-semibold leading-none tracking-tight text-gray-100',
       className,
     )}
     {...props}

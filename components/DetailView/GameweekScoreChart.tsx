@@ -120,7 +120,7 @@ export function GameweekScoreChart({
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
-      <CardFooter className='flex-col gap-2 text-sm'>
+      <CardFooter className='flex-col gap-2 text-sm text-white'>
         <div className='flex items-center gap-2 font-medium leading-none'>
           {trend > 0 ? 'Trending up' : 'Trending down'} by{' '}
           {Math.abs(trend).toFixed(1)}% this gameweek{' '}

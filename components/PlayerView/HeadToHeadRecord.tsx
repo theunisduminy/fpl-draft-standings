@@ -58,7 +58,7 @@ export function HeadToHeadRecord({ records }: HeadToHeadRecordProps) {
                 return (
                   <tr
                     key={record.opponentId}
-                    className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                    className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
                   >
                     <td className='py-3 pl-2 font-medium'>
                       {record.opponentName}

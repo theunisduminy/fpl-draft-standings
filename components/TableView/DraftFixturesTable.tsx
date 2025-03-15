@@ -7,6 +7,7 @@ import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
 import { MatchOddsCard } from '@/components/DetailView/MatchOddsCard';
+import { tableGradient } from '@/utils/tailwindVars';
 
 export default function DraftFixturesTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
@@ -93,7 +94,7 @@ export default function DraftFixturesTable() {
   if (futureGameweeks.length === 0) {
     return (
       <div className='flex w-[350px] flex-col md:w-[600px]'>
-        <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+        <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
           🏟️ Upcoming Fixtures
         </h1>
         <p className='pb-5 text-sm'>No upcoming fixtures available.</p>
@@ -125,7 +126,7 @@ export default function DraftFixturesTable() {
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
         🏟️ Upcoming Fixtures
       </h1>
       <p className='pb-5 text-sm'>
@@ -141,8 +142,10 @@ export default function DraftFixturesTable() {
 
       <div className='mt-6 space-y-6'>
         {/* Fixtures Table */}
-        <div className='w-full rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-6 shadow-2xl'>
-          <h2 className='pb-3 text-lg font-medium text-white'>
+        <div
+          className={`w-full rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
+        >
+          <h2 className='pb-3 text-xl font-medium text-white'>
             Gameweek {selectedGameweek} Fixtures
           </h2>
           <table className='w-full text-sm font-light text-white'>
@@ -157,7 +160,7 @@ export default function DraftFixturesTable() {
               {formattedMatches.map((match, index) => (
                 <tr
                   key={index}
-                  className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                  className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
                 >
                   <td className='py-4'>{match.home_player_name}</td>
                   <td className='py-4'>vs.</td>

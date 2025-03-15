@@ -7,7 +7,7 @@ import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import Link from 'next/link';
 import { LineChart, Users } from 'lucide-react';
-
+import { tableGradient } from '@/utils/tailwindVars';
 export default function FormulaOneTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,7 @@ export default function FormulaOneTable() {
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
         🏆 FPL Draft Standings
       </h1>
       <p className='pb-5 text-sm'>
@@ -46,7 +46,9 @@ export default function FormulaOneTable() {
         head-to-head matches.
       </p>
 
-      <div className='w-full rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-5 shadow-2xl'>
+      <div
+        className={`w-full rounded-lg border-2 border-black ${tableGradient} p-5 shadow-2xl`}
+      >
         <table className={'w-full text-sm font-light text-white'}>
           <thead>
             <tr className='border-b-2 border-white'>
@@ -64,7 +66,7 @@ export default function FormulaOneTable() {
             {standings.map((player: PlayerDetails, index) => (
               <tr
                 key={player.id}
-                className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
               >
                 <td className='border-r-2 border-white py-4'>
                   {player.player_name}
@@ -76,7 +78,7 @@ export default function FormulaOneTable() {
                 <td className='py-4 text-center'>
                   <Link
                     href={`/players/${player.id}`}
-                    className='inline-flex items-center justify-center rounded bg-white p-1.5 text-blue-600 transition-colors hover:bg-gray-100'
+                    className='text-blackOlive inline-flex items-center justify-center rounded bg-white p-1.5 transition-colors hover:bg-gray-100'
                     title='View detailed statistics'
                   >
                     <LineChart className='h-4 w-4' />

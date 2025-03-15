@@ -23,7 +23,7 @@ module.exports = {
         premGreen: '#75fa95',
         premTurquoise: '#00edfd',
         blackOlive: '#25291C',
-        teal: '#1F7A8C',
+        ruddyBlue: '#60a5fa',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

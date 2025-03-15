@@ -32,7 +32,7 @@ export default function RumblerDataCards(): JSX.Element {
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
         🍺 Rumbler Victim
       </h1>
       <p className='pb-5 text-sm'>

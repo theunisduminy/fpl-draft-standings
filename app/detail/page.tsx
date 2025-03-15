@@ -16,8 +16,8 @@ export default function DetailView() {
 
   // Define options for the select dropdown
   const selectOptions: SelectOption[] = [
-    { value: 'results', label: 'H2H Results' },
     { value: 'fixtures', label: 'H2H Fixtures' },
+    { value: 'results', label: 'H2H Results' },
   ];
 
   return (

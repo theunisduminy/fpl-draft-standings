@@ -8,7 +8,7 @@ import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
 import { GameweekSummaryCard } from '@/components/DetailView/GameWeekSummaryCard';
 import { GameweekScoreChart } from '@/components/DetailView/GameweekScoreChart';
-
+import { tableGradient } from '@/utils/tailwindVars';
 export default function DraftResultsTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -94,7 +94,7 @@ export default function DraftResultsTable() {
   if (gameweeks.length === 0) {
     return (
       <div className='flex w-[350px] flex-col md:w-[600px]'>
-        <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+        <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
           ⚔️ Head-to-Head Results
         </h1>
         <p className='pb-5 text-sm'>No results available yet.</p>
@@ -127,7 +127,7 @@ export default function DraftResultsTable() {
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
         ⚔️ Head-to-Head Results
       </h1>
       <p className='pb-5 text-sm'>
@@ -150,8 +150,10 @@ export default function DraftResultsTable() {
         />
 
         {/* Results Table */}
-        <div className='rounded-lg border-2 border-black bg-gradient-to-r from-cyan-600 to-blue-500 p-6 shadow-2xl'>
-          <h2 className='pb-3 text-lg font-medium text-white'>
+        <div
+          className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
+        >
+          <h2 className='pb-3 text-xl font-medium text-white'>
             Gameweek {selectedGameweek} Results
           </h2>
           <table className='w-full text-sm font-light text-white'>
@@ -166,7 +168,7 @@ export default function DraftResultsTable() {
               {formattedMatches.map((match, index) => (
                 <tr
                   key={index}
-                  className={index % 2 === 0 ? '' : 'bg-blue-400'}
+                  className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
                 >
                   <td
                     className={`py-4 ${match.home_wins ? 'font-bold text-yellow-300' : ''}`}

@@ -62,7 +62,7 @@ export function RumblerFrequencyChart({ data }: RumblerFrequencyChartProps) {
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>
+      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
         👀 Who had the most rumblers?
       </h1>
       <p className='pb-5 text-sm'>
