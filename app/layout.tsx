@@ -63,9 +63,13 @@ export default function RootLayout({
         inter.variable,
       )}
     >
-      <body className={`font-inter flex min-h-full flex-col bg-transparent`}>
+      <body
+        className={`font-inter flex min-h-screen flex-col bg-transparent antialiased`}
+      >
         <HeaderNav />
-        <div className='flex flex-1 flex-col'>{children}</div>
+        <div className='mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8'>
+          <main className='flex flex-col items-center'>{children}</main>
+        </div>
         <Analytics />
         <SpeedInsights />
         <Footer />

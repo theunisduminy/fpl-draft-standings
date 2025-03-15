@@ -8,7 +8,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <main
-      className={`mx-auto flex h-[100%] flex-col justify-start pb-20 pt-10`}
+      className={`mx-auto flex h-[100%] w-full flex-col items-center justify-start pb-20 pt-10`}
     >
       {children}
     </main>

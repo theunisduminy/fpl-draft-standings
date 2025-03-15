@@ -1,0 +1,32 @@
+---
+description: Roadmap for the application
+globs: 
+---
+# Feature development roadmap
+
+## 1. weekly gameweek email notifications
+
+- **Objective:** At the end of each gameweek, automatically send an email to all participants detailing the week's results.
+- **Details:**
+  - Generate an email summary that includes:
+    - Overall gameweek results.
+    - Identification of the participant with the lowest points (assigned to take a rumbler).
+  - Schedule the email to be sent out automatically once the gameweek concludes.
+  - Ensure the email template is clear, responsive, and styled consistently with the app’s design.
+
+## 2. display real football team results
+
+- **Objective:** Augment the fantasy results by displaying the actual results of the football teams that played.
+- **Details:**
+  - Integrate with a reliable football data API to fetch real match results.
+  - Present the actual scores and outcomes of the matches in a user-friendly format.
+  - Ensure that the displayed data complements the fantasy results, providing additional context for users.
+
+## 3. develop season visualisations
+
+- **Objective:** Create engaging and interactive visualisations to display season statistics and trends.
+- **Details:**
+  - Build dynamic dashboards that extract and showcase key statistics from the season.
+  - Use modern UI libraries (e.g., shadcn/ui) and Tailwind CSS to create responsive, visually appealing charts and graphs.
+  - Allow users to interact with the visualisations (e.g., filter data, drill down for more detail).
+  - Ensure visualisations are accessible and informative, aiding users in understanding season-long trends.
