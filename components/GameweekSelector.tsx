@@ -96,7 +96,7 @@ export function GameweekSelector({
               onClick={() => onSelectGameweek(gameweek)}
               className={`mx-1 min-w-[90px] rounded-xl border-2 border-premPurple px-4 py-2 text-center font-medium shadow-md transition-all ${
                 selectedGameweek === gameweek
-                  ? 'to-ruddyBlue bg-gradient-to-r from-cyan-600 text-white'
+                  ? 'bg-gradient-to-r from-cyan-600 to-ruddyBlue text-white'
                   : 'bg-gradient-to-r from-premTurquoise to-premGreen hover:from-premGreen hover:to-premTurquoise'
               } `}
             >

@@ -78,7 +78,7 @@ export default function FormulaOneTable() {
                 <td className='py-4 text-center'>
                   <Link
                     href={`/players/${player.id}`}
-                    className='text-blackOlive inline-flex items-center justify-center rounded bg-white p-1.5 transition-colors hover:bg-gray-100'
+                    className='inline-flex items-center justify-center rounded bg-white p-1.5 text-blackOlive transition-colors hover:bg-gray-100'
                     title='View detailed statistics'
                   >
                     <LineChart className='h-4 w-4' />

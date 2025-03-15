@@ -38,7 +38,7 @@ export default function HeaderNav() {
               />
             </Link>
             <div className='ml-12 hidden lg:block'>
-              <div className='bg-ruddyBlue flex items-center space-x-2 rounded-xl border-2 border-black px-4 py-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
+              <div className='flex items-center space-x-2 rounded-xl border-2 border-black bg-ruddyBlue px-4 py-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
                 {navigation.map((link) => (
                   <Link
                     target={link.target}
@@ -61,7 +61,7 @@ export default function HeaderNav() {
         {/* Mobile Navigation */}
         <div className='sticky top-0 z-50 lg:hidden'>
           <div className='flex justify-center py-4'>
-            <div className='bg-ruddyBlue flex w-full items-center justify-center space-x-3 rounded-xl border-2 border-black p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
+            <div className='flex w-full items-center justify-center space-x-3 rounded-xl border-2 border-black bg-ruddyBlue p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
               {navigation.map((link) => (
                 <Link
                   target={link.target}

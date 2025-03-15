@@ -80,7 +80,7 @@ export function GameweekSummaryCard({
       </CardHeader>
       <CardContent>
         <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-          <div className='bg-ruddyBlue rounded-lg p-4'>
+          <div className='rounded-lg bg-ruddyBlue p-4'>
             <div className='flex flex-col items-start gap-2'>
               <div className='flex items-center gap-2'>
                 <BarChart3 className='h-6 w-6 text-white' />
@@ -93,7 +93,7 @@ export function GameweekSummaryCard({
           </div>
 
           {highestScoringPlayer && (
-            <div className='bg-ruddyBlue rounded-lg p-4'>
+            <div className='rounded-lg bg-ruddyBlue p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex items-center gap-2'>
                   <Trophy className='h-6 w-6 text-amber-400' />
@@ -107,7 +107,7 @@ export function GameweekSummaryCard({
           )}
 
           {lowestScoringPlayer && (
-            <div className='bg-ruddyBlue rounded-lg p-4'>
+            <div className='rounded-lg bg-ruddyBlue p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex items-center gap-2'>
                   <ArrowDown className='h-6 w-6 text-red-400' />

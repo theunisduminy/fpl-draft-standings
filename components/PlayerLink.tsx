@@ -10,10 +10,10 @@ export function PlayerLink({ playerId, className }: PlayerLinkProps) {
   return (
     <Link
       href={`/players/${playerId}`}
-      className={`text-blackOlive inline-flex items-center justify-center rounded bg-white p-1.5 transition-colors hover:bg-gray-100 ${className || ''}`}
+      className={`inline-flex items-center justify-center rounded bg-white p-1.5 text-blackOlive transition-colors hover:bg-gray-100 ${className || ''}`}
       title='View detailed statistics'
     >
-      <LineChart className='text-blackOlive h-4 w-4' />
+      <LineChart className='h-4 w-4 text-blackOlive' />
     </Link>
   );
 }

@@ -13,7 +13,7 @@ const ViewButton: React.FC<ButtonProps> = ({ isActive, onClick, children }) => (
   <button
     className={`${buttonStyle} ${
       isActive
-        ? 'to-ruddyBlue bg-gradient-to-r from-cyan-600 text-white'
+        ? 'bg-gradient-to-r from-cyan-600 to-ruddyBlue text-white'
         : 'bg-gradient-to-r from-premTurquoise to-premGreen'
     }`}
     onClick={onClick}
