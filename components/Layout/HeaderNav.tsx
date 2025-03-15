@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
-
 'use client';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const navigation = [
   { name: 'Standings', href: '/', target: '_self' },
@@ -10,11 +11,23 @@ const navigation = [
 ];
 
 export default function HeaderNav() {
+  const pathname = usePathname();
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 100);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <header className='bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95]'>
-      {/* <header className='bg-[#75fa95]'> */}
       <nav className='mx-auto max-w-7xl px-6 lg:px-8' aria-label='Top'>
-        <div className='flex w-full flex-col items-center justify-between border-b-2 border-premPurple py-6'>
+        {/* Logo and Desktop Navigation */}
+        <div className='flex w-full flex-col items-center justify-between py-6 md:border-b-2 md:border-premPurple'>
           <div className='flex items-center'>
             <Link href='/'>
               <span className='sr-only'>Draft League Standings</span>
@@ -24,31 +37,47 @@ export default function HeaderNav() {
                 alt='draft standings logo'
               />
             </Link>
-            <div className='ml-10 hidden space-x-6 lg:block'>
-              {navigation.map((link) => (
-                <a
-                  target={link.target}
-                  key={link.name}
-                  href={link.href}
-                  className='text-md rounded-lg border border-premPurple px-4 py-2 font-medium text-premPurple hover:bg-premPurple hover:text-indigo-50'
-                >
-                  {link.name}
-                </a>
-              ))}
+            <div className='ml-12 hidden lg:block'>
+              <div className='flex items-center space-x-2 rounded-full border-2 border-black bg-blue-400 px-4 py-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
+                {navigation.map((link) => (
+                  <Link
+                    target={link.target}
+                    key={link.name}
+                    href={link.href}
+                    className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
+                      pathname === link.href
+                        ? 'bg-white text-black'
+                        : 'text-black hover:bg-white/10'
+                    }`}
+                  >
+                    {link.name}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-        <div className='sticky top-0 z-20 flex flex-wrap justify-center gap-x-2 py-4 lg:hidden'>
-          {navigation.map((link) => (
-            <a
-              target={link.target}
-              key={link.name}
-              href={link.href}
-              className='rounded-lg border border-premPurple px-4 py-2 text-sm font-medium text-premPurple hover:bg-premPurple hover:text-indigo-50'
-            >
-              {link.name}
-            </a>
-          ))}
+
+        {/* Mobile Navigation */}
+        <div className='sticky top-0 z-50 lg:hidden'>
+          <div className='flex justify-center py-4'>
+            <div className='flex w-full items-center justify-center space-x-3 rounded-full border-2 border-black bg-blue-400 p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
+              {navigation.map((link) => (
+                <Link
+                  target={link.target}
+                  key={link.name}
+                  href={link.href}
+                  className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
+                    pathname === link.href
+                      ? 'bg-white text-black'
+                      : 'text-black hover:bg-white/10'
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </nav>
     </header>

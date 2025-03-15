@@ -64,7 +64,7 @@ export function PlayerPerformanceChart({
         <div className='w-full'>
           <ChartContainer
             config={chartConfig}
-            className='aspect-[2/1] min-h-[300px] w-full'
+            className='w-full md:aspect-[2/1] md:min-h-[300px]'
           >
             <ResponsiveContainer width='100%' height='100%'>
               <LineChart
