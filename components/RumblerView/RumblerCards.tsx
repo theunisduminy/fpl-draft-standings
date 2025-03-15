@@ -230,7 +230,9 @@ export default function RumblerDataCards(): JSX.Element {
           <CardFooter className='flex-col items-start gap-3 p-5 text-white'>
             <div className='flex w-full items-start gap-3'>
               <div className='flex-1'>
-                <p className='text-lg italic text-white'>"{currentBlurb}"</p>
+                <p className='text-lg italic text-white'>
+                  &ldquo;{currentBlurb}&ldquo;
+                </p>
               </div>
             </div>
           </CardFooter>
