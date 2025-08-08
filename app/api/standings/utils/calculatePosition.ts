@@ -24,9 +24,15 @@ export function calculatePositions(
 
   // Iterate through each event
   const events = Array.from(new Set(matches.map((match) => match.event)));
+
   events.forEach((event) => {
     // Gather all matches for the current event
     const eventMatches = matches.filter((m) => m.event === event && m.finished);
+
+    // Skip events with no finished matches (start of season)
+    if (eventMatches.length === 0) {
+      return;
+    }
 
     // Combine and sort players by points within the event
     const sortedPlayers = eventMatches

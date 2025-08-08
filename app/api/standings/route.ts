@@ -7,8 +7,12 @@ import { sortPlayersObject } from './utils/sortPlayersObject';
 
 export const GET = async (req: Request, res: Response) => {
   try {
-    const { matches, league_entries, standings } = await fetchData();
+    const data = await fetchData();
 
+    // Extract data with fallbacks for missing properties
+    const matches = data.matches || [];
+    const league_entries = data.league_entries || [];
+    const standings = data.standings || [];
     // Create player objects
     const playerDetails = createPlayersObject(league_entries);
 
@@ -22,7 +26,7 @@ export const GET = async (req: Request, res: Response) => {
     const rankedPlayers = sortPlayersObject(standings, customStandings);
 
     // Sort by F1 score and assign F1 ranking
-    rankedPlayers.sort((a, b) => (b.f1_score || 0) - (a.f1_score || 0)); // Ensure sorting comparison with defaults
+    rankedPlayers.sort((a, b) => (b.f1_score || 0) - (a.f1_score || 0));
     rankedPlayers.forEach((player, index) => {
       player.f1_ranking = index + 1;
     });

@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { Match } from '@/interfaces/match';
-// import standing from '@/data/league-details.json';
 
 async function fetchData(): Promise<{ matches: Match[] }> {
   try {
     const res = await fetch(
-      'https://draft.premierleague.com/api/league/5525/details',
+      'https://draft.premierleague.com/api/league/21646/details',
       {
         next: {
           revalidate: 3600, // 1 hour

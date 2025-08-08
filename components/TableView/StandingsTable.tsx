@@ -6,7 +6,7 @@ import { fetchWithDelay } from '@/utils/fetchWithDelay';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import Link from 'next/link';
-import { LineChart, Users } from 'lucide-react';
+import { LineChart } from 'lucide-react';
 import { tableGradient } from '@/utils/tailwindVars';
 export default function FormulaOneTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
@@ -19,6 +19,12 @@ export default function FormulaOneTable() {
       const response = (await fetchWithDelay(['standings'])) as [
         PlayerDetails[],
       ];
+
+      console.log('standings');
+      console.log('--------------------------------');
+      console.log(response);
+      console.log('--------------------------------');
+
       const standingsData = response[0];
       setStandings(standingsData);
       setError(null);
