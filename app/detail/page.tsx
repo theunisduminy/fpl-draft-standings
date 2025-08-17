@@ -12,17 +12,17 @@ type SelectOption = {
 
 export default function DetailView() {
   const [activeTableMatches, setActiveTableMatches] =
-    useState<string>('fixtures');
+    useState<string>('results');
 
-  // Define options for the select dropdown
+  // Define options for the select dropdown - updated for Classic format
   const selectOptions: SelectOption[] = [
-    { value: 'fixtures', label: 'H2H Fixtures' },
-    { value: 'results', label: 'H2H Results' },
+    { value: 'results', label: 'Gameweek Results' },
+    { value: 'fixtures', label: 'Upcoming Gameweeks' },
   ];
 
   return (
     <div>
-      <h1 className='pb-5 text-4xl font-semibold text-[#310639]'>Matches</h1>
+      <h1 className='pb-5 text-4xl font-semibold text-[#310639]'>Gameweeks</h1>
       <SelectTable
         options={selectOptions}
         onSelectChange={(value) => setActiveTableMatches(value)}

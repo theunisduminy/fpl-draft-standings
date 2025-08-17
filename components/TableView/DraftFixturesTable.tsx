@@ -1,50 +1,48 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
-import { Match } from '@/interfaces/match';
 import { fetchWithDelay } from '@/utils/fetchWithDelay';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
-import { GameweekSelector } from '@/components/GameweekSelector';
-import { MatchOddsCard } from '@/components/DetailView/MatchOddsCard';
 import { tableGradient } from '@/utils/tailwindVars';
+
+// Interface for gameweek performance data (matching the updated matches API)
+interface GameweekPerformance {
+  event: number;
+  league_entry: number;
+  event_total: number;
+  rank: number;
+  finished: boolean;
+}
 
 export default function DraftFixturesTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [gameweekData, setGameweekData] = useState<GameweekPerformance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [futureGameweeks, setFutureGameweeks] = useState<number[]>([]);
-  const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
+  const [currentGameweek, setCurrentGameweek] = useState<number>(0);
 
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
-        const [standingsData, matchesData] = (await fetchWithDelay([
+        const [standingsData, gameweekPerformanceData] = (await fetchWithDelay([
           'standings',
-          'matches',
-        ])) as [PlayerDetails[], Match[]];
+          'matches', // This now returns gameweek performance data
+        ])) as [PlayerDetails[], GameweekPerformance[]];
 
         setStandings(standingsData);
-        setMatches(matchesData);
+        setGameweekData(gameweekPerformanceData);
 
-        // Extract all upcoming gameweeks
-        const upcoming = Array.from(
-          new Set(
-            matchesData
-              .filter((match) => !match.finished)
-              .map((match) => match.event),
-          ),
-        ).sort((a, b) => a - b); // Sort in ascending order (earliest first)
-
-        setFutureGameweeks(upcoming);
-
-        // Set the default selected gameweek to the next upcoming one
-        if (upcoming.length > 0) {
-          setSelectedGameweek(upcoming[0]);
-        }
-
+        // Get the current/next gameweek
+        const completedGameweeks = gameweekPerformanceData
+          .filter((gw) => gw.finished)
+          .map((gw) => gw.event);
+        const maxCompletedGameweek = completedGameweeks.length > 0 
+          ? Math.max(...completedGameweeks) 
+          : 0;
+        
+        setCurrentGameweek(maxCompletedGameweek + 1);
         setError(null);
       } catch (err) {
         setError('Failed to load data. Please try again later.');
@@ -62,23 +60,21 @@ export default function DraftFixturesTable() {
     setError(null);
     fetchWithDelay(['standings', 'matches'])
       .then((data: unknown) => {
-        const [standingsData, matchesData] = data as [PlayerDetails[], Match[]];
+        const [standingsData, gameweekPerformanceData] = data as [
+          PlayerDetails[],
+          GameweekPerformance[],
+        ];
         setStandings(standingsData);
-        setMatches(matchesData);
+        setGameweekData(gameweekPerformanceData);
 
-        const upcoming = Array.from(
-          new Set(
-            matchesData
-              .filter((match: Match) => !match.finished)
-              .map((match: Match) => match.event),
-          ),
-        ).sort((a: number, b: number) => a - b);
-
-        setFutureGameweeks(upcoming);
-
-        if (upcoming.length > 0) {
-          setSelectedGameweek(upcoming[0]);
-        }
+        const completedGameweeks = gameweekPerformanceData
+          .filter((gw: GameweekPerformance) => gw.finished)
+          .map((gw: GameweekPerformance) => gw.event);
+        const maxCompletedGameweek = completedGameweeks.length > 0 
+          ? Math.max(...completedGameweeks) 
+          : 0;
+        
+        setCurrentGameweek(maxCompletedGameweek + 1);
       })
       .catch((err) => {
         setError('Failed to load data. Please try again later.');
@@ -91,93 +87,142 @@ export default function DraftFixturesTable() {
 
   if (loading) return <SkeletonCard />;
   if (error) return <ErrorDisplay message={error} onRetry={handleRetry} />;
-  if (futureGameweeks.length === 0) {
-    return (
-      <div className='flex w-[350px] flex-col md:w-[600px]'>
-        <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-          🏟️ Upcoming Fixtures
-        </h1>
-        <p className='pb-5 text-sm'>No upcoming fixtures available.</p>
-      </div>
-    );
-  }
 
-  // Filter matches for the selected gameweek
-  const gameweekMatches = matches.filter(
-    (match) => match.event === selectedGameweek && !match.finished,
-  );
-
-  const formattedMatches = gameweekMatches.map((match) => {
-    const homePlayer = standings.find(
-      (player) => player.id === match.league_entry_1,
-    );
-    const awayPlayer = standings.find(
-      (player) => player.id === match.league_entry_2,
-    );
-
-    return {
-      home_player_name: homePlayer ? homePlayer.player_name : 'Unknown',
-      away_player_name: awayPlayer ? awayPlayer.player_name : 'Unknown',
-    };
+  // Sort standings by current total points
+  const currentStandings = standings.slice().sort((a, b) => {
+    return (b.total_points || 0) - (a.total_points || 0);
   });
 
-  // Get all finished matches for prediction calculations
-  const finishedMatches = matches.filter((match) => match.finished);
+  // Calculate recent form (last 3 gameweeks if available)
+  const recentForm = currentStandings.map(player => {
+    const playerGameweeks = gameweekData
+      .filter(gw => gw.league_entry === player.id && gw.finished)
+      .sort((a, b) => b.event - a.event)
+      .slice(0, 3); // Last 3 gameweeks
+    
+    const averageRecentPoints = playerGameweeks.length > 0
+      ? playerGameweeks.reduce((sum, gw) => sum + gw.event_total, 0) / playerGameweeks.length
+      : 0;
+    
+    return {
+      ...player,
+      recentForm: averageRecentPoints,
+      recentGameweeks: playerGameweeks.length,
+    };
+  });
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
       <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-        🏟️ Upcoming Fixtures
+        📅 Upcoming Gameweek
       </h1>
       <p className='pb-5 text-sm'>
-        Upcoming head-to-head fixtures in the Draft league.
+        Current standings and form ahead of Gameweek {currentGameweek}.
       </p>
 
-      <GameweekSelector
-        gameweeks={futureGameweeks}
-        selectedGameweek={selectedGameweek}
-        onSelectGameweek={setSelectedGameweek}
-        label='Select Gameweek'
-      />
-
       <div className='mt-6 space-y-6'>
-        {/* Fixtures Table */}
+        {/* Current Standings Table */}
         <div
-          className={`w-full rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
+          className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
         >
           <h2 className='pb-3 text-xl font-medium text-white'>
-            Gameweek {selectedGameweek} Fixtures
+            Current Standings (Going into GW {currentGameweek})
           </h2>
           <table className='w-full text-sm font-light text-white'>
             <thead>
               <tr className='border-b-2 border-white'>
-                <th className='py-2 font-medium'>Home</th>
-                <th></th>
-                <th className='py-2 font-medium'>Away</th>
+                <th className='py-2 text-left font-medium'>Pos</th>
+                <th className='py-2 text-left font-medium'>Player</th>
+                <th className='py-2 text-left font-medium'>Team</th>
+                <th className='py-2 text-right font-medium'>Total Pts</th>
+                <th className='py-2 text-right font-medium'>Recent Form</th>
               </tr>
             </thead>
             <tbody>
-              {formattedMatches.map((match, index) => (
+              {recentForm.map((player, index) => (
                 <tr
-                  key={index}
+                  key={player.id}
                   className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
                 >
-                  <td className='py-4'>{match.home_player_name}</td>
-                  <td className='py-4'>vs.</td>
-                  <td className='py-4'>{match.away_player_name}</td>
+                  <td className='py-4'>
+                    <span
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                        index === 0
+                          ? 'bg-yellow-400 text-black'
+                          : index === 1
+                          ? 'bg-gray-300 text-black'
+                          : index === 2
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-gray-600 text-white'
+                      }`}
+                    >
+                      {index + 1}
+                    </span>
+                  </td>
+                  <td className='py-4 font-medium'>{player.player_name}</td>
+                  <td className='py-4 text-gray-300'>{player.team_name}</td>
+                  <td className='py-4 text-right'>
+                    <span className='font-bold text-white'>
+                      {player.total_points || 0}
+                    </span>
+                  </td>
+                  <td className='py-4 text-right'>
+                    <span
+                      className={`font-bold ${
+                        player.recentForm >= 15
+                          ? 'text-green-300'
+                          : player.recentForm >= 10
+                          ? 'text-yellow-300'
+                          : 'text-red-300'
+                      }`}
+                    >
+                      {player.recentForm.toFixed(1)}
+                      <span className='text-xs text-gray-400 ml-1'>
+                        ({player.recentGameweeks}GW)
+                      </span>
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Match Odds Card */}
-        <MatchOddsCard
-          gameweek={selectedGameweek}
-          matches={matches}
-          players={standings}
-          finishedMatches={finishedMatches}
-        />
+        {/* Gameweek Preview */}
+        <div
+          className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
+        >
+          <h3 className='pb-3 text-lg font-medium text-white'>
+            Gameweek {currentGameweek} Preview
+          </h3>
+          <div className='grid grid-cols-1 gap-4 text-white md:grid-cols-2'>
+            <div>
+              <p className='text-sm text-gray-300'>Current Leader</p>
+              <p className='text-lg font-bold text-yellow-300'>
+                {recentForm[0]?.player_name} ({recentForm[0]?.total_points || 0} pts)
+              </p>
+            </div>
+            <div>
+              <p className='text-sm text-gray-300'>Best Recent Form</p>
+              <p className='text-lg font-bold text-green-300'>
+                {recentForm.sort((a, b) => b.recentForm - a.recentForm)[0]?.player_name} 
+                ({recentForm.sort((a, b) => b.recentForm - a.recentForm)[0]?.recentForm.toFixed(1)} avg)
+              </p>
+            </div>
+            <div>
+              <p className='text-sm text-gray-300'>Points Gap (1st to Last)</p>
+              <p className='text-lg font-bold'>
+                {(recentForm[0]?.total_points || 0) - (recentForm[recentForm.length - 1]?.total_points || 0)} pts
+              </p>
+            </div>
+            <div>
+              <p className='text-sm text-gray-300'>Average Points</p>
+              <p className='text-lg font-bold'>
+                {(recentForm.reduce((sum, p) => sum + (p.total_points || 0), 0) / recentForm.length).toFixed(1)} pts
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

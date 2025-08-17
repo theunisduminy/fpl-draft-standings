@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { fetchData } from '../standings/utils/fetchData';
 
-type Match = {
+// Interface for gameweek performance data (matching the updated matches API)
+interface GameweekPerformance {
   event: number;
-  league_entry_1: number;
-  league_entry_1_points: number;
-  league_entry_2: number;
-  league_entry_2_points: number;
+  league_entry: number;
+  event_total: number;
+  rank: number;
   finished: boolean;
-};
+}
 
 type LeagueEntry = {
   id: number;
@@ -23,104 +23,92 @@ type LowestScore = {
   player_names: string[];
 };
 
+// Helper function to get gameweek performance data from the matches API
+async function fetchGameweekPerformances(): Promise<GameweekPerformance[]> {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/matches`,
+      {
+        next: {
+          revalidate: 3600, // 1 hour
+        },
+      },
+    );
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching gameweek performances:', err);
+    return [];
+  }
+}
+
 export const GET = async (req: Request, res: Response) => {
   try {
-    // Fetch data from the endpoint
-    const {
-      matches,
-      league_entries,
-    }: { matches: Match[]; league_entries: LeagueEntry[] } = await fetchData();
+    // Fetch data from both endpoints
+    const [{ league_entries }, gameweekData] = await Promise.all([
+      fetchData(),
+      fetchGameweekPerformances(),
+    ]);
 
     // Prepare to store the lowest score for each Gameweek
     const lowestScoresByGW: Record<number, LowestScore> = {};
 
-    // Iterate over matches to determine the lowest score for each completed GW
-    matches.forEach((match) => {
-      const {
-        event,
-        league_entry_1,
-        league_entry_1_points,
-        league_entry_2,
-        league_entry_2_points,
-        finished,
-      } = match;
-
-      // Only consider matches that are finished
-      if (!finished) {
-        return;
-      }
-
-      // Check if the GW is already in the lowestScoresByGW object, if not initialize it
-      if (!lowestScoresByGW[event]) {
-        lowestScoresByGW[event] = {
-          points: Infinity,
-          entry_names: [],
-          player_names: [],
-        };
-      }
-
-      // Compare league_entry_1 points with the current lowest
-      if (league_entry_1_points < lowestScoresByGW[event].points) {
-        const player = league_entries.find(
-          (entry) => entry.id === league_entry_1,
-        );
-        if (player) {
-          lowestScoresByGW[event] = {
-            points: league_entry_1_points,
-            entry_names: [player.entry_name],
-            player_names: [`${player.player_first_name}`],
-          };
+    // Group gameweek data by event (gameweek)
+    const gameweeksByEvent: Record<number, GameweekPerformance[]> = {};
+    gameweekData.forEach((gw) => {
+      if (gw.finished) {
+        if (!gameweeksByEvent[gw.event]) {
+          gameweeksByEvent[gw.event] = [];
         }
-      } else if (league_entry_1_points === lowestScoresByGW[event].points) {
-        const player = league_entries.find(
-          (entry) => entry.id === league_entry_1,
-        );
-        if (player) {
-          lowestScoresByGW[event].entry_names.push(player.entry_name);
-          lowestScoresByGW[event].player_names.push(
-            `${player.player_first_name}`,
-          );
-        }
-      }
-
-      // Compare league_entry_2 points with the current lowest
-      if (league_entry_2_points < lowestScoresByGW[event].points) {
-        const player = league_entries.find(
-          (entry) => entry.id === league_entry_2,
-        );
-        if (player) {
-          lowestScoresByGW[event] = {
-            points: league_entry_2_points,
-            entry_names: [player.entry_name],
-            player_names: [`${player.player_first_name}`],
-          };
-        }
-      } else if (league_entry_2_points === lowestScoresByGW[event].points) {
-        const player = league_entries.find(
-          (entry) => entry.id === league_entry_2,
-        );
-        if (player) {
-          lowestScoresByGW[event].entry_names.push(player.entry_name);
-          lowestScoresByGW[event].player_names.push(
-            `${player.player_first_name}`,
-          );
-        }
+        gameweeksByEvent[gw.event].push(gw);
       }
     });
 
-    // Convert the lowestScoresByGW object into an array for the response, including only completed GWs
-    const lowestScoresArray = Object.entries(lowestScoresByGW)
-      .filter(([_, data]) => data.points !== Infinity) // Filter out incomplete GWs
-      .map(([gw, data]) => {
-        return {
-          gameweek: parseInt(gw, 10),
-          ...data,
+    // Find the lowest scorer(s) for each completed gameweek
+    Object.entries(gameweeksByEvent).forEach(
+      ([eventStr, gameweekPerformances]) => {
+        const event = parseInt(eventStr, 10);
+
+        // Find the minimum points for this gameweek
+        const minPoints = Math.min(
+          ...gameweekPerformances.map((gw) => gw.event_total),
+        );
+
+        // Find all players who scored the minimum points
+        const rumblers = gameweekPerformances.filter(
+          (gw) => gw.event_total === minPoints,
+        );
+
+        // Get player details for the rumblers
+        const rumblerDetails = rumblers.map((rumbler) => {
+          const player = league_entries.find(
+            (entry) => entry.id === rumbler.league_entry,
+          );
+          return {
+            entry_name: player ? player.entry_name : 'Unknown',
+            player_name: player ? player.player_first_name : 'Unknown',
+          };
+        });
+
+        lowestScoresByGW[event] = {
+          points: minPoints,
+          entry_names: rumblerDetails.map((r) => r.entry_name),
+          player_names: rumblerDetails.map((r) => r.player_name),
         };
-      });
+      },
+    );
+
+    // Convert the lowestScoresByGW object into an array for the response
+    const lowestScoresArray = Object.entries(lowestScoresByGW)
+      .map(([gw, data]) => ({
+        gameweek: parseInt(gw, 10),
+        ...data,
+      }))
+      .sort((a, b) => b.gameweek - a.gameweek); // Sort by gameweek descending
 
     // Return the lowest scores for each completed GW
     return NextResponse.json(lowestScoresArray);
   } catch (error) {
+    console.error('Error in rumbler API:', error);
     return NextResponse.json(
       { message: (error as Error).message },
       { status: 500 },

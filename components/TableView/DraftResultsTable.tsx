@@ -1,17 +1,23 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { PlayerDetails } from '@/interfaces/players';
-import { Match } from '@/interfaces/match';
 import { fetchWithDelay } from '@/utils/fetchWithDelay';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
-import { GameweekSummaryCard } from '@/components/DetailView/GameweekSummaryCard';
-import { GameweekScoreChart } from '@/components/DetailView/GameweekScoreChart';
 import { tableGradient } from '@/utils/tailwindVars';
+
+// Interface for gameweek performance data (matching the updated matches API)
+interface GameweekPerformance {
+  event: number;
+  league_entry: number;
+  event_total: number;
+  rank: number;
+  finished: boolean;
+}
 export default function DraftResultsTable() {
   const [standings, setStandings] = useState<PlayerDetails[]>([]);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [gameweekData, setGameweekData] = useState<GameweekPerformance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gameweeks, setGameweeks] = useState<number[]>([]);
@@ -21,20 +27,20 @@ export default function DraftResultsTable() {
     async function fetchData() {
       try {
         setLoading(true);
-        const [standingsData, matchesData] = (await fetchWithDelay([
+        const [standingsData, gameweekPerformanceData] = (await fetchWithDelay([
           'standings',
-          'matches',
-        ])) as [PlayerDetails[], Match[]];
+          'matches', // This now returns gameweek performance data
+        ])) as [PlayerDetails[], GameweekPerformance[]];
 
         setStandings(standingsData);
-        setMatches(matchesData);
+        setGameweekData(gameweekPerformanceData);
 
         // Extract all completed gameweeks
         const completedGameweeks = Array.from(
           new Set(
-            matchesData
-              .filter((match) => match.finished)
-              .map((match) => match.event),
+            gameweekPerformanceData
+              .filter((gw) => gw.finished)
+              .map((gw) => gw.event),
           ),
         ).sort((a, b) => b - a); // Sort in descending order (latest first)
 
@@ -62,15 +68,18 @@ export default function DraftResultsTable() {
     setError(null);
     fetchWithDelay(['standings', 'matches'])
       .then((data: unknown) => {
-        const [standingsData, matchesData] = data as [PlayerDetails[], Match[]];
+        const [standingsData, gameweekPerformanceData] = data as [
+          PlayerDetails[],
+          GameweekPerformance[],
+        ];
         setStandings(standingsData);
-        setMatches(matchesData);
+        setGameweekData(gameweekPerformanceData);
 
         const completedGameweeks = Array.from(
           new Set(
-            matchesData
-              .filter((match: Match) => match.finished)
-              .map((match: Match) => match.event),
+            gameweekPerformanceData
+              .filter((gw: GameweekPerformance) => gw.finished)
+              .map((gw: GameweekPerformance) => gw.event),
           ),
         ).sort((a: number, b: number) => b - a);
 
@@ -95,43 +104,37 @@ export default function DraftResultsTable() {
     return (
       <div className='flex w-[350px] flex-col md:w-[600px]'>
         <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-          ⚔️ Head-to-Head Results
+          📊 Gameweek Results
         </h1>
-        <p className='pb-5 text-sm'>No results available yet.</p>
+        <p className='pb-5 text-sm'>No gameweek results available yet.</p>
       </div>
     );
   }
 
-  // Filter matches for the selected gameweek
-  const gameweekMatches = matches.filter(
-    (match) => match.event === selectedGameweek && match.finished,
-  );
+  // Filter gameweek data for the selected gameweek and sort by rank
+  const gameweekResults = gameweekData
+    .filter((gw) => gw.event === selectedGameweek && gw.finished)
+    .sort((a, b) => a.rank - b.rank);
 
-  const formattedMatches = gameweekMatches.map((match) => {
-    const homePlayer = standings.find(
-      (player) => player.id === match.league_entry_1,
-    );
-    const awayPlayer = standings.find(
-      (player) => player.id === match.league_entry_2,
-    );
-
+  // Create formatted results with player names
+  const formattedResults = gameweekResults.map((gw) => {
+    const player = standings.find((p) => p.id === gw.league_entry);
     return {
-      home_player_name: homePlayer ? homePlayer.player_name : 'Unknown',
-      away_player_name: awayPlayer ? awayPlayer.player_name : 'Unknown',
-      home_player_points: match.league_entry_1_points,
-      away_player_points: match.league_entry_2_points,
-      home_wins: match.league_entry_1_points > match.league_entry_2_points,
-      away_wins: match.league_entry_2_points > match.league_entry_1_points,
+      rank: gw.rank,
+      player_name: player ? player.player_name : 'Unknown',
+      team_name: player ? player.team_name : 'Unknown',
+      points: gw.event_total,
+      league_entry: gw.league_entry,
     };
   });
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
       <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-        ⚔️ Head-to-Head Results
+        📊 Gameweek Results
       </h1>
       <p className='pb-5 text-sm'>
-        Previous gameweeks head-to-head results for the Draft league.
+        Previous gameweek rankings and points for the Draft league.
       </p>
 
       <GameweekSelector
@@ -142,53 +145,110 @@ export default function DraftResultsTable() {
       />
 
       <div className='mt-6 space-y-6'>
-        {/* Gameweek Summary Card */}
-        <GameweekSummaryCard
-          gameweek={selectedGameweek}
-          matches={matches}
-          players={standings}
-        />
-
         {/* Results Table */}
         <div
           className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
         >
           <h2 className='pb-3 text-xl font-medium text-white'>
-            Gameweek {selectedGameweek} Results
+            Gameweek {selectedGameweek} Rankings
           </h2>
           <table className='w-full text-sm font-light text-white'>
             <thead>
               <tr className='border-b-2 border-white'>
-                <th className='py-2 font-medium'>Home</th>
-                <th></th>
-                <th className='py-2 font-medium'>Away</th>
+                <th className='py-2 text-left font-medium'>Rank</th>
+                <th className='py-2 text-left font-medium'>Player</th>
+                <th className='py-2 text-left font-medium'>Team</th>
+                <th className='py-2 text-right font-medium'>Points</th>
               </tr>
             </thead>
             <tbody>
-              {formattedMatches.map((match, index) => (
+              {formattedResults.map((result, index) => (
                 <tr
-                  key={index}
+                  key={result.league_entry}
                   className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
                 >
-                  <td
-                    className={`py-4 ${match.home_wins ? 'font-bold text-yellow-300' : ''}`}
-                  >{`${match.home_player_name} (${match.home_player_points})`}</td>
-                  <td className='py-4'>vs.</td>
-                  <td
-                    className={`py-4 ${match.away_wins ? 'font-bold text-yellow-300' : ''}`}
-                  >{`${match.away_player_name} (${match.away_player_points})`}</td>
+                  <td className='py-4'>
+                    <span
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                        result.rank === 1
+                          ? 'bg-yellow-400 text-black'
+                          : result.rank === 2
+                            ? 'bg-gray-300 text-black'
+                            : result.rank === 3
+                              ? 'bg-amber-600 text-white'
+                              : result.rank === 8
+                                ? 'bg-red-600 text-white'
+                                : 'bg-gray-600 text-white'
+                      }`}
+                    >
+                      {result.rank}
+                    </span>
+                  </td>
+                  <td className='py-4 font-medium'>{result.player_name}</td>
+                  <td className='py-4 text-gray-300'>{result.team_name}</td>
+                  <td className='py-4 text-right'>
+                    <span
+                      className={`font-bold ${
+                        result.rank === 1
+                          ? 'text-yellow-300'
+                          : result.rank === 8
+                            ? 'text-red-300'
+                            : 'text-white'
+                      }`}
+                    >
+                      {result.points}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Score Chart */}
-        <GameweekScoreChart
-          gameweek={selectedGameweek}
-          matches={matches}
-          players={standings}
-        />
+        {/* Summary Stats */}
+        {formattedResults.length > 0 && (
+          <div
+            className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
+          >
+            <h3 className='pb-3 text-lg font-medium text-white'>
+              Gameweek {selectedGameweek} Summary
+            </h3>
+            <div className='grid grid-cols-2 gap-4 text-white'>
+              <div>
+                <p className='text-sm text-gray-300'>Highest Score</p>
+                <p className='text-lg font-bold text-yellow-300'>
+                  {formattedResults[0]?.points} pts (
+                  {formattedResults[0]?.player_name})
+                </p>
+              </div>
+              <div>
+                <p className='text-sm text-gray-300'>Lowest Score</p>
+                <p className='text-lg font-bold text-red-300'>
+                  {formattedResults[formattedResults.length - 1]?.points} pts (
+                  {formattedResults[formattedResults.length - 1]?.player_name})
+                </p>
+              </div>
+              <div>
+                <p className='text-sm text-gray-300'>Average Score</p>
+                <p className='text-lg font-bold'>
+                  {(
+                    formattedResults.reduce((sum, r) => sum + r.points, 0) /
+                    formattedResults.length
+                  ).toFixed(1)}{' '}
+                  pts
+                </p>
+              </div>
+              <div>
+                <p className='text-sm text-gray-300'>Point Difference</p>
+                <p className='text-lg font-bold'>
+                  {formattedResults[0]?.points -
+                    formattedResults[formattedResults.length - 1]?.points}{' '}
+                  pts
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

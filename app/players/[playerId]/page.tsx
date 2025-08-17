@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { PlayerSummaryCard } from '@/components/PlayerView/PlayerSummaryCard';
 import { PlayerPerformanceChart } from '@/components/PlayerView/PlayerPerformanceChart';
-import { HeadToHeadRecord } from '@/components/PlayerView/HeadToHeadRecord';
+import { PositionStatsCard } from '@/components/PlayerView/PositionStatsCard';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import Link from 'next/link';
@@ -134,10 +134,10 @@ export default function PlayerStatistics() {
           />
         </div>
 
-        {/* Two column layout below for Player Stats and Head-to-Head */}
+        {/* Two column layout below for Player Stats and Position Stats */}
         <div className='grid grid-cols-1 gap-8 md:grid-cols-2'>
           <PlayerSummaryCard player={playerData} />
-          <HeadToHeadRecord records={playerData.headToHead} />
+          <PositionStatsCard stats={playerData.stats} />
         </div>
       </div>
     </div>

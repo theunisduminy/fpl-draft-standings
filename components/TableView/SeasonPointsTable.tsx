@@ -42,8 +42,7 @@ export default function SeasonPointsTable() {
         💯 Season Points
       </h1>
       <p className='pb-5 text-sm'>
-        Breakdown of total points scored, points scored against and head-to-head
-        points.
+        Breakdown of total FPL points scored and F1 championship points earned.
       </p>
 
       <div
@@ -52,13 +51,12 @@ export default function SeasonPointsTable() {
         <table className='w-full table-fixed text-white'>
           <thead>
             <tr>
-              <th className='w-1/5 border-r-2 border-white py-2 font-medium'>
+              <th className='w-1/4 border-r-2 border-white py-2 text-left font-medium'>
                 Player
               </th>
-              <th className='w-1/5 py-2 font-medium'>TP For</th>
-              <th className='w-1/5 py-2 font-medium'>TP Agst</th>
-              <th className='w-1/5 py-2 font-medium'>H2H Pts</th>
-              <th className='w-1/5 py-2 font-medium'>Stats</th>
+              <th className='w-1/4 py-2 text-center font-medium'>TP</th>
+              <th className='w-1/4 py-2 text-center font-medium'>F1 Points</th>
+              <th className='w-1/4 py-2 text-center font-medium'>Stats</th>
             </tr>
           </thead>
           <tbody>
@@ -67,12 +65,19 @@ export default function SeasonPointsTable() {
                 key={player.id}
                 className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
               >
-                <td className='border-r-2 border-white py-4'>
-                  {player.player_name}
+                <td className='border-r-2 border-white py-4 text-left'>
+                  <div className='font-medium'>{player.player_name}</div>
                 </td>
-                <td className='py-4'>{player.total_points}</td>
-                <td className='py-4'>{player.points_against}</td>
-                <td className='py-4'>{player.head_to_head_points}</td>
+                <td className='py-4 text-center'>
+                  <span className='text-lg font-bold text-blue-300'>
+                    {player.total_points || 0}
+                  </span>
+                </td>
+                <td className='py-4 text-center'>
+                  <span className='text-lg font-bold text-yellow-300'>
+                    {player.f1_score || 0}
+                  </span>
+                </td>
                 <td className='py-4 text-center'>
                   <PlayerLink playerId={player.id} />
                 </td>

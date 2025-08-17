@@ -1,139 +1,139 @@
 import { NextResponse } from 'next/server';
 import { fetchData } from '@/app/api/standings/utils/fetchData';
-import { Match } from '@/interfaces/match';
 import { Player } from '@/interfaces/players';
 
-// Helper function to calculate player performance over gameweeks
-function calculatePerformanceOverTime(matches: Match[], playerId: number) {
-  const gameweeks: { [key: number]: number } = {};
+// Interface for gameweek performance data (matching the updated matches API)
+interface GameweekPerformance {
+  event: number;
+  league_entry: number;
+  event_total: number;
+  rank: number;
+  finished: boolean;
+}
 
-  matches.forEach((match) => {
-    if (!match.finished) return;
+// Helper function to get gameweek performance data from the matches API
+async function fetchGameweekPerformances(): Promise<GameweekPerformance[]> {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/matches`,
+      {
+        next: {
+          revalidate: 3600, // 1 hour
+        },
+      },
+    );
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching gameweek performances:', err);
+    return [];
+  }
+}
 
-    const event = match.event;
-
-    if (match.league_entry_1 === playerId) {
-      gameweeks[event] = match.league_entry_1_points;
-    } else if (match.league_entry_2 === playerId) {
-      gameweeks[event] = match.league_entry_2_points;
-    }
-  });
-
-  return Object.entries(gameweeks)
-    .map(([gameweek, points]) => ({
-      gameweek: parseInt(gameweek),
-      points,
+// Helper function to calculate player performance over gameweeks for Classic format
+function calculatePerformanceOverTime(
+  gameweekData: GameweekPerformance[],
+  playerId: number,
+) {
+  return gameweekData
+    .filter((gw) => gw.league_entry === playerId && gw.finished)
+    .map((gw) => ({
+      gameweek: gw.event,
+      points: gw.event_total,
+      rank: gw.rank,
     }))
     .sort((a, b) => a.gameweek - b.gameweek);
 }
 
-// Helper function to calculate head-to-head records
-function calculateHeadToHeadRecords(
-  matches: Match[],
+// Helper function to find best and worst performances for Classic format
+function findBestAndWorstPerformances(
+  gameweekData: GameweekPerformance[],
   playerId: number,
-  players: Player[],
 ) {
-  const records: {
-    [key: number]: {
-      wins: number;
-      losses: number;
-      draws: number;
-      totalPoints: number;
-      againstPoints: number;
-    };
-  } = {};
+  const playerGameweeks = gameweekData.filter(
+    (gw) => gw.league_entry === playerId && gw.finished,
+  );
 
-  // Initialize records for all opponents
-  players.forEach((player) => {
-    if (player.id !== playerId) {
-      records[player.id] = {
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        totalPoints: 0,
-        againstPoints: 0,
+  if (playerGameweeks.length === 0) {
+    return {
+      bestGameweek: { gameweek: 0, points: 0, rank: 0 },
+      worstGameweek: { gameweek: 0, points: 0, rank: 0 },
+    };
+  }
+
+  let bestGameweek = { gameweek: 0, points: 0, rank: 0 };
+  let worstGameweek = { gameweek: 0, points: Number.MAX_SAFE_INTEGER, rank: 0 };
+
+  playerGameweeks.forEach((gw) => {
+    if (gw.event_total > bestGameweek.points) {
+      bestGameweek = {
+        gameweek: gw.event,
+        points: gw.event_total,
+        rank: gw.rank,
+      };
+    }
+
+    if (gw.event_total < worstGameweek.points) {
+      worstGameweek = {
+        gameweek: gw.event,
+        points: gw.event_total,
+        rank: gw.rank,
       };
     }
   });
 
-  // Calculate head-to-head statistics
-  matches.forEach((match) => {
-    if (!match.finished) return;
-
-    if (match.league_entry_1 === playerId && records[match.league_entry_2]) {
-      const playerPoints = match.league_entry_1_points;
-      const opponentPoints = match.league_entry_2_points;
-
-      records[match.league_entry_2].totalPoints += playerPoints;
-      records[match.league_entry_2].againstPoints += opponentPoints;
-
-      if (playerPoints > opponentPoints) {
-        records[match.league_entry_2].wins += 1;
-      } else if (playerPoints < opponentPoints) {
-        records[match.league_entry_2].losses += 1;
-      } else {
-        records[match.league_entry_2].draws += 1;
-      }
-    } else if (
-      match.league_entry_2 === playerId &&
-      records[match.league_entry_1]
-    ) {
-      const playerPoints = match.league_entry_2_points;
-      const opponentPoints = match.league_entry_1_points;
-
-      records[match.league_entry_1].totalPoints += playerPoints;
-      records[match.league_entry_1].againstPoints += opponentPoints;
-
-      if (playerPoints > opponentPoints) {
-        records[match.league_entry_1].wins += 1;
-      } else if (playerPoints < opponentPoints) {
-        records[match.league_entry_1].losses += 1;
-      } else {
-        records[match.league_entry_1].draws += 1;
-      }
-    }
-  });
-
-  // Format the data for the frontend
-  return Object.entries(records).map(([opponentId, record]) => {
-    const opponent = players.find((p) => p.id === parseInt(opponentId));
-    return {
-      opponentId: parseInt(opponentId),
-      opponentName: opponent ? `${opponent.player_first_name}` : 'Unknown',
-      opponentTeam: opponent ? opponent.entry_name : 'Unknown',
-      ...record,
-    };
-  });
+  return { bestGameweek, worstGameweek };
 }
 
-// Helper function to find best and worst performances
-function findBestAndWorstPerformances(matches: Match[], playerId: number) {
-  let bestGameweek = { gameweek: 0, points: 0 };
-  let worstGameweek = { gameweek: 0, points: Number.MAX_SAFE_INTEGER };
+// Helper function to calculate position statistics for Classic format
+function calculatePositionStats(
+  gameweekData: GameweekPerformance[],
+  playerId: number,
+) {
+  const playerGameweeks = gameweekData.filter(
+    (gw) => gw.league_entry === playerId && gw.finished,
+  );
 
-  matches.forEach((match) => {
-    if (!match.finished) return;
+  const positionCounts = {
+    first: 0,
+    second: 0,
+    third: 0,
+    fourth: 0,
+    fifth: 0,
+    sixth: 0,
+    seventh: 0,
+    eighth: 0,
+  };
 
-    let points = 0;
-
-    if (match.league_entry_1 === playerId) {
-      points = match.league_entry_1_points;
-    } else if (match.league_entry_2 === playerId) {
-      points = match.league_entry_2_points;
-    } else {
-      return;
-    }
-
-    if (points > bestGameweek.points) {
-      bestGameweek = { gameweek: match.event, points };
-    }
-
-    if (points < worstGameweek.points) {
-      worstGameweek = { gameweek: match.event, points };
+  playerGameweeks.forEach((gw) => {
+    switch (gw.rank) {
+      case 1:
+        positionCounts.first++;
+        break;
+      case 2:
+        positionCounts.second++;
+        break;
+      case 3:
+        positionCounts.third++;
+        break;
+      case 4:
+        positionCounts.fourth++;
+        break;
+      case 5:
+        positionCounts.fifth++;
+        break;
+      case 6:
+        positionCounts.sixth++;
+        break;
+      case 7:
+        positionCounts.seventh++;
+        break;
+      case 8:
+        positionCounts.eighth++;
+        break;
     }
   });
 
-  return { bestGameweek, worstGameweek };
+  return positionCounts;
 }
 
 // Main API handler
@@ -142,7 +142,11 @@ export const GET = async (
   { params }: { params: { id: string } },
 ) => {
   try {
-    const { matches, league_entries, standings } = await fetchData();
+    const [{ league_entries, standings }, gameweekData] = await Promise.all([
+      fetchData(),
+      fetchGameweekPerformances(),
+    ]);
+
     const playerId = parseInt(params.id, 10);
 
     // Get player basic info
@@ -158,65 +162,39 @@ export const GET = async (
     // Get player from standings to get additional data
     const playerStanding = standings.find((s) => s.league_entry === playerId);
 
-    // Calculate statistics
-    const performance = calculatePerformanceOverTime(matches, playerId);
-    const headToHead = calculateHeadToHeadRecords(
-      matches,
-      playerId,
-      league_entries,
-    );
+    // Calculate statistics for Classic format
+    const performance = calculatePerformanceOverTime(gameweekData, playerId);
     const { bestGameweek, worstGameweek } = findBestAndWorstPerformances(
-      matches,
+      gameweekData,
       playerId,
     );
+    const positionStats = calculatePositionStats(gameweekData, playerId);
 
     // Calculate overall stats
-    const totalMatches = headToHead.reduce(
-      (sum, record) => sum + record.wins + record.losses + record.draws,
-      0,
-    );
-    const totalWins = headToHead.reduce((sum, record) => sum + record.wins, 0);
-    const totalLosses = headToHead.reduce(
-      (sum, record) => sum + record.losses,
-      0,
-    );
-    const totalDraws = headToHead.reduce(
-      (sum, record) => sum + record.draws,
-      0,
-    );
-    const winPercentage =
-      totalMatches > 0 ? (totalWins / totalMatches) * 100 : 0;
-
-    // Calculate average points per gameweek
+    const totalGameweeks = performance.length;
     const totalPoints = performance.reduce((sum, gw) => sum + gw.points, 0);
-    const averagePoints =
-      performance.length > 0 ? totalPoints / performance.length : 0;
+    const averagePoints = totalGameweeks > 0 ? totalPoints / totalGameweeks : 0;
+    const averageRank =
+      totalGameweeks > 0
+        ? performance.reduce((sum, gw) => sum + gw.rank, 0) / totalGameweeks
+        : 0;
 
-    // Count number of rumblers (gameweeks with lowest score)
-    const rumblerCount = matches.filter((match) => {
-      if (!match.finished) return false;
+    // Count number of rumblers (gameweeks where player finished last - rank 8)
+    const rumblerCount = performance.filter((gw) => gw.rank === 8).length;
 
-      // Get all points for this gameweek
-      const gameweekMatches = matches.filter(
-        (m) => m.event === match.event && m.finished,
-      );
-      const allPoints: number[] = [];
+    // Count number of wins (gameweeks where player finished first - rank 1)
+    const totalWins = performance.filter((gw) => gw.rank === 1).length;
 
-      gameweekMatches.forEach((m) => {
-        allPoints.push(m.league_entry_1_points);
-        allPoints.push(m.league_entry_2_points);
-      });
-
-      const minPoints = Math.min(...allPoints);
-
-      // Check if this player had the minimum points
-      return (
-        (match.league_entry_1 === playerId &&
-          match.league_entry_1_points === minPoints) ||
-        (match.league_entry_2 === playerId &&
-          match.league_entry_2_points === minPoints)
-      );
-    }).length;
+    // Calculate consistency metric (lower standard deviation = more consistent)
+    const pointsArray = performance.map((gw) => gw.points);
+    const variance =
+      pointsArray.length > 0
+        ? pointsArray.reduce(
+            (sum, points) => sum + Math.pow(points - averagePoints, 2),
+            0,
+          ) / pointsArray.length
+        : 0;
+    const consistency = Math.sqrt(variance);
 
     return NextResponse.json({
       id: playerId,
@@ -224,22 +202,22 @@ export const GET = async (
       player_surname: playerBasic.player_last_name,
       team_name: playerBasic.entry_name,
       stats: {
-        totalMatches,
+        totalGameweeks,
         totalWins,
-        totalLosses,
-        totalDraws,
-        winPercentage: parseFloat(winPercentage.toFixed(1)),
         totalPoints,
         averagePoints: parseFloat(averagePoints.toFixed(1)),
+        averageRank: parseFloat(averageRank.toFixed(1)),
         bestGameweek,
         worstGameweek,
         rumblerCount,
+        consistency: parseFloat(consistency.toFixed(1)),
+        positionStats,
       },
       performance,
-      headToHead,
       standingInfo: playerStanding || null,
     });
   } catch (error) {
+    console.error('Error in player API:', error);
     return NextResponse.json(
       { message: (error as Error).message },
       { status: 500 },

@@ -2,7 +2,24 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+
+import * as React from 'react';
+import {
+  CircleCheckIcon,
+  CircleHelpIcon,
+  CircleIcon,
+  MenuIcon,
+} from 'lucide-react';
+
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from '@/components/ui/navigation-menu';
 
 const navigation = [
   { name: 'Standings', href: '/', target: '_self' },
@@ -12,74 +29,65 @@ const navigation = [
 
 export default function HeaderNav() {
   const pathname = usePathname();
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 100);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   return (
     <header className='bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95]'>
       <nav className='mx-auto max-w-7xl px-6 lg:px-8' aria-label='Top'>
         {/* Logo and Desktop Navigation */}
-        <div className='flex w-full flex-col items-center justify-between py-6 md:border-b-2 md:border-premPurple'>
-          <div className='flex items-center'>
-            <Link href='/'>
-              <span className='sr-only'>Draft League Standings</span>
-              <img
-                className='w-40 max-w-screen-lg'
-                src='../better-draft.png'
-                alt='draft standings logo'
-              />
-            </Link>
-            <div className='ml-12 hidden lg:block'>
-              <div className='flex items-center space-x-2 rounded-xl border-2 border-black bg-ruddyBlue px-4 py-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
-                {navigation.map((link) => (
-                  <Link
-                    target={link.target}
-                    key={link.name}
-                    href={link.href}
-                    className={`rounded-xl px-4 py-1.5 text-sm font-medium transition-colors ${
-                      pathname === link.href
-                        ? 'bg-white text-black'
-                        : 'text-white hover:bg-white/10'
-                    }`}
-                  >
-                    {link.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        <div className='sticky top-0 z-50 lg:hidden'>
-          <div className='flex justify-center py-4'>
-            <div className='flex w-full items-center justify-center space-x-3 rounded-xl border-2 border-black bg-ruddyBlue p-2 shadow-[2px_2px_0px_rgba(0,0,0,1)]'>
-              {navigation.map((link) => (
-                <Link
-                  target={link.target}
-                  key={link.name}
-                  href={link.href}
-                  className={`rounded-xl px-4 py-1.5 text-sm font-medium transition-colors ${
-                    pathname === link.href
-                      ? 'bg-white text-black'
-                      : 'text-white hover:bg-white/10'
-                  }`}
-                >
-                  {link.name}
-                </Link>
-              ))}
-            </div>
-          </div>
+        <div className='flex w-full flex-row items-center justify-between py-6 md:justify-evenly md:border-b-2 md:border-premPurple'>
+          <Link href='/'>
+            <span className='sr-only'>Draft League Standings</span>
+            <img
+              className='w-40 max-w-screen-lg'
+              src='../better-draft.png'
+              alt='draft standings logo'
+            />
+          </Link>
+          <NavigationMenu>
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger>
+                  <MenuIcon className='h-5 w-5 pr-1' />
+                  Menu
+                </NavigationMenuTrigger>
+                <NavigationMenuContent className='p-2'>
+                  <ul className='grid w-[200px] gap-2'>
+                    {navigation.map((link) => (
+                      <ListItem
+                        key={link.name}
+                        href={link.href}
+                        title={link.name}
+                      />
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
         </div>
       </nav>
     </header>
+  );
+}
+
+function ListItem({
+  title,
+  children,
+  href,
+  ...props
+}: React.ComponentPropsWithoutRef<'li'> & { href: string }) {
+  return (
+    <li {...props}>
+      <NavigationMenuLink asChild>
+        <Link href={href}>
+          <div className='rounded-lg p-2 text-sm font-medium leading-none hover:bg-premPurple hover:text-white'>
+            {title}
+          </div>
+          <p className='line-clamp-2 text-sm leading-snug text-muted-foreground'>
+            {children}
+          </p>
+        </Link>
+      </NavigationMenuLink>
+    </li>
   );
 }
