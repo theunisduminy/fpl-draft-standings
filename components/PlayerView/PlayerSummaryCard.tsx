@@ -2,12 +2,12 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
   Trophy,
-  Users,
   Zap,
   Award,
   Frown,
   BarChart3,
   BeerIcon,
+  Target,
 } from 'lucide-react';
 
 interface PlayerSummaryCardProps {
@@ -29,11 +29,11 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
                   <Trophy className='h-6 w-6 text-yellow-400' />
-                  <p className='text-sm text-gray-300'>Win Rate</p>
+                  <p className='text-sm text-gray-300'>F1 Score</p>
                 </div>
                 <div>
                   <p className='text-lg font-medium text-white'>
-                    {stats.winPercentage}%
+                    {player.f1_score || 0}
                   </p>
                 </div>
               </div>
@@ -42,13 +42,12 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
             <div className='rounded-lg bg-ruddyBlue p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex flex-row gap-2'>
-                  <Users className='h-6 w-6 text-white' />
-                  <p className='text-sm text-gray-300'>Record</p>
+                  <Target className='h-6 w-6 text-emerald-400' />
+                  <p className='text-sm text-gray-300'>F1 Ranking</p>
                 </div>
                 <div>
                   <p className='text-lg font-medium text-white'>
-                    {stats.totalWins}W - {stats.totalLosses}L -{' '}
-                    {stats.totalDraws}D
+                    #{player.f1_ranking || 'N/A'}
                   </p>
                 </div>
               </div>

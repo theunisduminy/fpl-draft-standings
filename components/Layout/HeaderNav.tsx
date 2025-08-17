@@ -4,12 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import * as React from 'react';
-import {
-  CircleCheckIcon,
-  CircleHelpIcon,
-  CircleIcon,
-  MenuIcon,
-} from 'lucide-react';
+import { MenuIcon } from 'lucide-react';
 
 import {
   NavigationMenu,
@@ -23,7 +18,7 @@ import {
 
 const navigation = [
   { name: 'Standings', href: '/', target: '_self' },
-  { name: 'Matches', href: '/detail', target: '_self' },
+  { name: 'Results', href: '/results', target: '_self' },
   { name: 'Rumblers', href: '/rumblers', target: '_self' },
 ];
 
@@ -34,7 +29,7 @@ export default function HeaderNav() {
     <header className='bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95]'>
       <nav className='mx-auto max-w-7xl px-6 lg:px-8' aria-label='Top'>
         {/* Logo and Desktop Navigation */}
-        <div className='flex w-full flex-row items-center justify-between py-6 md:justify-evenly md:border-b-2 md:border-premPurple'>
+        <div className='flex w-full flex-row items-center justify-between border-b-2 border-premPurple py-6 md:justify-evenly'>
           <Link href='/'>
             <span className='sr-only'>Draft League Standings</span>
             <img

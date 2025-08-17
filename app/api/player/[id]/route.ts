@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { fetchData } from '@/app/api/standings/utils/fetchData';
-import { Player } from '@/interfaces/players';
 
 // Interface for gameweek performance data (matching the updated matches API)
 interface GameweekPerformance {
@@ -142,15 +140,27 @@ export const GET = async (
   { params }: { params: { id: string } },
 ) => {
   try {
-    const [{ league_entries, standings }, gameweekData] = await Promise.all([
-      fetchData(),
+    // Get data directly from FPL API and our matches API
+    const [leagueRes, gameweekData, standingsData] = await Promise.all([
+      fetch('https://draft.premierleague.com/api/league/75224/details', {
+        cache: 'no-store',
+      }),
       fetchGameweekPerformances(),
+      fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/standings`,
+        { cache: 'no-store' },
+      ),
     ]);
+
+    const { league_entries, standings } = await leagueRes.json();
+    const playerF1Data = await standingsData.json();
 
     const playerId = parseInt(params.id, 10);
 
     // Get player basic info
-    const playerBasic = league_entries.find((entry) => entry.id === playerId);
+    const playerBasic = league_entries.find(
+      (entry: { id: number }) => entry.id === playerId,
+    );
 
     if (!playerBasic) {
       return NextResponse.json(
@@ -160,7 +170,9 @@ export const GET = async (
     }
 
     // Get player from standings to get additional data
-    const playerStanding = standings.find((s) => s.league_entry === playerId);
+    const playerStanding = standings.find(
+      (s: { league_entry: number }) => s.league_entry === playerId,
+    );
 
     // Calculate statistics for Classic format
     const performance = calculatePerformanceOverTime(gameweekData, playerId);
@@ -196,11 +208,16 @@ export const GET = async (
         : 0;
     const consistency = Math.sqrt(variance);
 
+    // Find player F1 data
+    const playerF1Info = playerF1Data.find((p: any) => p.id === playerId);
+
     return NextResponse.json({
       id: playerId,
       player_name: playerBasic.player_first_name,
       player_surname: playerBasic.player_last_name,
       team_name: playerBasic.entry_name,
+      f1_score: playerF1Info?.f1_score || 0,
+      f1_ranking: playerF1Info?.f1_ranking || null,
       stats: {
         totalGameweeks,
         totalWins,
