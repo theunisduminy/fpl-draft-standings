@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic';
+
 // Interface for gameweek performance data (matching the updated matches API)
 interface GameweekPerformance {
   event: number;

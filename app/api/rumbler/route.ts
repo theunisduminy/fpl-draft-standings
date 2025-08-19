@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic';
+
 export const GET = async (req: Request, res: Response) => {
   try {
     // Fetch the basic league data directly
