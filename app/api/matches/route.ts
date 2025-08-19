@@ -5,8 +5,12 @@ export const GET = async (req: Request, res: Response) => {
   try {
     // Get FPL data directly
     const [leagueRes, statusRes] = await Promise.all([
-      fetch('https://draft.premierleague.com/api/league/75224/details', { cache: 'no-store' }),
-      fetch('https://draft.premierleague.com/api/pl/event-status', { cache: 'no-store' })
+      fetch('https://draft.premierleague.com/api/league/75224/details', {
+        cache: 'no-store',
+      }),
+      fetch('https://draft.premierleague.com/api/pl/event-status', {
+        cache: 'no-store',
+      }),
     ]);
 
     const leagueData = await leagueRes.json();
@@ -17,7 +21,9 @@ export const GET = async (req: Request, res: Response) => {
 
     // Get current gameweek
     const currentEvent = status.find((s: any) => s.points === 'r')?.event || 1;
-    const isFinished = status.find((s: any) => s.event === currentEvent)?.leagues_updated || false;
+    const isFinished =
+      status.find((s: any) => s.event === currentEvent)?.leagues_updated ||
+      false;
 
     // Return current gameweek performance data
     const results = standings.map((standing: any) => ({

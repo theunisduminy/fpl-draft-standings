@@ -1,9 +1,13 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTableData } from '@/hooks/use-table-data';
+import { BaseTable } from './base-table';
+import {
+  draftResultsTableConfig,
+  tableConfigs,
+  GameweekResult,
+} from './table-configs';
 import { PlayerDetails } from '@/interfaces/players';
-import { fetchWithDelay } from '@/utils/fetchWithDelay';
-import { SkeletonCard } from '@/components/SkeletonTable';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
 import { tableGradient } from '@/utils/tailwindVars';
 
@@ -15,127 +19,90 @@ interface GameweekPerformance {
   rank: number;
   finished: boolean;
 }
+
+interface DraftResultsData {
+  standings: PlayerDetails[];
+  gameweekData: GameweekPerformance[];
+}
+
 export default function DraftResultsTable() {
-  const [standings, setStandings] = useState<PlayerDetails[]>([]);
-  const [gameweekData, setGameweekData] = useState<GameweekPerformance[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [gameweeks, setGameweeks] = useState<number[]>([]);
   const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        const [standingsData, gameweekPerformanceData] = (await fetchWithDelay([
-          'standings',
-          'matches', // This now returns gameweek performance data
-        ])) as [PlayerDetails[], GameweekPerformance[]];
+  const { data, loading, error, refetch } = useTableData<DraftResultsData>({
+    endpoints: ['standings', 'matches'],
+    transform: (response) => {
+      const [standingsData, gameweekPerformanceData] = response as [
+        PlayerDetails[],
+        GameweekPerformance[],
+      ];
+      return {
+        standings: standingsData,
+        gameweekData: gameweekPerformanceData,
+      };
+    },
+  });
 
-        setStandings(standingsData);
-        setGameweekData(gameweekPerformanceData);
+  // Extract completed gameweeks and set default selection
+  const gameweeks = useMemo(() => {
+    if (!data?.gameweekData) return [];
 
-        // Extract all completed gameweeks
-        const completedGameweeks = Array.from(
-          new Set(
-            gameweekPerformanceData
-              .filter((gw) => gw.finished)
-              .map((gw) => gw.event),
-          ),
-        ).sort((a, b) => b - a); // Sort in descending order (latest first)
+    const completedGameweeks = Array.from(
+      new Set(
+        data.gameweekData.filter((gw) => gw.finished).map((gw) => gw.event),
+      ),
+    ).sort((a, b) => b - a); // Sort in descending order (latest first)
 
-        setGameweeks(completedGameweeks);
-
-        // Set the default selected gameweek to the most recent one
-        if (completedGameweeks.length > 0) {
-          setSelectedGameweek(completedGameweeks[0]);
-        }
-
-        setError(null);
-      } catch (err) {
-        setError('Failed to load data. Please try again later.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+    // Set default selected gameweek to the most recent one
+    if (completedGameweeks.length > 0 && selectedGameweek === 0) {
+      setSelectedGameweek(completedGameweeks[0]);
     }
 
-    fetchData();
-  }, []);
+    return completedGameweeks;
+  }, [data?.gameweekData, selectedGameweek]);
 
-  const handleRetry = () => {
-    setLoading(true);
-    setError(null);
-    fetchWithDelay(['standings', 'matches'])
-      .then((data: unknown) => {
-        const [standingsData, gameweekPerformanceData] = data as [
-          PlayerDetails[],
-          GameweekPerformance[],
-        ];
-        setStandings(standingsData);
-        setGameweekData(gameweekPerformanceData);
+  // Process data for selected gameweek
+  const formattedResults: GameweekResult[] = useMemo(() => {
+    if (!data || !selectedGameweek) return [];
 
-        const completedGameweeks = Array.from(
-          new Set(
-            gameweekPerformanceData
-              .filter((gw: GameweekPerformance) => gw.finished)
-              .map((gw: GameweekPerformance) => gw.event),
-          ),
-        ).sort((a: number, b: number) => b - a);
+    const gameweekResults = data.gameweekData
+      .filter((gw) => gw.event === selectedGameweek && gw.finished)
+      .sort((a, b) => a.rank - b.rank);
 
-        setGameweeks(completedGameweeks);
+    return gameweekResults.map((gw) => {
+      const player = data.standings.find((p) => p.id === gw.league_entry);
+      return {
+        rank: gw.rank,
+        player_name: player ? player.player_name : 'Unknown',
+        team_name: player ? player.team_name : 'Unknown',
+        points: gw.event_total,
+        league_entry: gw.league_entry,
+      };
+    });
+  }, [data, selectedGameweek]);
 
-        if (completedGameweeks.length > 0) {
-          setSelectedGameweek(completedGameweeks[0]);
-        }
-      })
-      .catch((err) => {
-        setError('Failed to load data. Please try again later.');
-        console.error(err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
+  const config = tableConfigs.draftResults;
 
-  if (loading) return <SkeletonCard />;
-  if (error) return <ErrorDisplay message={error} onRetry={handleRetry} />;
-  if (gameweeks.length === 0) {
+  if (loading || error || gameweeks.length === 0) {
     return (
-      <div className='flex w-[350px] flex-col md:w-[600px]'>
-        <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-          📊 Gameweek Results
-        </h1>
-        <p className='pb-5 text-sm'>No gameweek results available yet.</p>
-      </div>
+      <BaseTable
+        title={config.title}
+        subtitle={config.subtitle}
+        data={formattedResults}
+        columns={draftResultsTableConfig}
+        loading={loading}
+        error={error}
+        onRetry={refetch}
+        emptyMessage={config.emptyMessage}
+      />
     );
   }
-
-  // Filter gameweek data for the selected gameweek and sort by rank
-  const gameweekResults = gameweekData
-    .filter((gw) => gw.event === selectedGameweek && gw.finished)
-    .sort((a, b) => a.rank - b.rank);
-
-  // Create formatted results with player names
-  const formattedResults = gameweekResults.map((gw) => {
-    const player = standings.find((p) => p.id === gw.league_entry);
-    return {
-      rank: gw.rank,
-      player_name: player ? player.player_name : 'Unknown',
-      team_name: player ? player.team_name : 'Unknown',
-      points: gw.event_total,
-      league_entry: gw.league_entry,
-    };
-  });
 
   return (
     <div className='flex w-[350px] flex-col md:w-[600px]'>
       <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-        📊 Gameweek Results
+        {config.title}
       </h1>
-      <p className='pb-5 text-sm'>
-        Previous gameweek rankings and points for the Draft league.
-      </p>
+      <p className='pb-5 text-sm'>{config.subtitle}</p>
 
       <GameweekSelector
         gameweeks={gameweeks}
@@ -147,7 +114,7 @@ export default function DraftResultsTable() {
       <div className='mt-6 space-y-6'>
         {/* Results Table */}
         <div
-          className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
+          className={`rounded-lg border-2 border-black ${tableGradient} p-5 shadow-2xl`}
         >
           <h2 className='pb-3 text-xl font-medium text-white'>
             Gameweek {selectedGameweek} Rankings
@@ -155,50 +122,44 @@ export default function DraftResultsTable() {
           <table className='w-full text-sm font-light text-white'>
             <thead>
               <tr className='border-b-2 border-white'>
-                <th className='py-2 text-left font-medium'>Rank</th>
-                <th className='py-2 text-left font-medium'>Player</th>
-                <th className='py-2 text-left font-medium'>Team</th>
-                <th className='py-2 text-right font-medium'>Points</th>
+                {draftResultsTableConfig.map((column, index) => (
+                  <th
+                    key={index}
+                    className={`py-2 font-medium ${
+                      column.align === 'center'
+                        ? 'text-center'
+                        : column.align === 'right'
+                          ? 'text-right'
+                          : 'text-left'
+                    } ${column.className || ''}`}
+                  >
+                    {column.header}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {formattedResults.map((result, index) => (
                 <tr
                   key={result.league_entry}
-                  className={index % 2 === 0 ? '' : 'bg-ruddyBlue'}
+                  className='border-b border-gray-400'
                 >
-                  <td className='py-4'>
-                    <span
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-                        result.rank === 1
-                          ? 'bg-yellow-400 text-black'
-                          : result.rank === 2
-                            ? 'bg-gray-300 text-black'
-                            : result.rank === 3
-                              ? 'bg-amber-600 text-white'
-                              : result.rank === 8
-                                ? 'bg-red-600 text-white'
-                                : 'bg-gray-600 text-white'
-                      }`}
+                  {draftResultsTableConfig.map((column, colIndex) => (
+                    <td
+                      key={colIndex}
+                      className={`py-4 ${
+                        column.align === 'center'
+                          ? 'text-center'
+                          : column.align === 'right'
+                            ? 'text-right'
+                            : 'text-left'
+                      } ${column.cellClassName ? column.cellClassName(result, index) : ''}`}
                     >
-                      {result.rank}
-                    </span>
-                  </td>
-                  <td className='py-4 font-medium'>{result.player_name}</td>
-                  <td className='py-4 text-gray-300'>{result.team_name}</td>
-                  <td className='py-4 text-right'>
-                    <span
-                      className={`font-bold ${
-                        result.rank === 1
-                          ? 'text-yellow-300'
-                          : result.rank === 8
-                            ? 'text-red-300'
-                            : 'text-white'
-                      }`}
-                    >
-                      {result.points}
-                    </span>
-                  </td>
+                      {typeof column.key === 'function'
+                        ? column.key(result)
+                        : result[column.key as keyof GameweekResult]}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
