@@ -12,12 +12,22 @@ export const GET = async (req: Request, res: Response) => {
     );
     const { league_entries } = await leagueRes.json();
 
-    // Fetch matches data directly with no cache
+    // Fetch matches data from our internal API (now properly returns historical data)
     const matchesRes = await fetch(
       `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/matches`,
       { cache: 'no-store' },
     );
+
+    if (!matchesRes.ok) {
+      throw new Error(`Matches API returned ${matchesRes.status}`);
+    }
+
     const gameweekData = await matchesRes.json();
+
+    // Verify gameweekData is an array
+    if (!Array.isArray(gameweekData)) {
+      throw new Error('Invalid data format from matches API');
+    }
 
     // Group by gameweek
     const gameweeksByEvent: Record<number, any[]> = {};

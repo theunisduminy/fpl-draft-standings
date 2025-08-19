@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic';
 
-// Simplified matches API - returns current gameweek performance
+// Matches API - returns performance data for all completed gameweeks
 export const GET = async (req: Request, res: Response) => {
   try {
     // Get FPL data directly
@@ -22,20 +22,57 @@ export const GET = async (req: Request, res: Response) => {
     const { standings } = leagueData;
     const { status } = statusData;
 
-    // Get current gameweek
+    const results: any[] = [];
+
+    // Get current gameweek data (from league details)
     const currentEvent = status.find((s: any) => s.points === 'r')?.event || 1;
-    const isFinished =
+    const isCurrentFinished =
       status.find((s: any) => s.event === currentEvent)?.leagues_updated ||
       false;
 
-    // Return current gameweek performance data
-    const results = standings.map((standing: any) => ({
-      event: currentEvent,
-      league_entry: standing.league_entry,
-      event_total: standing.event_total,
-      rank: standing.rank,
-      finished: isFinished,
-    }));
+    // Add current gameweek data
+    standings.forEach((standing: any) => {
+      results.push({
+        event: currentEvent,
+        league_entry: standing.league_entry,
+        event_total: standing.event_total,
+        rank: standing.rank,
+        finished: isCurrentFinished,
+      });
+    });
+
+    // Get all completed events (excluding current)
+    const completedEvents = status
+      .filter(
+        (s: any) => s.leagues_updated === true && s.event !== currentEvent,
+      )
+      .map((s: any) => s.event);
+
+    // Fetch historical data for each completed gameweek
+    for (const event of completedEvents) {
+      try {
+        const gameweekRes = await fetch(
+          `https://draft.premierleague.com/api/league/75224/element-status?event=${event}`,
+          { cache: 'no-store' },
+        );
+
+        if (gameweekRes.ok) {
+          const gameweekStandings = await gameweekRes.json();
+
+          gameweekStandings.forEach((standing: any) => {
+            results.push({
+              event: event,
+              league_entry: standing.league_entry,
+              event_total: standing.event_total,
+              rank: standing.rank,
+              finished: true,
+            });
+          });
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch gameweek ${event} data:`, err);
+      }
+    }
 
     return NextResponse.json(results);
   } catch (error) {
