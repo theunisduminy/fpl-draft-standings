@@ -12,18 +12,78 @@ interface GameweekPerformance {
   finished: boolean;
 }
 
-// Helper function to get gameweek performance data from the matches API
+// Helper function to get gameweek performance data directly from FPL API
 async function fetchGameweekPerformances(): Promise<GameweekPerformance[]> {
   try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/matches`,
-      {
-        next: {
-          revalidate: 3600, // 1 hour
-        },
-      },
-    );
-    return await res.json();
+    // Fetch data directly from FPL API to avoid internal API call issues
+    const [leagueRes, statusRes] = await Promise.all([
+      fetch('https://draft.premierleague.com/api/league/75224/details', {
+        cache: 'no-store',
+      }),
+      fetch('https://draft.premierleague.com/api/pl/event-status', {
+        cache: 'no-store',
+      }),
+    ]);
+
+    const leagueData = await leagueRes.json();
+    const statusData = await statusRes.json();
+
+    const { standings } = leagueData;
+    const { status } = statusData;
+
+    const gameweekData: GameweekPerformance[] = [];
+
+    // Get current gameweek data
+    const currentEvent = status.find((s: any) => s.points === 'r')?.event || 1;
+    const isCurrentFinished =
+      status.find((s: any) => s.event === currentEvent)?.leagues_updated ||
+      false;
+
+    // Add current gameweek data
+    standings.forEach((standing: any) => {
+      gameweekData.push({
+        event: currentEvent,
+        league_entry: standing.league_entry,
+        event_total: standing.event_total,
+        rank: standing.rank,
+        finished: isCurrentFinished,
+      });
+    });
+
+    // Get all completed events (excluding current)
+    const completedEvents = status
+      .filter(
+        (s: any) => s.leagues_updated === true && s.event !== currentEvent,
+      )
+      .map((s: any) => s.event);
+
+    // Fetch historical data for each completed gameweek
+    for (const event of completedEvents) {
+      try {
+        const gameweekRes = await fetch(
+          `https://draft.premierleague.com/api/league/75224/element-status?event=${event}`,
+          { cache: 'no-store' },
+        );
+
+        if (gameweekRes.ok) {
+          const gameweekStandings = await gameweekRes.json();
+
+          gameweekStandings.forEach((standing: any) => {
+            gameweekData.push({
+              event: event,
+              league_entry: standing.league_entry,
+              event_total: standing.event_total,
+              rank: standing.rank,
+              finished: true,
+            });
+          });
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch gameweek ${event} data:`, err);
+      }
+    }
+
+    return gameweekData;
   } catch (err) {
     console.error('Error fetching gameweek performances:', err);
     return [];
@@ -143,20 +203,43 @@ export const GET = async (
   { params }: { params: { id: string } },
 ) => {
   try {
-    // Get data directly from FPL API and our matches API
-    const [leagueRes, gameweekData, standingsData] = await Promise.all([
+    // Get data directly from FPL API (no internal API calls)
+    const [leagueRes, gameweekData] = await Promise.all([
       fetch('https://draft.premierleague.com/api/league/75224/details', {
         cache: 'no-store',
       }),
       fetchGameweekPerformances(),
-      fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/standings`,
-        { cache: 'no-store' },
-      ),
     ]);
 
     const { league_entries, standings } = await leagueRes.json();
-    const playerF1Data = await standingsData.json();
+
+    // Build F1 standings data directly (same logic as standings API)
+    const playerF1Data = standings.map((standing: any) => {
+      const player = league_entries.find(
+        (entry: any) => entry.id === standing.league_entry,
+      );
+
+      // Calculate F1 points directly from current rank
+      const rankPoints = [20, 15, 12, 10, 8, 6, 4, 2];
+      const f1Points = rankPoints[standing.rank - 1] || 0;
+
+      return {
+        id: standing.league_entry,
+        player_name: player?.player_first_name || 'Unknown',
+        player_surname: player?.player_last_name || 'Unknown',
+        team_name: player?.entry_name || 'Unknown',
+        total_points: standing.total,
+        f1_score: f1Points,
+        f1_ranking: 0, // Will be set after sorting
+        total_wins: standing.rank === 1 ? 1 : 0,
+      };
+    });
+
+    // Sort by F1 score and assign final rankings
+    playerF1Data.sort((a: any, b: any) => b.f1_score - a.f1_score);
+    playerF1Data.forEach((player: any, index: number) => {
+      player.f1_ranking = index + 1;
+    });
 
     const playerId = parseInt(params.id, 10);
 
