@@ -100,7 +100,7 @@ export function GameweekSelector({
                   : 'bg-gradient-to-r from-premTurquoise to-premGreen hover:from-premGreen hover:to-premTurquoise'
               } `}
             >
-              GW {gameweek}
+              {gameweek === 0 ? 'All' : `GW ${gameweek}`}
             </button>
           ))}
           <div className='pr-8' /> {/* Right padding for scroll button */}

@@ -29,47 +29,74 @@ export const GET = async (req: Request, res: Response) => {
       status.find((s: any) => s.event === currentEvent)?.leagues_updated ||
       false;
 
-    // Add current gameweek data
-    standings.forEach((standing: any) => {
+    // Add current gameweek data with correct rankings based on event_total
+    const currentGameweekData = standings.map((standing: any) => ({
+      league_entry: standing.league_entry,
+      event_total: standing.event_total,
+      finished: isCurrentFinished,
+    }));
+
+    // Sort by event_total to determine correct ranks for current gameweek
+    currentGameweekData.sort((a: number, b: number) => b - a);
+
+    // Add ranks with proper tie handling for current gameweek
+    let currentRank = 1;
+    for (let i = 0; i < currentGameweekData.length; i++) {
+      // If this player has the same score as the previous, give same rank
+      if (
+        i > 0 &&
+        currentGameweekData[i].event_total ===
+          currentGameweekData[i - 1].event_total
+      ) {
+        // Keep the same rank as previous player
+      } else {
+        // New rank position
+        currentRank = i + 1;
+      }
+
       gameweekData.push({
         event: currentEvent,
-        league_entry: standing.league_entry,
-        event_total: standing.event_total,
-        rank: standing.rank,
-        finished: isCurrentFinished,
+        league_entry: currentGameweekData[i].league_entry,
+        event_total: currentGameweekData[i].event_total,
+        rank: currentRank,
+        finished: currentGameweekData[i].finished,
       });
-    });
+    }
 
-    // Get all completed events (excluding current)
-    const completedEvents = status
-      .filter(
-        (s: any) => s.leagues_updated === true && s.event !== currentEvent,
-      )
-      .map((s: any) => s.event);
+    // Reconstruct gameweek 1 data from cumulative totals
+    // Since total = gw1 + gw2, we can calculate: gw1 = total - event_total
+    if (currentEvent > 1) {
+      // Create gameweek 1 data by calculating backwards from current totals
+      const gameweek1Data = standings.map((standing: any) => ({
+        league_entry: standing.league_entry,
+        event_total: standing.total - standing.event_total, // GW1 points = total - current GW points
+        finished: true,
+      }));
 
-    // Fetch historical data for each completed gameweek
-    for (const event of completedEvents) {
-      try {
-        const gameweekRes = await fetch(
-          `https://draft.premierleague.com/api/league/75224/element-status?event=${event}`,
-          { cache: 'no-store' },
-        );
+      // Sort by event_total to determine ranks for gameweek 1
+      gameweek1Data.sort((a: number, b: number) => b - a);
 
-        if (gameweekRes.ok) {
-          const gameweekStandings = await gameweekRes.json();
-
-          gameweekStandings.forEach((standing: any) => {
-            gameweekData.push({
-              event: event,
-              league_entry: standing.league_entry,
-              event_total: standing.event_total,
-              rank: standing.rank,
-              finished: true,
-            });
-          });
+      // Add ranks with proper tie handling and push to gameweek data
+      let currentRank = 1;
+      for (let i = 0; i < gameweek1Data.length; i++) {
+        // If this player has the same score as the previous, give same rank
+        if (
+          i > 0 &&
+          gameweek1Data[i].event_total === gameweek1Data[i - 1].event_total
+        ) {
+          // Keep the same rank as previous player
+        } else {
+          // New rank position
+          currentRank = i + 1;
         }
-      } catch (err) {
-        console.warn(`Failed to fetch gameweek ${event} data:`, err);
+
+        gameweekData.push({
+          event: 1,
+          league_entry: gameweek1Data[i].league_entry,
+          event_total: gameweek1Data[i].event_total,
+          rank: currentRank,
+          finished: true,
+        });
       }
     }
 

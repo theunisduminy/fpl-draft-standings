@@ -167,49 +167,63 @@ export default function DraftResultsTable() {
         </div>
 
         {/* Summary Stats */}
-        {formattedResults.length > 0 && (
-          <div
-            className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
-          >
-            <h3 className='pb-3 text-lg font-medium text-white'>
-              Gameweek {selectedGameweek} Summary
-            </h3>
-            <div className='grid grid-cols-2 gap-4 text-white'>
-              <div>
-                <p className='text-sm text-gray-300'>Highest Score</p>
-                <p className='text-lg font-bold text-yellow-300'>
-                  {formattedResults[0]?.points} pts (
-                  {formattedResults[0]?.player_name})
-                </p>
+        {formattedResults.length > 0 &&
+          (() => {
+            // Find all players with the highest score
+            const highestScore = formattedResults[0]?.points;
+            const highestScorers = formattedResults.filter(
+              (r) => r.points === highestScore,
+            );
+
+            // Find all players with the lowest score
+            const lowestScore =
+              formattedResults[formattedResults.length - 1]?.points;
+            const lowestScorers = formattedResults.filter(
+              (r) => r.points === lowestScore,
+            );
+
+            return (
+              <div
+                className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
+              >
+                <h3 className='pb-3 text-lg font-medium text-white'>
+                  Gameweek {selectedGameweek} Summary
+                </h3>
+                <div className='grid grid-cols-2 gap-4 text-white'>
+                  <div>
+                    <p className='text-sm text-gray-300'>Highest Score</p>
+                    <p className='text-lg font-bold text-yellow-300'>
+                      {highestScore} pts (
+                      {highestScorers.map((p) => p.player_name).join(', ')})
+                    </p>
+                  </div>
+                  <div>
+                    <p className='text-sm text-gray-300'>Lowest Score</p>
+                    <p className='text-lg font-bold text-red-300'>
+                      {lowestScore} pts (
+                      {lowestScorers.map((p) => p.player_name).join(', ')})
+                    </p>
+                  </div>
+                  <div>
+                    <p className='text-sm text-gray-300'>Average Score</p>
+                    <p className='text-lg font-bold'>
+                      {(
+                        formattedResults.reduce((sum, r) => sum + r.points, 0) /
+                        formattedResults.length
+                      ).toFixed(1)}{' '}
+                      pts
+                    </p>
+                  </div>
+                  <div>
+                    <p className='text-sm text-gray-300'>Point Difference</p>
+                    <p className='text-lg font-bold'>
+                      {highestScore - lowestScore} pts
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className='text-sm text-gray-300'>Lowest Score</p>
-                <p className='text-lg font-bold text-red-300'>
-                  {formattedResults[formattedResults.length - 1]?.points} pts (
-                  {formattedResults[formattedResults.length - 1]?.player_name})
-                </p>
-              </div>
-              <div>
-                <p className='text-sm text-gray-300'>Average Score</p>
-                <p className='text-lg font-bold'>
-                  {(
-                    formattedResults.reduce((sum, r) => sum + r.points, 0) /
-                    formattedResults.length
-                  ).toFixed(1)}{' '}
-                  pts
-                </p>
-              </div>
-              <div>
-                <p className='text-sm text-gray-300'>Point Difference</p>
-                <p className='text-lg font-bold'>
-                  {formattedResults[0]?.points -
-                    formattedResults[formattedResults.length - 1]?.points}{' '}
-                  pts
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+            );
+          })()}
       </div>
     </div>
   );
