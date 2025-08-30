@@ -140,12 +140,11 @@ export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
         {renderRankBadge(result.rank, 'md')}
         <div>
           <div className='font-medium'>{result.player_name}</div>
-          <div className='text-xs text-gray-300'>{result.team_name}</div>
         </div>
       </div>
     ),
     width: '50%',
-    className: 'border-r-2 border-white pl-4',
+    className: 'border-r-2 border-white pl-1',
   },
   {
     header: 'Movement',
