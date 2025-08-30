@@ -1,31 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { fetchWithDelay } from '@/utils/fetchWithDelay';
+import React from 'react';
+import { useTableData } from '@/hooks/use-table-data';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { RumblerFrequencyChart } from './RumblerFrequencyChart';
 import { AlertCircle } from 'lucide-react';
-import { GameweekData } from '@/interfaces/match';
+import { RumblerGameweekData } from '@/interfaces/players';
 
 export default function RumblerDashboard() {
-  const [gameweekData, setGameweekData] = useState<GameweekData[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchData(): Promise<void> {
-      try {
-        const [data] = (await fetchWithDelay(['rumbler'])) as [GameweekData[]];
-        setGameweekData(data);
-      } catch (err) {
-        setError('Failed to fetch data. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, []);
+  const { data, loading, error } = useTableData<RumblerGameweekData[]>({
+    endpoints: ['rumbler'],
+    transform: (response) => response[0], // Extract first element from response array
+  });
 
   if (loading) return <SkeletonCard />;
 
@@ -38,5 +24,5 @@ export default function RumblerDashboard() {
     );
   }
 
-  return <RumblerFrequencyChart data={gameweekData} />;
+  return <RumblerFrequencyChart data={data || []} />;
 }

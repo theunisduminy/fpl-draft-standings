@@ -1,6 +1,6 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { fetchWithDelay } from '@/utils/fetchWithDelay';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTableData } from '@/hooks/use-table-data';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
@@ -14,47 +14,39 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { GameweekData } from '@/interfaces/match';
+import { RumblerGameweekData } from '@/interfaces/players';
 import { Beer, TrendingDown, Calendar } from 'lucide-react';
 
 export default function RumblerDataCards(): JSX.Element {
-  const [gameweekData, setGameweekData] = useState<GameweekData[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [gameweeks, setGameweeks] = useState<number[]>([]);
   const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
   const [currentBlurb, setCurrentBlurb] = useState<string>('');
 
-  useEffect(() => {
-    async function fetchData(): Promise<void> {
-      try {
-        setLoading(true);
-        const [data] = (await fetchWithDelay(['rumbler'])) as [GameweekData[]];
-        setGameweekData(data as GameweekData[]);
+  const {
+    data: gameweekData,
+    loading,
+    error,
+    refetch,
+  } = useTableData<RumblerGameweekData[]>({
+    endpoints: ['rumbler'],
+    transform: (response) => response[0], // Extract first element from response array
+  });
 
-        // Extract all gameweeks
-        const allGameweeks = (data as GameweekData[])
-          .map((item) => item.gameweek)
-          .sort((a, b) => b - a);
-        setGameweeks(allGameweeks);
+  // Extract all gameweeks and set default selection
+  const gameweeks = useMemo(() => {
+    if (!gameweekData || gameweekData.length === 0) return [];
 
-        // Set the default selected gameweek to the most recent one
-        if (allGameweeks.length > 0) {
-          setSelectedGameweek(allGameweeks[0]);
-          setCurrentBlurb(getRandomBlurb());
-        }
+    const allGameweeks = gameweekData
+      .map((item) => item.gameweek)
+      .sort((a, b) => b - a);
 
-        setError(null);
-      } catch (err) {
-        setError('Failed to load data. Please try again later.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+    // Set the default selected gameweek to the most recent one
+    if (allGameweeks.length > 0 && selectedGameweek === 0) {
+      setSelectedGameweek(allGameweeks[0]);
+      setCurrentBlurb(getRandomBlurb());
     }
 
-    fetchData();
-  }, []);
+    return allGameweeks;
+  }, [gameweekData, selectedGameweek]);
 
   useEffect(() => {
     // Set a new random blurb when gameweek changes
@@ -63,35 +55,9 @@ export default function RumblerDataCards(): JSX.Element {
     }
   }, [selectedGameweek, gameweeks.length]);
 
-  const handleRetry = () => {
-    setLoading(true);
-    setError(null);
-    fetchWithDelay(['rumbler'])
-      .then((data) => {
-        setGameweekData(data as GameweekData[]);
-
-        const allGameweeks = (data as GameweekData[])
-          .map((item) => item.gameweek)
-          .sort((a, b) => b - a);
-        setGameweeks(allGameweeks);
-
-        if (allGameweeks.length > 0) {
-          setSelectedGameweek(allGameweeks[0]);
-          setCurrentBlurb(getRandomBlurb());
-        }
-      })
-      .catch((err) => {
-        setError('Failed to load data. Please try again later.');
-        console.error(err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
   if (loading) return <SkeletonCard />;
-  if (error) return <ErrorDisplay message={error} onRetry={handleRetry} />;
-  if (gameweekData.length === 0) {
+  if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
+  if (!gameweekData || gameweekData.length === 0) {
     return (
       <div className='flex w-[350px] flex-col md:w-[600px]'>
         <h1 className='pb-2 text-2xl font-semibold text-[#310639]'>

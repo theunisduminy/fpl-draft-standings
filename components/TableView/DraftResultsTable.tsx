@@ -7,75 +7,66 @@ import {
   tableConfigs,
   GameweekResult,
 } from './table-configs';
-import { PlayerDetails } from '@/interfaces/players';
+import { GameweekDataResponse } from '@/interfaces/players';
 import { GameweekSelector } from '@/components/GameweekSelector';
 import { tableGradient } from '@/utils/tailwindVars';
-
-// Interface for gameweek performance data (matching the updated matches API)
-interface GameweekPerformance {
-  event: number;
-  league_entry: number;
-  event_total: number;
-  rank: number;
-  finished: boolean;
-}
-
-interface DraftResultsData {
-  standings: PlayerDetails[];
-  gameweekData: GameweekPerformance[];
-}
 
 export default function DraftResultsTable() {
   const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
 
-  const { data, loading, error, refetch } = useTableData<DraftResultsData>({
-    endpoints: ['standings', 'matches'],
-    transform: (response) => {
-      const [standingsData, gameweekPerformanceData] = response as [
-        PlayerDetails[],
-        GameweekPerformance[],
-      ];
-      return {
-        standings: standingsData,
-        gameweekData: gameweekPerformanceData,
-      };
-    },
+  const { data, loading, error, refetch } = useTableData<GameweekDataResponse>({
+    endpoints: ['gameweek-data'],
+    transform: (response) => response[0], // Extract first element from response array
   });
 
   // Extract completed gameweeks and set default selection
   const gameweeks = useMemo(() => {
-    if (!data?.gameweekData) return [];
-
-    const completedGameweeks = Array.from(
-      new Set(
-        data.gameweekData.filter((gw) => gw.finished).map((gw) => gw.event),
-      ),
-    ).sort((a, b) => b - a); // Sort in descending order (latest first)
+    if (!data?.completedGameweeks) return [];
 
     // Set default selected gameweek to the most recent one
-    if (completedGameweeks.length > 0 && selectedGameweek === 0) {
-      setSelectedGameweek(completedGameweeks[0]);
+    if (data.completedGameweeks.length > 0 && selectedGameweek === 0) {
+      setSelectedGameweek(data.completedGameweeks[0]);
     }
 
-    return completedGameweeks;
-  }, [data?.gameweekData, selectedGameweek]);
+    return data.completedGameweeks;
+  }, [data?.completedGameweeks, selectedGameweek]);
 
-  // Process data for selected gameweek
+  // Process data for selected gameweek with position movement
   const formattedResults: GameweekResult[] = useMemo(() => {
     if (!data || !selectedGameweek) return [];
 
-    const gameweekResults = data.gameweekData
+    const gameweekResults = data.gameweekPerformances
       .filter((gw) => gw.event === selectedGameweek && gw.finished)
       .sort((a, b) => a.rank - b.rank);
 
     return gameweekResults.map((gw) => {
-      const player = data.standings.find((p) => p.id === gw.league_entry);
+      const player = data.players.find((p) => p.id === gw.league_entry);
+
+      // Calculate position movement by comparing to previous gameweek
+      let positionMovement: number | undefined = undefined;
+
+      if (selectedGameweek > 1) {
+        const previousGameweek = selectedGameweek - 1;
+        const previousRank = data.gameweekPerformances.find(
+          (prevGw) =>
+            prevGw.event === previousGameweek &&
+            prevGw.league_entry === gw.league_entry &&
+            prevGw.finished,
+        )?.rank;
+
+        if (previousRank !== undefined) {
+          // Position movement: previous rank - current rank (positive = moved up)
+          positionMovement = previousRank - gw.rank;
+        }
+      }
+
       return {
         rank: gw.rank,
         player_name: player ? player.player_name : 'Unknown',
         team_name: player ? player.team_name : 'Unknown',
         points: gw.event_total,
         league_entry: gw.league_entry,
+        position_movement: positionMovement,
       };
     });
   }, [data, selectedGameweek]);
@@ -140,14 +131,11 @@ export default function DraftResultsTable() {
             </thead>
             <tbody>
               {formattedResults.map((result, index) => (
-                <tr
-                  key={result.league_entry}
-                  className='border-b border-gray-400'
-                >
+                <tr key={result.league_entry}>
                   {draftResultsTableConfig.map((column, colIndex) => (
                     <td
                       key={colIndex}
-                      className={`py-4 ${
+                      className={`py-4 ${colIndex < draftResultsTableConfig.length - 1 ? 'border-r-2 border-white' : ''} ${
                         column.align === 'center'
                           ? 'text-center'
                           : column.align === 'right'

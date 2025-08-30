@@ -31,11 +31,31 @@ export function useTableData<T = any>({
       setLoading(true);
       setError(null);
       const response = await fetchWithDelay(endpoints);
+      
+      // Check if response contains error information
+      if (Array.isArray(response)) {
+        for (const item of response) {
+          if (item && typeof item === 'object' && 'error' in item) {
+            throw new Error((item as any).message || (item as any).error);
+          }
+        }
+      } else if (response && typeof response === 'object' && 'error' in response) {
+        throw new Error((response as any).message || (response as any).error);
+      }
+      
       const processedData = transform ? transform(response as any[]) : response;
 
       setData(processedData);
     } catch (err) {
-      const errorMessage = 'Failed to load data. Please try again later.';
+      let errorMessage = 'Failed to load data. Please try again later.';
+      
+      if (err instanceof Error) {
+        // Use the actual error message if it's informative
+        if (err.message && !err.message.includes('fetch')) {
+          errorMessage = err.message;
+        }
+      }
+      
       setError(errorMessage);
       console.error('Table data fetch error:', err);
 

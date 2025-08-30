@@ -100,7 +100,7 @@ export function BaseTable<T extends Record<string, any>>({
                 {columns.map((column, colIndex) => (
                   <td
                     key={colIndex}
-                    className={`py-4 ${
+                    className={`${colIndex < columns.length - 1 ? 'border-r-2 border-white' : ''} py-4 ${
                       column.align === 'center'
                         ? 'text-center'
                         : column.align === 'right'

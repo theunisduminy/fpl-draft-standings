@@ -117,20 +117,43 @@ export const positionPlacedTableConfig: TableColumn<PlayerDetails>[] = [
 export interface GameweekResult {
   rank: number;
   player_name: string;
+  team_name: string;
   points: number;
   league_entry: number;
+  position_movement?: number; // Positive = moved up, negative = moved down, 0 = no change, undefined = first gameweek
 }
+
+// Utility function for position movement display
+export const renderPositionMovement = (movement?: number) => {
+  if (movement === undefined)
+    return <span className='text-sm text-gray-400'>NEW</span>;
+  if (movement === 0) return <span className='text-gray-400'>→</span>;
+  if (movement > 0) return <span className='text-green-400'>↑{movement}</span>;
+  return <span className='text-red-400'>↓{Math.abs(movement)}</span>;
+};
 
 export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
   {
-    header: 'Rank',
-    key: (result: GameweekResult) => renderRankBadge(result.rank, 'md'),
-    align: 'left',
+    header: 'Player Ranking',
+    key: (result: GameweekResult) => (
+      <div className='flex items-center gap-3'>
+        {renderRankBadge(result.rank, 'md')}
+        <div>
+          <div className='font-medium'>{result.player_name}</div>
+          <div className='text-xs text-gray-300'>{result.team_name}</div>
+        </div>
+      </div>
+    ),
+    width: '50%',
+    className: 'border-r-2 border-white pl-4',
   },
   {
-    header: 'Player',
-    key: 'player_name',
-    cellClassName: () => 'font-medium',
+    header: 'Movement',
+    key: (result: GameweekResult) =>
+      renderPositionMovement(result.position_movement),
+    align: 'center',
+    width: '25%',
+    className: 'border-r-2 border-white',
   },
   {
     header: 'Points',
@@ -147,7 +170,8 @@ export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
         {result.points}
       </span>
     ),
-    align: 'right',
+    align: 'center',
+    width: '25%',
   },
 ];
 

@@ -1,0 +1,11 @@
+meta {
+  name: league-status
+  type: http
+  seq: 8
+}
+
+get {
+  url: https://draft.premierleague.com/api/league/{{new_league_id}}/element-status
+  body: none
+  auth: none
+}

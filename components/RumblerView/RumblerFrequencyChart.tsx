@@ -17,19 +17,13 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { RumblerGameweekData } from '@/interfaces/players';
 
 export const description =
   'A bar chart showing the frequency of rumbler victims';
 
-interface GameweekData {
-  gameweek: number;
-  points: number;
-  entry_names: string[];
-  player_names: string[];
-}
-
 interface RumblerFrequencyChartProps {
-  data: GameweekData[];
+  data: RumblerGameweekData[];
 }
 
 const chartConfig = {
