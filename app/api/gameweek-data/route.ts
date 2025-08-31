@@ -223,24 +223,31 @@ export const GET = async (req: Request) => {
       league_entries,
     );
 
-    // 4. Add current gameweek data if available
+    // 4. Add current gameweek data if available (only if not already in historical data)
     if (isCurrentFinished && standings) {
-      const currentGameweekData = standings.map((standing: any) => ({
-        league_entry: standing.league_entry,
-        event_total: standing.event_total,
-      }));
+      // Check if current gameweek data is already in historical data
+      const hasCurrentGameweekData = historicalData.some(
+        (gw) => gw.event === currentEvent,
+      );
 
-      const rankedCurrentData = assignRanks(currentGameweekData);
+      if (!hasCurrentGameweekData) {
+        const currentGameweekData = standings.map((standing: any) => ({
+          league_entry: standing.league_entry,
+          event_total: standing.event_total,
+        }));
 
-      rankedCurrentData.forEach((player) => {
-        historicalData.push({
-          event: currentEvent,
-          league_entry: player.league_entry,
-          event_total: player.event_total,
-          rank: player.rank,
-          finished: true,
+        const rankedCurrentData = assignRanks(currentGameweekData);
+
+        rankedCurrentData.forEach((player) => {
+          historicalData.push({
+            event: currentEvent,
+            league_entry: player.league_entry,
+            event_total: player.event_total,
+            rank: player.rank,
+            finished: true,
+          });
         });
-      });
+      }
     }
 
     // 5. Calculate player statistics

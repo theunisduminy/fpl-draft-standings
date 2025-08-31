@@ -27,6 +27,7 @@ export interface BaseTableProps<T> {
   rowClassName?: (item: T, index: number) => string;
   onRowClick?: (item: T) => void;
   children?: React.ReactNode; // For additional content like selectors
+  getRowKey?: (item: T, index: number) => string | number; // Function to get unique key for each row
 }
 
 export function BaseTable<T extends Record<string, any>>({
@@ -43,6 +44,7 @@ export function BaseTable<T extends Record<string, any>>({
   rowClassName,
   onRowClick,
   children,
+  getRowKey,
 }: BaseTableProps<T>) {
   if (loading) return <SkeletonCard />;
 
@@ -93,7 +95,7 @@ export function BaseTable<T extends Record<string, any>>({
           <tbody>
             {data.map((item, index) => (
               <tr
-                key={index}
+                key={getRowKey ? getRowKey(item, index) : index}
                 className={`${onRowClick ? 'cursor-pointer transition-colors hover:bg-white/10' : ''}`}
                 onClick={() => onRowClick?.(item)}
               >

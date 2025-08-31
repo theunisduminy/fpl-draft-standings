@@ -84,6 +84,7 @@ export default function DraftResultsTable() {
         error={error}
         onRetry={refetch}
         emptyMessage={config.emptyMessage}
+        getRowKey={(result) => result.league_entry}
       />
     );
   }

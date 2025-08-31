@@ -31,6 +31,7 @@ export default function StandingsTable() {
       emptyMessage={config.emptyMessage}
       className={config.className}
       tableClassName={config.tableClassName}
+      getRowKey={(player) => player.id}
     />
   );
 }
