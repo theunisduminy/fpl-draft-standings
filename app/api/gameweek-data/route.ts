@@ -160,6 +160,11 @@ export const GET = async (req: Request) => {
 
     const { league_entries, standings } = leagueData;
     const { status } = statusData;
+    const stopEvent =
+      typeof leagueData?.league?.stop_event === 'number' &&
+      leagueData.league.stop_event > 0
+        ? leagueData.league.stop_event
+        : 38;
 
     // 2. Determine current gameweek - find the latest gameweek with completed data
     // Since the event-status API might not be reliable, we'll check for actual data
@@ -181,8 +186,7 @@ export const GET = async (req: Request) => {
 
     // Try to determine the actual number of completed gameweeks with real data
     let maxGameweek = 0;
-    for (let gw = 1; gw <= 10; gw++) {
-      // Check up to 10 gameweeks
+    for (let gw = 1; gw <= stopEvent; gw++) {
       try {
         const gwTest = await fetch(
           `https://draft.premierleague.com/api/event/${gw}/live`,
