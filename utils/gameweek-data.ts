@@ -11,6 +11,9 @@ const CACHE_KEY = 'gameweek-data';
 const CACHE_TTL_SECONDS = 3600; // 1 hour — FPL data only changes once per gameweek
 const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
 
+// Promise deduplication: concurrent requests share the same computation
+let pendingPromise: Promise<GameweekDataResponse> | null = null;
+
 function assignRanks(
   data: Array<{ event_total: number; league_entry: number }>,
 ): Array<{ rank: number; league_entry: number; event_total: number }> {
@@ -138,175 +141,188 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
     return cached;
   }
 
-  const [leagueRes, statusRes] = await Promise.all([
-    fetch(`https://draft.premierleague.com/api/league/${LEAGUE_ID}/details`, {
-      next: { revalidate: 300 },
-    }),
-    fetch('https://draft.premierleague.com/api/pl/event-status', {
-      next: { revalidate: 300 },
-    }),
-  ]);
-
-  if (!leagueRes.ok || !statusRes.ok) {
-    throw new Error('Failed to fetch data from Premier League API');
+  // If another request is already computing, wait for it instead of duplicating work
+  if (pendingPromise) {
+    return pendingPromise;
   }
 
-  const leagueData = await leagueRes.json();
-  const statusData = await statusRes.json();
+  pendingPromise = (async () => {
+    const [leagueRes, statusRes] = await Promise.all([
+      fetch(`https://draft.premierleague.com/api/league/${LEAGUE_ID}/details`, {
+        next: { revalidate: 300 },
+      }),
+      fetch('https://draft.premierleague.com/api/pl/event-status', {
+        next: { revalidate: 300 },
+      }),
+    ]);
 
-  const { league_entries, standings } = leagueData;
-  const { status } = statusData;
+    if (!leagueRes.ok || !statusRes.ok) {
+      throw new Error('Failed to fetch data from Premier League API');
+    }
 
-  // Derive max gameweek from status array — instant, no extra HTTP calls
-  const maxGameweek = Math.max(...status.map((s: any) => s.event), 0);
-  const completedEvents = status.filter((s: any) => s.leagues_updated);
-  const maxCompletedGameweek =
-    completedEvents.length > 0
-      ? Math.max(...completedEvents.map((s: any) => s.event))
-      : 0;
+    const leagueData = await leagueRes.json();
+    const statusData = await statusRes.json();
 
-  const currentEvent = maxGameweek;
-  const isCurrentFinished = completedEvents.some(
-    (s: any) => s.event === currentEvent,
-  );
+    const { league_entries, standings } = leagueData;
+    const { status } = statusData;
 
-  const historicalData = await fetchAllGameweekData(
-    maxCompletedGameweek || maxGameweek,
-    league_entries,
-  );
+    // Derive max gameweek from status array — instant, no extra HTTP calls
+    const maxGameweek = Math.max(...status.map((s: any) => s.event), 0);
+    const completedEvents = status.filter((s: any) => s.leagues_updated);
+    const maxCompletedGameweek =
+      completedEvents.length > 0
+        ? Math.max(...completedEvents.map((s: any) => s.event))
+        : 0;
 
-  if (isCurrentFinished && standings) {
-    const hasCurrentGameweekData = historicalData.some(
-      (gw) => gw.event === currentEvent,
+    const currentEvent = maxGameweek;
+    const isCurrentFinished = completedEvents.some(
+      (s: any) => s.event === currentEvent,
     );
 
-    if (!hasCurrentGameweekData) {
-      const currentGameweekData = standings.map((standing: any) => ({
-        league_entry: standing.league_entry,
-        event_total: standing.event_total,
-      }));
+    const historicalData = await fetchAllGameweekData(
+      maxCompletedGameweek || maxGameweek,
+      league_entries,
+    );
 
-      const rankedCurrentData = assignRanks(currentGameweekData);
+    if (isCurrentFinished && standings) {
+      const hasCurrentGameweekData = historicalData.some(
+        (gw) => gw.event === currentEvent,
+      );
 
-      rankedCurrentData.forEach((player) => {
-        historicalData.push({
-          event: currentEvent,
-          league_entry: player.league_entry,
-          event_total: player.event_total,
-          rank: player.rank,
-          finished: true,
+      if (!hasCurrentGameweekData) {
+        const currentGameweekData = standings.map((standing: any) => ({
+          league_entry: standing.league_entry,
+          event_total: standing.event_total,
+        }));
+
+        const rankedCurrentData = assignRanks(currentGameweekData);
+
+        rankedCurrentData.forEach((player) => {
+          historicalData.push({
+            event: currentEvent,
+            league_entry: player.league_entry,
+            event_total: player.event_total,
+            rank: player.rank,
+            finished: true,
+          });
         });
-      });
-    }
-  }
-
-  const playerMetrics: Record<number, PlayerDetails> = {};
-
-  league_entries.forEach((entry: any) => {
-    playerMetrics[entry.id] = {
-      id: entry.id,
-      player_name: entry.player_first_name || 'Unknown',
-      player_surname: entry.player_last_name || 'Unknown',
-      team_name: entry.entry_name || 'Unknown',
-      total_points: 0,
-      f1_score: 0,
-      f1_ranking: 0,
-      total_wins: 0,
-      position_placed: {
-        first: 0,
-        second: 0,
-        third: 0,
-        fourth: 0,
-        fifth: 0,
-        sixth: 0,
-        seventh: 0,
-        eighth: 0,
-      },
-    };
-  });
-
-  historicalData.forEach((gameweek) => {
-    const player = playerMetrics[gameweek.league_entry];
-    if (player) {
-      const f1Points = F1_POINTS[gameweek.rank - 1] || 0;
-      player.f1_score += f1Points;
-      if (gameweek.rank === 1) player.total_wins++;
-
-      const positions = [
-        'first',
-        'second',
-        'third',
-        'fourth',
-        'fifth',
-        'sixth',
-        'seventh',
-        'eighth',
-      ] as const;
-      if (gameweek.rank >= 1 && gameweek.rank <= 8) {
-        player.position_placed[positions[gameweek.rank - 1]]++;
       }
     }
-  });
 
-  standings?.forEach((standing: any) => {
-    const player = playerMetrics[standing.league_entry];
-    if (player) {
-      player.total_points = standing.total;
-    }
-  });
+    const playerMetrics: Record<number, PlayerDetails> = {};
 
-  const players = Object.values(playerMetrics);
-  players.sort((a, b) => b.f1_score - a.f1_score);
-  players.forEach((player, index) => {
-    player.f1_ranking = index + 1;
-  });
-
-  const gameweeksByEvent: Record<number, GameweekPerformance[]> = {};
-  historicalData.forEach((gw) => {
-    if (!gameweeksByEvent[gw.event]) {
-      gameweeksByEvent[gw.event] = [];
-    }
-    gameweeksByEvent[gw.event].push(gw);
-  });
-
-  const rumblerData = Object.entries(gameweeksByEvent).map(
-    ([eventStr, performances]) => {
-      const event = parseInt(eventStr, 10);
-      const worstRank = Math.max(...performances.map((p) => p.rank));
-      const rumblers = performances.filter((p) => p.rank === worstRank);
-
-      const rumblerDetails = rumblers.map((rumbler) => {
-        const player = league_entries.find(
-          (entry: any) => entry.id === rumbler.league_entry,
-        );
-        return {
-          points: rumbler.event_total,
-          entry_name: player?.entry_name || 'Unknown',
-          player_name: player?.player_first_name || 'Unknown',
-        };
-      });
-
-      return {
-        gameweek: event,
-        points: rumblerDetails[0]?.points || 0,
-        entry_names: rumblerDetails.map((r) => r.entry_name),
-        player_names: rumblerDetails.map((r) => r.player_name),
+    league_entries.forEach((entry: any) => {
+      playerMetrics[entry.id] = {
+        id: entry.id,
+        player_name: entry.player_first_name || 'Unknown',
+        player_surname: entry.player_last_name || 'Unknown',
+        team_name: entry.entry_name || 'Unknown',
+        total_points: 0,
+        f1_score: 0,
+        f1_ranking: 0,
+        total_wins: 0,
+        position_placed: {
+          first: 0,
+          second: 0,
+          third: 0,
+          fourth: 0,
+          fifth: 0,
+          sixth: 0,
+          seventh: 0,
+          eighth: 0,
+        },
       };
-    },
-  );
+    });
 
-  const completedGameweeks = Array.from(
-    new Set(historicalData.map((gw) => gw.event)),
-  ).sort((a, b) => b - a);
+    historicalData.forEach((gameweek) => {
+      const player = playerMetrics[gameweek.league_entry];
+      if (player) {
+        const f1Points = F1_POINTS[gameweek.rank - 1] || 0;
+        player.f1_score += f1Points;
+        if (gameweek.rank === 1) player.total_wins++;
 
-  const response: GameweekDataResponse = {
-    players,
-    gameweekPerformances: historicalData,
-    currentGameweek: currentEvent,
-    completedGameweeks,
-    rumblerData: rumblerData.sort((a, b) => b.gameweek - a.gameweek),
-  };
+        const positions = [
+          'first',
+          'second',
+          'third',
+          'fourth',
+          'fifth',
+          'sixth',
+          'seventh',
+          'eighth',
+        ] as const;
+        if (gameweek.rank >= 1 && gameweek.rank <= 8) {
+          player.position_placed[positions[gameweek.rank - 1]]++;
+        }
+      }
+    });
 
-  setCache(CACHE_KEY, response, CACHE_TTL_SECONDS);
-  return response;
+    standings?.forEach((standing: any) => {
+      const player = playerMetrics[standing.league_entry];
+      if (player) {
+        player.total_points = standing.total;
+      }
+    });
+
+    const players = Object.values(playerMetrics);
+    players.sort((a, b) => b.f1_score - a.f1_score);
+    players.forEach((player, index) => {
+      player.f1_ranking = index + 1;
+    });
+
+    const gameweeksByEvent: Record<number, GameweekPerformance[]> = {};
+    historicalData.forEach((gw) => {
+      if (!gameweeksByEvent[gw.event]) {
+        gameweeksByEvent[gw.event] = [];
+      }
+      gameweeksByEvent[gw.event].push(gw);
+    });
+
+    const rumblerData = Object.entries(gameweeksByEvent).map(
+      ([eventStr, performances]) => {
+        const event = parseInt(eventStr, 10);
+        const worstRank = Math.max(...performances.map((p) => p.rank));
+        const rumblers = performances.filter((p) => p.rank === worstRank);
+
+        const rumblerDetails = rumblers.map((rumbler) => {
+          const player = league_entries.find(
+            (entry: any) => entry.id === rumbler.league_entry,
+          );
+          return {
+            points: rumbler.event_total,
+            entry_name: player?.entry_name || 'Unknown',
+            player_name: player?.player_first_name || 'Unknown',
+          };
+        });
+
+        return {
+          gameweek: event,
+          points: rumblerDetails[0]?.points || 0,
+          entry_names: rumblerDetails.map((r) => r.entry_name),
+          player_names: rumblerDetails.map((r) => r.player_name),
+        };
+      },
+    );
+
+    const completedGameweeks = Array.from(
+      new Set(historicalData.map((gw) => gw.event)),
+    ).sort((a, b) => b - a);
+
+    const response: GameweekDataResponse = {
+      players,
+      gameweekPerformances: historicalData,
+      currentGameweek: currentEvent,
+      completedGameweeks,
+      rumblerData: rumblerData.sort((a, b) => b.gameweek - a.gameweek),
+    };
+
+    setCache(CACHE_KEY, response, CACHE_TTL_SECONDS);
+    return response;
+  })();
+
+  try {
+    return await pendingPromise;
+  } finally {
+    pendingPromise = null;
+  }
 }
