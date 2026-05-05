@@ -2,7 +2,22 @@
 import React from 'react';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
-import { tableGradient } from '@/utils/tailwindVars';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 
 export interface TableColumn<T> {
   header: string;
@@ -26,8 +41,8 @@ export interface BaseTableProps<T> {
   tableClassName?: string;
   rowClassName?: (item: T, index: number) => string;
   onRowClick?: (item: T) => void;
-  children?: React.ReactNode; // For additional content like selectors
-  getRowKey?: (item: T, index: number) => string | number; // Function to get unique key for each row
+  children?: React.ReactNode;
+  getRowKey?: (item: T, index: number) => string | number;
 }
 
 export function BaseTable<T extends Record<string, any>>({
@@ -39,7 +54,7 @@ export function BaseTable<T extends Record<string, any>>({
   error,
   onRetry,
   emptyMessage,
-  className = 'flex w-[350px] flex-col md:w-[600px]',
+  className = '',
   tableClassName,
   rowClassName,
   onRowClick,
@@ -54,72 +69,93 @@ export function BaseTable<T extends Record<string, any>>({
 
   if (data.length === 0) {
     return (
-      <div className={className}>
-        <h1 className='pb-2 text-xl font-semibold text-[#310639]'>{title}</h1>
-        {subtitle && <p className='pb-5 text-sm'>{subtitle}</p>}
-        <p className='pb-5 text-sm'>{emptyMessage || 'No data available.'}</p>
-      </div>
+      <Card className='w-full border-white/10 bg-[#2a0d33]'>
+        <CardHeader className='pb-2'>
+          <CardTitle className='text-lg text-white'>{title}</CardTitle>
+          {subtitle && (
+            <CardDescription className='text-white/60'>
+              {subtitle}
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <p className='text-sm text-white/50'>
+            {emptyMessage || 'No data available.'}
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className={className}>
-      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>{title}</h1>
-      {subtitle && <p className='pb-5 text-sm'>{subtitle}</p>}
+    <div className={`w-full space-y-4 ${className}`}>
+      <div>
+        <h2 className='text-lg font-semibold text-white md:text-xl'>{title}</h2>
+        {subtitle && <p className='mt-1 text-sm text-white/60'>{subtitle}</p>}
+      </div>
 
       {children}
 
-      <div
-        className={`mt-6 rounded-lg border-2 border-black p-3 shadow-2xl ${tableGradient} ${tableClassName || ''}`}
+      <Card
+        className={`overflow-hidden border-white/10 bg-[#2a0d33] ${tableClassName || ''}`}
       >
-        <table className='w-full text-sm font-light text-white'>
-          <thead>
-            <tr className='border-b-2 border-white'>
-              {columns.map((column, index) => (
-                <th
-                  key={index}
-                  className={`py-2 font-medium ${
-                    column.align === 'center'
-                      ? 'text-center'
-                      : column.align === 'right'
-                        ? 'text-right'
-                        : 'text-left'
-                  } ${column.className || ''}`}
-                  style={column.width ? { width: column.width } : undefined}
-                >
-                  {column.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((item, index) => (
-              <tr
-                key={getRowKey ? getRowKey(item, index) : index}
-                className={`${onRowClick ? 'cursor-pointer transition-colors hover:bg-white/10' : ''}`}
-                onClick={() => onRowClick?.(item)}
-              >
-                {columns.map((column, colIndex) => (
-                  <td
-                    key={colIndex}
-                    className={`${colIndex < columns.length - 1 ? 'border-r-2 border-white' : ''} py-4 ${
-                      column.align === 'center'
-                        ? 'text-center'
-                        : column.align === 'right'
-                          ? 'text-right'
-                          : 'text-left'
-                    } ${column.cellClassName ? column.cellClassName(item, index) : ''}`}
+        <CardContent className='p-0'>
+          <ScrollArea className='custom-scrollbar w-full'>
+            <Table>
+              <TableHeader>
+                <TableRow className='border-white/10 hover:bg-transparent'>
+                  {columns.map((column, index) => (
+                    <TableHead
+                      key={index}
+                      className={`whitespace-nowrap px-4 py-4 text-xs font-semibold uppercase tracking-wider text-white/60 ${
+                        column.align === 'center'
+                          ? 'text-center'
+                          : column.align === 'right'
+                            ? 'text-right'
+                            : 'text-left'
+                      } ${column.className || ''}`}
+                      style={column.width ? { width: column.width } : undefined}
+                    >
+                      {column.header}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map((item, index) => (
+                  <TableRow
+                    key={getRowKey ? getRowKey(item, index) : index}
+                    className={`border-white/5 transition-colors ${
+                      onRowClick
+                        ? 'cursor-pointer hover:bg-white/5'
+                        : 'hover:bg-white/5'
+                    } ${rowClassName ? rowClassName(item, index) : ''}`}
+                    onClick={() => onRowClick?.(item)}
                   >
-                    {typeof column.key === 'function'
-                      ? column.key(item)
-                      : item[column.key as keyof T]}
-                  </td>
+                    {columns.map((column, colIndex) => (
+                      <TableCell
+                        key={colIndex}
+                        className={`px-4 py-5 text-sm text-white/90 ${
+                          column.align === 'center'
+                            ? 'text-center'
+                            : column.align === 'right'
+                              ? 'text-right'
+                              : 'text-left'
+                        } ${column.cellClassName ? column.cellClassName(item, index) : ''}`}
+                      >
+                        {typeof column.key === 'function'
+                          ? column.key(item)
+                          : item[column.key as keyof T]}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </TableBody>
+            </Table>
+            <ScrollBar orientation='horizontal' />
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   );
 }

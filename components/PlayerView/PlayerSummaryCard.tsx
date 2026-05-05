@@ -11,126 +11,80 @@ import {
 } from 'lucide-react';
 
 interface PlayerSummaryCardProps {
-  player: any; // We'll properly type this later
+  player: any;
 }
 
 export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
   const { stats } = player;
 
+  const statItems = [
+    {
+      icon: <Trophy className='h-5 w-5 text-yellow-400' />,
+      label: 'F1 Score',
+      value: player.f1_score || 0,
+      color: 'text-yellow-400',
+    },
+    {
+      icon: <Target className='h-5 w-5 text-[#00edfd]' />,
+      label: 'F1 Ranking',
+      value: `#${player.f1_ranking || 'N/A'}`,
+      color: 'text-[#00edfd]',
+    },
+    {
+      icon: <Zap className='h-5 w-5 text-[#75fa95]' />,
+      label: 'Avg. Points',
+      value: stats.averagePoints,
+      color: 'text-[#75fa95]',
+    },
+    {
+      icon: <Award className='h-5 w-5 text-emerald-400' />,
+      label: 'Best GW',
+      value: `GW${stats.bestGameweek.gameweek}: ${stats.bestGameweek.points}pts`,
+      color: 'text-emerald-400',
+    },
+    {
+      icon: <Frown className='h-5 w-5 text-red-400' />,
+      label: 'Worst GW',
+      value: `GW${stats.worstGameweek.gameweek}: ${stats.worstGameweek.points}pts`,
+      color: 'text-red-400',
+    },
+    {
+      icon: <BeerIcon className='h-5 w-5 text-amber-400' />,
+      label: 'Rumblers',
+      value: stats.rumblerCount,
+      color: 'text-amber-400',
+    },
+    {
+      icon: <BarChart3 className='h-5 w-5 text-purple-400' />,
+      label: 'Total Points',
+      value: stats.totalPoints,
+      color: 'text-purple-400',
+    },
+  ];
+
   return (
-    <Card className='h-full'>
-      <CardHeader>
-        <CardTitle className='text-xl'>Player Stats</CardTitle>
+    <Card className='h-full border-white/10 bg-[#2a0d33]'>
+      <CardHeader className='pb-3'>
+        <CardTitle className='text-base text-white md:text-lg'>
+          Player Stats
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className='flex h-full flex-col justify-between space-y-6'>
-          <div className='grid grid-cols-2 gap-6'>
-            <div className='rounded-lg bg-ruddyBlue p-4'>
-              <div className='flex flex-col items-start gap-2'>
-                <div className='flex flex-row gap-2'>
-                  <Trophy className='h-6 w-6 text-yellow-400' />
-                  <p className='text-sm text-gray-300'>F1 Score</p>
-                </div>
-                <div>
-                  <p className='text-lg font-medium text-white'>
-                    {player.f1_score || 0}
-                  </p>
-                </div>
+        <div className='grid grid-cols-2 gap-3'>
+          {statItems.map((item) => (
+            <div
+              key={item.label}
+              className='rounded-lg bg-[#1a0520] p-3 transition-colors hover:bg-[#1a0520]/80'
+            >
+              <div className='mb-2 flex items-center gap-2'>
+                {item.icon}
+                <p className='text-xs text-white/50'>{item.label}</p>
               </div>
+              <p className={`text-sm font-bold md:text-base ${item.color}`}>
+                {item.value}
+              </p>
             </div>
-
-            <div className='rounded-lg bg-ruddyBlue p-4'>
-              <div className='flex flex-col items-start gap-2'>
-                <div className='flex flex-row gap-2'>
-                  <Target className='h-6 w-6 text-emerald-400' />
-                  <p className='text-sm text-gray-300'>F1 Ranking</p>
-                </div>
-                <div>
-                  <p className='text-lg font-medium text-white'>
-                    #{player.f1_ranking || 'N/A'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className='grid grid-cols-2 gap-6'>
-            <div className='rounded-lg bg-ruddyBlue p-4'>
-              <div className='flex flex-col items-start gap-2'>
-                <div className='flex flex-row gap-2'>
-                  <Zap className='h-6 w-6 text-amber-400' />
-                  <p className='text-sm text-gray-300'>Avg. Points</p>
-                </div>
-                <div>
-                  <p className='text-lg font-medium text-white'>
-                    {stats.averagePoints}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className='rounded-lg bg-ruddyBlue p-4'>
-              <div className='flex flex-col items-start gap-2'>
-                <div className='flex flex-row gap-2'>
-                  <Award className='h-6 w-6 text-emerald-400' />
-                  <p className='text-sm text-gray-300'>Best GW</p>
-                </div>
-                <div>
-                  <p className='text-lg font-medium text-white'>
-                    GW{stats.bestGameweek.gameweek}: {stats.bestGameweek.points}
-                    pts
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className='grid grid-cols-2 gap-6'>
-            <div className='rounded-lg bg-ruddyBlue p-4'>
-              <div className='flex flex-col items-start gap-2'>
-                <div className='flex flex-row gap-2'>
-                  <Frown className='h-6 w-6 text-red-600' />
-                  <p className='text-sm text-gray-300'>Worst GW</p>
-                </div>
-                <div>
-                  <p className='text-lg font-medium text-white'>
-                    GW{stats.worstGameweek.gameweek}:{' '}
-                    {stats.worstGameweek.points}pts
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className='rounded-lg bg-ruddyBlue p-4'>
-              <div className='flex flex-col items-start gap-2'>
-                <div className='flex flex-row gap-2'>
-                  <BeerIcon className='h-6 w-6 text-yellow-400' />
-                  <p className='text-sm text-gray-300'>Rumblers</p>
-                </div>
-                <div>
-                  <p className='text-lg font-medium text-white'>
-                    {stats.rumblerCount}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className='grid grid-cols-1 gap-6'>
-            <div className='rounded-lg bg-ruddyBlue p-4'>
-              <div className='flex flex-col items-start gap-2'>
-                <div className='flex flex-row gap-2'>
-                  <BarChart3 className='h-6 w-6 text-purple-800' />
-                  <p className='text-sm text-gray-300'>Total Points</p>
-                </div>
-                <div>
-                  <p className='text-lg font-medium text-white'>
-                    {stats.totalPoints}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </CardContent>
     </Card>

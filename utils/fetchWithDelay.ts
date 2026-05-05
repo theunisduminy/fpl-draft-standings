@@ -5,7 +5,7 @@ export async function fetchWithDelay(
   minimumDuration = 300,
 ) {
   const start = Date.now();
-  
+
   try {
     const data = await Promise.all(
       endpoints.map(async (endpoint) => {
@@ -17,7 +17,7 @@ export async function fetchWithDelay(
         }
       }),
     );
-    
+
     const duration = Date.now() - start;
     const delay = Math.max(minimumDuration - duration, 0);
 

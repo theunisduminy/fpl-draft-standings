@@ -2,9 +2,10 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
 import * as React from 'react';
-import { MenuIcon, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 
 const navigation = [
   { name: 'Standings', href: '/', target: '_self' },
@@ -14,78 +15,86 @@ const navigation = [
 
 export default function HeaderNav() {
   const pathname = usePathname();
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-
-  const closeMenu = () => {
-    setIsMenuOpen(false);
-  };
+  const [open, setOpen] = React.useState(false);
 
   return (
-    <header className='bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95]'>
-      <nav className='mx-auto max-w-7xl px-6 lg:px-8' aria-label='Top'>
-        {/* Logo and Menu Button */}
-        <div className='flex w-full flex-row items-center justify-between py-6 md:justify-evenly'>
-          <Link href='/' onClick={closeMenu}>
+    <header className='sticky top-0 z-40 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg'>
+      <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
+        <div className='flex h-16 items-center justify-between'>
+          {/* Logo */}
+          <Link href='/' className='flex items-center gap-2'>
             <span className='sr-only'>Draft League Standings</span>
             <img
-              className='w-40 max-w-screen-lg'
-              src='../better-draft.png'
+              className='h-8 w-auto md:h-10'
+              src='/better-draft.png'
               alt='draft standings logo'
             />
           </Link>
 
-          {/* Menu Toggle Button */}
-          <button
-            onClick={toggleMenu}
-            className='flex items-center space-x-2 rounded-lg px-3 py-2 text-sm font-medium text-premPurple transition-colors hover:bg-premPurple/10 focus:outline-none focus:ring-2 focus:ring-premPurple/20'
-            aria-expanded={isMenuOpen}
-            aria-label='Toggle navigation menu'
-          >
-            {isMenuOpen ? (
-              <X className='h-5 w-5' />
-            ) : (
-              <MenuIcon className='h-5 w-5' />
-            )}
-            <span className='hidden sm:block'>
-              {isMenuOpen ? 'Close' : 'Menu'}
-            </span>
-          </button>
-        </div>
+          {/* Desktop Navigation */}
+          <nav className='hidden md:flex md:gap-1'>
+            {navigation.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className={`relative rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                    isActive
+                      ? 'bg-[#310639] text-white'
+                      : 'text-[#310639] hover:bg-[#310639]/10'
+                  }`}
+                >
+                  {link.name}
+                  {isActive && (
+                    <span className='absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-[#310639]' />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
 
-        {/* Divider */}
-        <div className='border-b-2 border-premPurple'></div>
-
-        {/* Collapsible Menu */}
-        <div
-          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-          }`}
-        >
-          <div className='py-4'>
-            <ul className='flex flex-col space-y-2 sm:flex-row sm:justify-center sm:space-x-6 sm:space-y-0'>
-              {navigation.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    onClick={closeMenu}
-                    className={`block rounded-lg px-4 py-3 text-center font-medium transition-colors sm:px-3 sm:py-2 ${
-                      pathname === link.href
-                        ? 'bg-premPurple text-white'
-                        : 'text-premPurple hover:bg-premPurple/10 hover:text-premPurple'
-                    }`}
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          {/* Mobile Menu Sheet */}
+          <div className='md:hidden'>
+            <Sheet open={open} onOpenChange={setOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='text-[#310639] hover:bg-[#310639]/10'
+                >
+                  <Menu className='h-6 w-6' />
+                  <span className='sr-only'>Open menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side='right'
+                className='w-[280px] border-white/10 bg-[#1a0520]'
+              >
+                <nav className='flex flex-col gap-2 pt-8'>
+                  {navigation.map((link) => {
+                    const isActive = pathname === link.href;
+                    return (
+                      <Link
+                        key={link.name}
+                        href={link.href}
+                        onClick={() => setOpen(false)}
+                        className={`rounded-lg px-4 py-3 text-sm font-medium transition-all ${
+                          isActive
+                            ? 'bg-[#00edfd]/20 text-[#00edfd]'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {link.name}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
-      </nav>
+      </div>
     </header>
   );
 }

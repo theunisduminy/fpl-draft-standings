@@ -1,6 +1,5 @@
 // Libraries
 import { Inter } from 'next/font/google';
-import clsx from 'clsx';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -8,14 +7,14 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 import Footer from '@/components/Layout/Footer';
 import HeaderNav from '@/components/Layout/HeaderNav';
-import { bgGradient } from '@/utils/tailwindVars';
+import MobileNav from '@/components/Layout/MobileNav';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import { config } from '@fortawesome/fontawesome-svg-core';
 config.autoAddCss = false;
 
 // Fonts & Head
 const inter = Inter({
-  weight: ['100', '200', '300', '400', '600', '900'],
+  weight: ['100', '200', '300', '400', '500', '600', '700', '900'],
   style: ['normal'],
   subsets: ['latin'],
   display: 'swap',
@@ -47,7 +46,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: 'white',
+  themeColor: '#1a0520',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -58,23 +60,22 @@ export default function RootLayout({
   return (
     <html
       lang='en'
-      className={clsx(
-        `h-full ${bgGradient} scroll-smooth from-30% antialiased`,
-        inter.variable,
-      )}
+      className={`${inter.variable} h-full scroll-smooth antialiased`}
     >
-      <body
-        className={`font-inter flex min-h-screen flex-col bg-transparent antialiased`}
-      >
+      <body className='font-inter flex min-h-screen flex-col bg-[#1a0520] text-white antialiased'>
         <HeaderNav />
-        <div className='mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8'>
-          <main className='flex min-h-[80vh] flex-col items-center pb-20 pt-10'>
+
+        <main className='flex-1 pb-20 pt-4 md:pb-8 md:pt-8'>
+          <div className='mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'>
             {children}
-          </main>
-        </div>
+          </div>
+        </main>
+
+        <Footer />
+        <MobileNav />
+
         <Analytics />
         <SpeedInsights />
-        <Footer />
       </body>
     </html>
   );

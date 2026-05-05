@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { LineChart } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface PlayerLinkProps {
   playerId: number;
@@ -8,12 +9,15 @@ interface PlayerLinkProps {
 
 export function PlayerLink({ playerId, className }: PlayerLinkProps) {
   return (
-    <Link
-      href={`/players/${playerId}`}
-      className={`inline-flex items-center justify-center rounded bg-white p-1.5 text-blackOlive transition-colors hover:bg-gray-100 ${className || ''}`}
-      title='View detailed statistics'
-    >
-      <LineChart className='h-4 w-4 text-blackOlive' />
+    <Link href={`/players/${playerId}`} className={className}>
+      <Button
+        variant='ghost'
+        size='icon'
+        className='h-8 w-8 text-white/50 hover:bg-white/10 hover:text-[#00edfd]'
+        title='View detailed statistics'
+      >
+        <LineChart className='h-4 w-4' />
+      </Button>
     </Link>
   );
 }

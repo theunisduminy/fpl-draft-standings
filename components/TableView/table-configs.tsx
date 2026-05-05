@@ -1,14 +1,21 @@
 import React from 'react';
 import { TableColumn } from './base-table';
 import { PlayerDetails } from '@/interfaces/players';
+import { Badge } from '@/components/ui/badge';
+import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
+
+// Truncate text helper
+const truncate = (str: string, maxLen: number) =>
+  str.length > maxLen ? str.slice(0, maxLen) + '…' : str;
 
 // Utility function for rank badge styling
 export const getRankBadgeClasses = (rank: number): string => {
-  if (rank === 1) return 'bg-yellow-400 text-black';
-  if (rank === 2) return 'bg-gray-300 text-black';
-  if (rank === 3) return 'bg-amber-600 text-white';
-  if (rank === 8) return 'bg-red-600 text-white';
-  return 'bg-gray-600 text-white';
+  if (rank === 1)
+    return 'bg-yellow-400/20 text-yellow-400 border-yellow-400/30';
+  if (rank === 2) return 'bg-gray-300/20 text-gray-300 border-gray-300/30';
+  if (rank === 3) return 'bg-amber-600/20 text-amber-500 border-amber-600/30';
+  if (rank === 8) return 'bg-red-600/20 text-red-400 border-red-600/30';
+  return 'bg-white/10 text-white/70 border-white/20';
 };
 
 // Utility function for rendering rank badges
@@ -16,50 +23,53 @@ export const renderRankBadge = (rank: number, size: 'sm' | 'md' = 'sm') => {
   const sizeClasses = size === 'md' ? 'h-8 w-8 text-sm' : 'h-6 w-6 text-xs';
 
   return (
-    <span
-      className={`inline-flex ${sizeClasses} flex-shrink-0 items-center justify-center rounded-full font-bold ${getRankBadgeClasses(rank)}`}
+    <Badge
+      variant='outline'
+      className={`inline-flex ${sizeClasses} flex-shrink-0 items-center justify-center rounded-full border p-0 font-bold ${getRankBadgeClasses(rank)}`}
     >
       {rank}
-    </span>
+    </Badge>
   );
 };
 
 // Standings Table Configuration
 export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
   {
-    header: 'Player Ranking',
+    header: 'Player',
     key: (player: PlayerDetails) => (
       <div className='flex items-center gap-3'>
         {renderRankBadge(player.f1_ranking)}
         <div>
-          <div className='font-medium'>{player.player_name}</div>
-          <div className='text-xs text-gray-300'>{player.team_name}</div>
+          <div className='font-medium text-white'>
+            {truncate(player.player_name, 12)}
+          </div>
+          <div className='text-xs text-white/50'>
+            {truncate(player.team_name, 14)}
+          </div>
         </div>
       </div>
     ),
-    width: '50%',
-    className: 'border-r-2 border-white pl-4',
+    width: '55%',
   },
   {
-    header: 'Score',
+    header: 'F1 Score',
     key: (player: PlayerDetails) => (
-      <span className='text-lg font-bold text-yellow-300'>
+      <span className='text-base font-bold text-[#00edfd]'>
         {player.f1_score}
       </span>
     ),
     align: 'center',
-    width: '25%',
-    className: 'border-r-2 border-white',
+    width: '22.5%',
   },
   {
-    header: 'TP',
+    header: 'Total Pts',
     key: (player: PlayerDetails) => (
-      <span className='text-lg font-bold text-blue-300'>
+      <span className='text-base font-bold text-[#75fa95]'>
         {player.total_points || 0}
       </span>
     ),
     align: 'center',
-    width: '25%',
+    width: '22.5%',
   },
 ];
 
@@ -67,23 +77,38 @@ export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
 export const positionPlacedTableConfig: TableColumn<PlayerDetails>[] = [
   {
     header: 'Player',
-    key: 'player_name',
-    width: '16.67%',
-    className: 'border-r-2 border-white',
+    key: (player: PlayerDetails) => (
+      <span className='font-medium text-white'>
+        {truncate(player.player_name, 12)}
+      </span>
+    ),
+    width: '20%',
   },
   {
     header: '1st',
-    key: (player) => player.position_placed['first'] || 0,
+    key: (player) => (
+      <span className='font-semibold text-yellow-400'>
+        {player.position_placed['first'] || 0}
+      </span>
+    ),
     align: 'center' as const,
   },
   {
     header: '2nd',
-    key: (player) => player.position_placed['second'] || 0,
+    key: (player) => (
+      <span className='font-semibold text-gray-300'>
+        {player.position_placed['second'] || 0}
+      </span>
+    ),
     align: 'center' as const,
   },
   {
     header: '3rd',
-    key: (player) => player.position_placed['third'] || 0,
+    key: (player) => (
+      <span className='font-semibold text-amber-500'>
+        {player.position_placed['third'] || 0}
+      </span>
+    ),
     align: 'center' as const,
   },
   {
@@ -108,7 +133,11 @@ export const positionPlacedTableConfig: TableColumn<PlayerDetails>[] = [
   },
   {
     header: '8th',
-    key: (player) => player.position_placed['eighth'] || 0,
+    key: (player) => (
+      <span className='font-semibold text-red-400'>
+        {player.position_placed['eighth'] || 0}
+      </span>
+    ),
     align: 'center' as const,
   },
 ];
@@ -120,49 +149,74 @@ export interface GameweekResult {
   team_name: string;
   points: number;
   league_entry: number;
-  position_movement?: number; // Positive = moved up, negative = moved down, 0 = no change, undefined = first gameweek
+  position_movement?: number;
 }
 
 // Utility function for position movement display
 export const renderPositionMovement = (movement?: number) => {
   if (movement === undefined)
-    return <span className='text-sm text-gray-400'>NEW</span>;
-  if (movement === 0) return <span className='text-gray-400'>→</span>;
-  if (movement > 0) return <span className='text-green-400'>↑{movement}</span>;
-  return <span className='text-red-400'>↓{Math.abs(movement)}</span>;
+    return (
+      <span className='inline-flex items-center gap-1 text-xs text-white/40'>
+        <Minus className='h-3 w-3' />
+        NEW
+      </span>
+    );
+  if (movement === 0)
+    return (
+      <span className='inline-flex items-center gap-1 text-xs text-white/40'>
+        <Minus className='h-3 w-3' />
+        SAME
+      </span>
+    );
+  if (movement > 0)
+    return (
+      <span className='inline-flex items-center gap-1 text-xs font-medium text-[#75fa95]'>
+        <ArrowUp className='h-3 w-3' />
+        {movement}
+      </span>
+    );
+  return (
+    <span className='inline-flex items-center gap-1 text-xs font-medium text-red-400'>
+      <ArrowDown className='h-3 w-3' />
+      {Math.abs(movement)}
+    </span>
+  );
 };
 
 export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
   {
-    header: 'Player Ranking',
+    header: 'Player',
     key: (result: GameweekResult) => (
       <div className='flex items-center gap-3'>
         {renderRankBadge(result.rank, 'md')}
         <div>
-          <div className='font-medium'>{result.player_name}</div>
+          <div className='font-medium text-white'>
+            {truncate(result.player_name, 12)}
+          </div>
+          <div className='text-xs text-white/50'>
+            {truncate(result.team_name, 14)}
+          </div>
         </div>
       </div>
     ),
-    width: '50%',
-    className: 'border-r-2 border-white pl-1',
+    width: '55%',
   },
   {
-    header: 'Movement',
+    header: 'Move',
     key: (result: GameweekResult) =>
       renderPositionMovement(result.position_movement),
     align: 'center',
-    width: '25%',
-    className: 'border-r-2 border-white',
+    width: '22.5%',
   },
   {
     header: 'Points',
     key: (result: GameweekResult) => (
       <span
-        className={`font-bold ${
+        className={`text-base font-bold ${
           result.rank === 1
-            ? 'text-yellow-300'
+            ? 'text-yellow-400'
             : result.rank === 8
-              ? 'text-red-300'
+              ? 'text-red-400'
               : 'text-white'
         }`}
       >
@@ -170,7 +224,7 @@ export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
       </span>
     ),
     align: 'center',
-    width: '25%',
+    width: '22.5%',
   },
 ];
 
@@ -193,8 +247,8 @@ export const tableConfigs: Record<string, TableConfig> = {
     title: '🎖️ Position Placed',
     subtitle:
       'Frequency of position placed, based on total points, for the previous gameweeks.',
-    className: 'flex w-[350px] flex-col md:w-[600px]',
-    tableClassName: 'mb-8',
+    className: '',
+    tableClassName: '',
   },
   draftResults: {
     title: '📊 Gameweek Results',

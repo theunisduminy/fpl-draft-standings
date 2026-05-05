@@ -9,29 +9,25 @@ import {
 } from './table-configs';
 import { GameweekDataResponse } from '@/interfaces/players';
 import { GameweekSelector } from '@/components/GameweekSelector';
-import { tableGradient } from '@/utils/tailwindVars';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TrendingUp, TrendingDown, BarChart3, Minus } from 'lucide-react';
 
 export default function DraftResultsTable() {
   const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
 
   const { data, loading, error, refetch } = useTableData<GameweekDataResponse>({
     endpoints: ['gameweek-data'],
-    transform: (response) => response[0], // Extract first element from response array
+    transform: (response) => response[0],
   });
 
-  // Extract completed gameweeks and set default selection
   const gameweeks = useMemo(() => {
     if (!data?.completedGameweeks) return [];
-
-    // Set default selected gameweek to the most recent one
     if (data.completedGameweeks.length > 0 && selectedGameweek === 0) {
       setSelectedGameweek(data.completedGameweeks[0]);
     }
-
     return data.completedGameweeks;
   }, [data?.completedGameweeks, selectedGameweek]);
 
-  // Process data for selected gameweek with position movement
   const formattedResults: GameweekResult[] = useMemo(() => {
     if (!data || !selectedGameweek) return [];
 
@@ -41,8 +37,6 @@ export default function DraftResultsTable() {
 
     return gameweekResults.map((gw) => {
       const player = data.players.find((p) => p.id === gw.league_entry);
-
-      // Calculate position movement by comparing to previous gameweek
       let positionMovement: number | undefined = undefined;
 
       if (selectedGameweek > 1) {
@@ -55,7 +49,6 @@ export default function DraftResultsTable() {
         )?.rank;
 
         if (previousRank !== undefined) {
-          // Position movement: previous rank - current rank (positive = moved up)
           positionMovement = previousRank - gw.rank;
         }
       }
@@ -72,6 +65,30 @@ export default function DraftResultsTable() {
   }, [data, selectedGameweek]);
 
   const config = tableConfigs.draftResults;
+
+  const summaryStats = useMemo(() => {
+    if (formattedResults.length === 0) return null;
+    const highestScore = formattedResults[0]?.points;
+    const highestScorers = formattedResults.filter(
+      (r) => r.points === highestScore,
+    );
+    const lowestScore = formattedResults[formattedResults.length - 1]?.points;
+    const lowestScorers = formattedResults.filter(
+      (r) => r.points === lowestScore,
+    );
+    const average =
+      formattedResults.reduce((sum, r) => sum + r.points, 0) /
+      formattedResults.length;
+
+    return {
+      highestScore,
+      highestScorers,
+      lowestScore,
+      lowestScorers,
+      average,
+      diff: highestScore - lowestScore,
+    };
+  }, [formattedResults]);
 
   if (loading || error || gameweeks.length === 0) {
     return (
@@ -90,12 +107,7 @@ export default function DraftResultsTable() {
   }
 
   return (
-    <div className='flex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-        {config.title}
-      </h1>
-      <p className='pb-5 text-sm'>{config.subtitle}</p>
-
+    <div className='w-full space-y-6'>
       <GameweekSelector
         gameweeks={gameweeks}
         selectedGameweek={selectedGameweek}
@@ -103,117 +115,80 @@ export default function DraftResultsTable() {
         label='Select Gameweek'
       />
 
-      <div className='mt-6 space-y-6'>
-        {/* Results Table */}
-        <div
-          className={`rounded-lg border-2 border-black ${tableGradient} p-5 shadow-2xl`}
-        >
-          <h2 className='pb-3 text-xl font-medium text-white'>
-            Gameweek {selectedGameweek} Rankings
-          </h2>
-          <table className='w-full text-sm font-light text-white'>
-            <thead>
-              <tr className='border-b-2 border-white'>
-                {draftResultsTableConfig.map((column, index) => (
-                  <th
-                    key={index}
-                    className={`py-2 font-medium ${
-                      column.align === 'center'
-                        ? 'text-center'
-                        : column.align === 'right'
-                          ? 'text-right'
-                          : 'text-left'
-                    } ${column.className || ''}`}
-                  >
-                    {column.header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {formattedResults.map((result, index) => (
-                <tr key={result.league_entry}>
-                  {draftResultsTableConfig.map((column, colIndex) => (
-                    <td
-                      key={colIndex}
-                      className={`py-4 ${colIndex < draftResultsTableConfig.length - 1 ? 'border-r-2 border-white' : ''} ${
-                        column.align === 'center'
-                          ? 'text-center'
-                          : column.align === 'right'
-                            ? 'text-right'
-                            : 'text-left'
-                      } ${column.cellClassName ? column.cellClassName(result, index) : ''}`}
-                    >
-                      {typeof column.key === 'function'
-                        ? column.key(result)
-                        : result[column.key as keyof GameweekResult]}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <BaseTable
+        title={`Gameweek ${selectedGameweek} Rankings`}
+        subtitle={config.subtitle}
+        data={formattedResults}
+        columns={draftResultsTableConfig}
+        loading={false}
+        error={null}
+        getRowKey={(result) => result.league_entry}
+      />
 
-        {/* Summary Stats */}
-        {formattedResults.length > 0 &&
-          (() => {
-            // Find all players with the highest score
-            const highestScore = formattedResults[0]?.points;
-            const highestScorers = formattedResults.filter(
-              (r) => r.points === highestScore,
-            );
+      {summaryStats && (
+        <Card className='border-white/10 bg-[#2a0d33]'>
+          <CardHeader className='pb-3'>
+            <CardTitle className='text-base text-white md:text-lg'>
+              Gameweek {selectedGameweek} Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
+              <StatCard
+                icon={<TrendingUp className='h-4 w-4 text-yellow-400' />}
+                label='Highest'
+                value={`${summaryStats.highestScore} pts`}
+                detail={summaryStats.highestScorers
+                  .map((p) => p.player_name)
+                  .join(', ')}
+              />
+              <StatCard
+                icon={<TrendingDown className='h-4 w-4 text-red-400' />}
+                label='Lowest'
+                value={`${summaryStats.lowestScore} pts`}
+                detail={summaryStats.lowestScorers
+                  .map((p) => p.player_name)
+                  .join(', ')}
+              />
+              <StatCard
+                icon={<BarChart3 className='h-4 w-4 text-[#00edfd]' />}
+                label='Average'
+                value={`${summaryStats.average.toFixed(1)} pts`}
+              />
+              <StatCard
+                icon={<Minus className='h-4 w-4 text-[#75fa95]' />}
+                label='Difference'
+                value={`${summaryStats.diff} pts`}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
 
-            // Find all players with the lowest score
-            const lowestScore =
-              formattedResults[formattedResults.length - 1]?.points;
-            const lowestScorers = formattedResults.filter(
-              (r) => r.points === lowestScore,
-            );
-
-            return (
-              <div
-                className={`rounded-lg border-2 border-black ${tableGradient} p-6 shadow-2xl`}
-              >
-                <h3 className='pb-3 text-lg font-medium text-white'>
-                  Gameweek {selectedGameweek} Summary
-                </h3>
-                <div className='grid grid-cols-2 gap-4 text-white'>
-                  <div>
-                    <p className='text-sm text-gray-300'>Highest Score</p>
-                    <p className='text-lg font-bold text-yellow-300'>
-                      {highestScore} pts (
-                      {highestScorers.map((p) => p.player_name).join(', ')})
-                    </p>
-                  </div>
-                  <div>
-                    <p className='text-sm text-gray-300'>Lowest Score</p>
-                    <p className='text-lg font-bold text-red-300'>
-                      {lowestScore} pts (
-                      {lowestScorers.map((p) => p.player_name).join(', ')})
-                    </p>
-                  </div>
-                  <div>
-                    <p className='text-sm text-gray-300'>Average Score</p>
-                    <p className='text-lg font-bold'>
-                      {(
-                        formattedResults.reduce((sum, r) => sum + r.points, 0) /
-                        formattedResults.length
-                      ).toFixed(1)}{' '}
-                      pts
-                    </p>
-                  </div>
-                  <div>
-                    <p className='text-sm text-gray-300'>Point Difference</p>
-                    <p className='text-lg font-bold'>
-                      {highestScore - lowestScore} pts
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+function StatCard({
+  icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div className='rounded-lg bg-[#1a0520] p-3'>
+      <div className='mb-1 flex items-center gap-2'>
+        {icon}
+        <span className='text-xs text-white/50'>{label}</span>
       </div>
+      <p className='text-sm font-bold text-white md:text-base'>{value}</p>
+      {detail && (
+        <p className='mt-1 truncate text-[10px] text-white/40'>{detail}</p>
+      )}
     </div>
   );
 }

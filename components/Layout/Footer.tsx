@@ -38,27 +38,28 @@ const navigation = [
   },
 ];
 
-export default function Example() {
+export default function Footer() {
   return (
-    <footer className='bg-premPurple'>
-      <div className='mx-auto max-w-5xl px-6 py-12 md:flex md:items-center md:justify-between lg:px-8'>
-        <div className='flex justify-center space-x-6 md:order-2'>
-          {navigation.map((item) => (
-            <a
-              key={item.name}
-              href={item.href}
-              target='_blank'
-              className='text-gray-200 hover:text-gray-300'
-            >
-              <span className='sr-only'>{item.name}</span>
-              <item.icon aria-hidden='true' className='h-6 w-6' />
-            </a>
-          ))}
-        </div>
-        <div className='mt-8 md:order-1 md:mt-0'>
-          <p className='text-center text-xs leading-5 text-gray-100'>
+    <footer className='hidden border-t border-white/10 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] py-6 md:block'>
+      <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
+        <div className='flex flex-col items-center gap-4 md:flex-row md:justify-between'>
+          <p className='text-center text-xs font-semibold text-[#310639]'>
             &copy; {year} Theunis Duminy. For the lads. All rights reserved.
           </p>
+          <div className='flex items-center gap-4'>
+            {navigation.map((item) => (
+              <a
+                key={item.name}
+                href={item.href}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-[#310639]/70 transition-colors hover:text-[#310639]'
+              >
+                <span className='sr-only'>{item.name}</span>
+                <item.icon aria-hidden='true' className='h-5 w-5' />
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </footer>

@@ -41,7 +41,6 @@ export function GameweekScoreChart({
   matches,
   players,
 }: GameweekScoreChartProps) {
-  // Filter matches for the selected gameweek
   const gameweekMatches = matches.filter(
     (m) => m.event === gameweek && m.finished,
   );
@@ -50,7 +49,6 @@ export function GameweekScoreChart({
     return null;
   }
 
-  // Calculate player scores for this gameweek
   const playerScores: Record<number, number> = {};
 
   gameweekMatches.forEach((match) => {
@@ -62,7 +60,6 @@ export function GameweekScoreChart({
     }
   });
 
-  // Prepare data for the chart - sort by score (highest first)
   const chartData = Object.entries(playerScores)
     .map(([playerId, score]) => {
       const playerIdNumber = parseInt(playerId);
@@ -74,7 +71,6 @@ export function GameweekScoreChart({
     })
     .sort((a, b) => b.score - a.score);
 
-  // Calculate average score for the trend
   const averageScore =
     chartData.reduce((acc, curr) => acc + curr.score, 0) / chartData.length;
   const previousGameweekMatches = matches.filter(
@@ -90,43 +86,60 @@ export function GameweekScoreChart({
     ? previousScores.reduce((acc, curr) => acc + curr, 0) /
       previousScores.length
     : 0;
-  const trend = ((averageScore - previousAverage) / previousAverage) * 100;
+  const trend =
+    previousAverage > 0
+      ? ((averageScore - previousAverage) / previousAverage) * 100
+      : 0;
 
   return (
-    <Card className='mt-6'>
-      <CardHeader>
-        <CardTitle>Gameweek {gameweek} Player Scores</CardTitle>
+    <Card className='mt-6 border-white/10 bg-[#2a0d33]'>
+      <CardHeader className='pb-2'>
+        <CardTitle className='text-base text-white md:text-lg'>
+          Gameweek {gameweek} Player Scores
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <ChartContainer
           config={chartConfig}
-          className='mx-auto aspect-square max-h-[400px]'
+          className='mx-auto aspect-square max-h-[350px] md:max-h-[400px]'
         >
           <ResponsiveContainer width='100%' height='100%'>
             <RadarChart data={chartData}>
               <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-              <PolarAngleAxis dataKey='name' tick={{ fill: '#FFFFFF' }} />
-              <PolarGrid />
+              <PolarAngleAxis
+                dataKey='name'
+                tick={{
+                  fill: 'rgba(255,255,255,0.7)',
+                  fontSize: 11,
+                }}
+              />
+              <PolarGrid stroke='rgba(255,255,255,0.1)' />
               <Radar
                 dataKey='score'
                 fill='#75fa95'
-                fillOpacity={0.6}
+                fillOpacity={0.5}
+                stroke='#75fa95'
                 dot={{
                   r: 4,
                   fillOpacity: 1,
+                  fill: '#00edfd',
                 }}
               />
             </RadarChart>
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
-      <CardFooter className='flex-col gap-2 text-sm text-white'>
-        <div className='flex items-center gap-2 font-medium leading-none'>
+      <CardFooter className='flex-col gap-2 border-t border-white/10 pt-4 text-xs text-white/60 md:text-sm'>
+        <div className='flex items-center gap-2 font-medium'>
           {trend > 0 ? 'Trending up' : 'Trending down'} by{' '}
           {Math.abs(trend).toFixed(1)}% this gameweek{' '}
-          <TrendingUp className={`h-4 w-4 ${trend < 0 ? 'rotate-180' : ''}`} />
+          <TrendingUp
+            className={`h-4 w-4 ${
+              trend < 0 ? 'rotate-180 text-red-400' : 'text-[#75fa95]'
+            }`}
+          />
         </div>
-        <div className='flex items-center gap-2 leading-none'>
+        <div className='flex items-center gap-2'>
           Average score: {Math.round(averageScore)} points
         </div>
       </CardFooter>

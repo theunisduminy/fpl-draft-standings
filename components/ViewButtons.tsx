@@ -1,25 +1,40 @@
-import { ReactNode, MouseEventHandler } from 'react';
+import { ReactNode } from 'react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-const buttonStyle =
-  'px-7 py-3 border-2 rounded-lg text-sm shadow-2xl min-w-[9rem] border-premPurple duration-500';
-
-interface ButtonProps {
-  isActive: boolean;
-  onClick: MouseEventHandler<HTMLButtonElement>;
-  children: ReactNode;
+interface ViewButtonOption {
+  value: string;
+  label: ReactNode;
 }
 
-const ViewButton: React.FC<ButtonProps> = ({ isActive, onClick, children }) => (
-  <button
-    className={`${buttonStyle} ${
-      isActive
-        ? 'bg-gradient-to-r from-cyan-600 to-ruddyBlue text-white'
-        : 'bg-gradient-to-r from-premTurquoise to-premGreen'
-    }`}
-    onClick={onClick}
-  >
-    {children}
-  </button>
-);
+interface ViewButtonsProps {
+  options: ViewButtonOption[];
+  activeValue: string;
+  onValueChange: (value: string) => void;
+}
 
-export default ViewButton;
+export default function ViewButtons({
+  options,
+  activeValue,
+  onValueChange,
+}: ViewButtonsProps) {
+  return (
+    <ToggleGroup
+      type='single'
+      value={activeValue}
+      onValueChange={(value) => {
+        if (value) onValueChange(value);
+      }}
+      className='flex flex-wrap gap-2'
+    >
+      {options.map((option) => (
+        <ToggleGroupItem
+          key={option.value}
+          value={option.value}
+          className='rounded-lg border border-white/20 bg-[#2a0d33] px-4 py-2 text-sm font-medium text-white/70 transition-all hover:border-[#00edfd]/50 hover:bg-[#3d1a4d] hover:text-white data-[state=on]:border-[#00edfd] data-[state=on]:bg-[#00edfd]/20 data-[state=on]:text-[#00edfd]'
+        >
+          {option.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}

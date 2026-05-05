@@ -19,9 +19,6 @@ import {
 } from '@/components/ui/chart';
 import { RumblerGameweekData } from '@/interfaces/players';
 
-export const description =
-  'A bar chart showing the frequency of rumbler victims';
-
 interface RumblerFrequencyChartProps {
   data: RumblerGameweekData[];
 }
@@ -47,63 +44,75 @@ export function RumblerFrequencyChart({ data }: RumblerFrequencyChartProps) {
   const chartData = Object.entries(rumblerFrequency)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 8); // Top 10 players
+    .slice(0, 8);
 
   const totalRumblers = chartData.reduce((sum, item) => sum + item.count, 0);
-  const averageRumblers = totalRumblers / chartData.length;
+  const averageRumblers =
+    chartData.length > 0 ? totalRumblers / chartData.length : 1;
   const topPlayerRumblers = chartData[0]?.count || 0;
   const trend = ((topPlayerRumblers - averageRumblers) / averageRumblers) * 100;
 
   return (
-    <div className='flex w-[350px] flex-col md:w-[600px]'>
-      <h1 className='pb-2 text-xl font-semibold text-[#310639]'>
-        👀 Who had the most rumblers?
-      </h1>
-      <p className='pb-5 text-sm'>
-        Visualed, who has to make up for their Draft skills with drinking.
-      </p>
-      <Card>
-        <CardHeader>
-          <CardTitle>Rumbler Frequency</CardTitle>
-          {/* <CardDescription>Top rumbler victims</CardDescription> */}
+    <div className='w-full space-y-4'>
+      <div>
+        <h2 className='text-lg font-semibold text-white md:text-xl'>
+          Who had the most rumblers?
+        </h2>
+        <p className='mt-1 text-sm text-white/60'>
+          Who has to make up for their Draft skills with drinking.
+        </p>
+      </div>
+      <Card className='w-full border-white/10 bg-[#2a0d33]'>
+        <CardHeader className='pb-2'>
+          <CardTitle className='text-base text-white md:text-lg'>
+            Rumbler Frequency
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig}>
             <BarChart
-              layout='vertical' // Keep the layout as vertical for better use of mobile space
+              layout='vertical'
               data={chartData}
-              margin={{ top: 0, right: 0, left: -50, bottom: 0 }}
-              width={350} // Set a width suitable for mobile devices
-              height={chartData.length * 80} // Dynamically adjust height, giving more room per label
+              margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+              height={chartData.length * 50}
             >
-              <CartesianGrid horizontal={false} />
+              <CartesianGrid
+                horizontal={false}
+                stroke='rgba(255,255,255,0.05)'
+              />
               <XAxis
                 type='number'
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: '#FFFFFF' }}
+                tick={{
+                  fill: 'rgba(255,255,255,0.5)',
+                  fontSize: 11,
+                }}
               />
               <YAxis
                 type='category'
                 dataKey='name'
                 tickLine={false}
                 axisLine={false}
-                width={100} // Ensure the full name is visible
-                tick={{ fill: '#FFFFFF' }}
+                width={100}
+                tick={{
+                  fill: 'rgba(255,255,255,0.7)',
+                  fontSize: 12,
+                }}
               />
               <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-              <Bar dataKey='count' fill='#75fa95' radius={6} barSize={30} />
+              <Bar dataKey='count' fill='#75fa95' radius={4} barSize={24} />
             </BarChart>
           </ChartContainer>
         </CardContent>
-        <CardFooter className='flex-col items-start gap-2 text-sm'>
-          <div className='flex gap-2 font-medium leading-none text-gray-200'>
+        <CardFooter className='flex-col items-start gap-2 border-t border-white/10 pt-4'>
+          <div className='flex gap-2 text-xs font-medium text-white/60 md:text-sm'>
             {trend > 0 ? 'Trending up' : 'Trending down'} by{' '}
             {Math.abs(trend).toFixed(1)}% compared to average
             {trend > 0 ? (
-              <TrendingUp className='h-4 w-4' />
+              <TrendingUp className='h-4 w-4 text-[#75fa95]' />
             ) : (
-              <TrendingDown className='h-4 w-4' />
+              <TrendingDown className='h-4 w-4 text-red-400' />
             )}
           </div>
         </CardFooter>

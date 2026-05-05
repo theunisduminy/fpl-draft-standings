@@ -15,27 +15,29 @@ export function GameweekSummaryCard({
   matches,
   players,
 }: GameweekSummaryProps) {
-  // Filter matches for the selected gameweek
   const gameweekMatches = matches.filter(
     (m) => m.event === gameweek && m.finished,
   );
 
   if (gameweekMatches.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Gameweek {gameweek} Summary</CardTitle>
+      <Card className='border-white/10 bg-[#2a0d33]'>
+        <CardHeader className='pb-2'>
+          <CardTitle className='text-base text-white md:text-lg'>
+            Gameweek {gameweek} Summary
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className='flex items-center justify-center p-8 text-center text-gray-200'>
-            <p>No results available for this gameweek yet.</p>
+          <div className='flex items-center justify-center p-8 text-center text-white/50'>
+            <p className='text-sm'>
+              No results available for this gameweek yet.
+            </p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Calculate player scores for this gameweek
   const playerScores: Record<number, number> = {};
 
   gameweekMatches.forEach((match) => {
@@ -47,12 +49,10 @@ export function GameweekSummaryCard({
     }
   });
 
-  // Calculate average score
   const scores = Object.values(playerScores);
   const averageScore =
     scores.reduce((sum, score) => sum + score, 0) / scores.length;
 
-  // Find highest and lowest scoring players
   let highestScore = -1;
   let lowestScore = Infinity;
   let highestScoringPlayer: PlayerDetails | undefined;
@@ -74,47 +74,51 @@ export function GameweekSummaryCard({
   });
 
   return (
-    <Card className='mb-6'>
-      <CardHeader>
-        <CardTitle>Gameweek {gameweek} Summary</CardTitle>
+    <Card className='mb-6 border-white/10 bg-[#2a0d33]'>
+      <CardHeader className='pb-2'>
+        <CardTitle className='text-base text-white md:text-lg'>
+          Gameweek {gameweek} Summary
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-          <div className='rounded-lg bg-ruddyBlue p-4'>
+        <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
+          <div className='rounded-lg border border-white/10 bg-[#1a0520] p-4'>
             <div className='flex flex-col items-start gap-2'>
               <div className='flex items-center gap-2'>
-                <BarChart3 className='h-6 w-6 text-white' />
-                <p className='text-sm text-gray-300'>Average Score</p>
+                <BarChart3 className='h-5 w-5 text-[#00edfd]' />
+                <p className='text-xs text-white/50'>Average Score</p>
               </div>
-              <p className='text-xl font-medium text-white'>
+              <p className='text-lg font-bold text-white'>
                 {averageScore.toFixed(1)}
               </p>
             </div>
           </div>
 
           {highestScoringPlayer && (
-            <div className='rounded-lg bg-ruddyBlue p-4'>
+            <div className='rounded-lg border border-yellow-500/20 bg-[#1a0520] p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex items-center gap-2'>
-                  <Trophy className='h-6 w-6 text-amber-400' />
-                  <p className='text-sm text-gray-300'>Top Performer</p>
+                  <Trophy className='h-5 w-5 text-yellow-400' />
+                  <p className='text-xs text-white/50'>Top Performer</p>
                 </div>
-                <p className='text-xl font-medium text-white'>
-                  {highestScoringPlayer.player_name} ({highestScore})
+                <p className='text-sm font-bold text-white md:text-base'>
+                  {highestScoringPlayer.player_name}{' '}
+                  <span className='text-yellow-400'>({highestScore})</span>
                 </p>
               </div>
             </div>
           )}
 
           {lowestScoringPlayer && (
-            <div className='rounded-lg bg-ruddyBlue p-4'>
+            <div className='rounded-lg border border-red-500/20 bg-[#1a0520] p-4'>
               <div className='flex flex-col items-start gap-2'>
                 <div className='flex items-center gap-2'>
-                  <ArrowDown className='h-6 w-6 text-red-400' />
-                  <p className='text-sm text-gray-300'>Lowest Score</p>
+                  <ArrowDown className='h-5 w-5 text-red-400' />
+                  <p className='text-xs text-white/50'>Lowest Score</p>
                 </div>
-                <p className='text-xl font-medium text-white'>
-                  {lowestScoringPlayer.player_name} ({lowestScore})
+                <p className='text-sm font-bold text-white md:text-base'>
+                  {lowestScoringPlayer.player_name}{' '}
+                  <span className='text-red-400'>({lowestScore})</span>
                 </p>
               </div>
             </div>
