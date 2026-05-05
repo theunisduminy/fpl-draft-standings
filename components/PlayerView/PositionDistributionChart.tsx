@@ -201,9 +201,12 @@ export function PositionDistributionChart({
           </ChartContainer>
 
           {/* Legend */}
-          <div className='mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-white/10 pt-3'>
+          <div className='mt-4 grid grid-cols-4 gap-2 border-t border-white/10 pt-3'>
             {Object.entries(POSITION_COLORS).map(([key, color]) => (
-              <div key={key} className='flex items-center gap-1.5'>
+              <div
+                key={key}
+                className='flex items-center justify-center gap-1.5'
+              >
                 <div
                   className='h-3 w-3 rounded-sm'
                   style={{ backgroundColor: color }}

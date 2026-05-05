@@ -2,19 +2,23 @@
 import React from 'react';
 import { useTableData } from '@/hooks/use-table-data';
 import { PositionDistributionChart } from '@/components/PlayerView/PositionDistributionChart';
-import { PlayerDetails } from '@/interfaces/players';
+import { StreaksTracker } from '@/components/PlayerView/StreaksTracker';
+import { FormGuide } from '@/components/PlayerView/FormGuide';
+import { PositionTrajectory } from '@/components/PlayerView/PositionTrajectory';
+import { PodiumRace } from '@/components/PlayerView/PodiumRace';
+import { GameweekDataResponse } from '@/interfaces/players';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 
 export default function PositionPlacedTable() {
-  const { data, loading, error, refetch } = useTableData<PlayerDetails[]>({
-    endpoints: ['standings'],
+  const { data, loading, error, refetch } = useTableData<GameweekDataResponse>({
+    endpoints: ['gameweek-data'],
     transform: (response) => response[0],
   });
 
   if (loading) return <SkeletonCard />;
   if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
-  if (!data || data.length === 0) {
+  if (!data || !data.players || data.players.length === 0) {
     return (
       <ErrorDisplay
         message='No position data available yet.'
@@ -23,5 +27,29 @@ export default function PositionPlacedTable() {
     );
   }
 
-  return <PositionDistributionChart players={data} />;
+  const playerNames = Object.fromEntries(
+    data.players.map((p) => [p.id, p.player_name]),
+  );
+
+  return (
+    <div className='w-full space-y-4'>
+      <PositionDistributionChart players={data.players} />
+      <FormGuide
+        performances={data.gameweekPerformances}
+        playerNames={playerNames}
+      />
+      <StreaksTracker
+        performances={data.gameweekPerformances}
+        playerNames={playerNames}
+      />
+      <PositionTrajectory
+        performances={data.gameweekPerformances}
+        playerNames={playerNames}
+      />
+      <PodiumRace
+        performances={data.gameweekPerformances}
+        playerNames={playerNames}
+      />
+    </div>
+  );
 }
