@@ -38,10 +38,6 @@ export default function PositionPlacedTable() {
         performances={data.gameweekPerformances}
         playerNames={playerNames}
       />
-      <StreaksTracker
-        performances={data.gameweekPerformances}
-        playerNames={playerNames}
-      />
       <PositionTrajectory
         performances={data.gameweekPerformances}
         playerNames={playerNames}

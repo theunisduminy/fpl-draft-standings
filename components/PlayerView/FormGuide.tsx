@@ -32,12 +32,18 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
   );
 
   const players = Object.entries(byPlayer)
-    .map(([id, perf]) => ({
-      playerId: parseInt(id),
-      playerName: playerNames[parseInt(id)] || `Player ${id}`,
-      last5: perf.slice(-5),
-    }))
-    .sort((a, b) => a.playerName.localeCompare(b.playerName));
+    .map(([id, perf]) => {
+      const last5 = perf.slice(-5);
+      const avgRank =
+        last5.reduce((sum, p) => sum + p.rank, 0) / (last5.length || 1);
+      return {
+        playerId: parseInt(id),
+        playerName: playerNames[parseInt(id)] || `Player ${id}`,
+        last5,
+        avgRank,
+      };
+    })
+    .sort((a, b) => a.avgRank - b.avgRank);
 
   return (
     <Card className='w-full border-white/10 bg-[#2a0d33]'>
