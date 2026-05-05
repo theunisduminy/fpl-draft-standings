@@ -2,7 +2,6 @@
 import React from 'react';
 import { useTableData } from '@/hooks/use-table-data';
 import { PositionDistributionChart } from '@/components/PlayerView/PositionDistributionChart';
-import { StreaksTracker } from '@/components/PlayerView/StreaksTracker';
 import { FormGuide } from '@/components/PlayerView/FormGuide';
 import { PositionTrajectory } from '@/components/PlayerView/PositionTrajectory';
 import { PodiumRace } from '@/components/PlayerView/PodiumRace';
@@ -38,14 +37,16 @@ export default function PositionPlacedTable() {
         performances={data.gameweekPerformances}
         playerNames={playerNames}
       />
-      <PositionTrajectory
-        performances={data.gameweekPerformances}
-        playerNames={playerNames}
-      />
-      <PodiumRace
-        performances={data.gameweekPerformances}
-        playerNames={playerNames}
-      />
+      <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+        <PositionTrajectory
+          performances={data.gameweekPerformances}
+          playerNames={playerNames}
+        />
+        <PodiumRace
+          performances={data.gameweekPerformances}
+          playerNames={playerNames}
+        />
+      </div>
     </div>
   );
 }
