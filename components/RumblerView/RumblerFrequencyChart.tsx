@@ -68,12 +68,12 @@ export function RumblerFrequencyChart({ data }: RumblerFrequencyChartProps) {
             Rumbler Frequency
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className='p-3 pt-0 md:p-4 md:pt-0'>
           <ChartContainer config={chartConfig}>
             <BarChart
               layout='vertical'
               data={chartData}
-              margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+              margin={{ top: 0, right: 10, left: -10, bottom: 0 }}
               height={chartData.length * 50}
             >
               <CartesianGrid
@@ -94,7 +94,7 @@ export function RumblerFrequencyChart({ data }: RumblerFrequencyChartProps) {
                 dataKey='name'
                 tickLine={false}
                 axisLine={false}
-                width={100}
+                width={70}
                 tick={{
                   fill: 'rgba(255,255,255,0.7)',
                   fontSize: 12,
