@@ -8,7 +8,8 @@ import { getCache, setCache } from './cache';
 const LEAGUE_ID = 75224;
 const F1_POINTS = [20, 15, 12, 10, 8, 6, 4, 2];
 const CACHE_KEY = 'gameweek-data';
-const CACHE_TTL_SECONDS = 300; // 5 minutes
+const CACHE_TTL_SECONDS = 3600; // 1 hour — FPL data only changes once per gameweek
+const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
 
 function assignRanks(
   data: Array<{ event_total: number; league_entry: number }>,
@@ -26,92 +27,109 @@ function assignRanks(
   return rankedData;
 }
 
+async function fetchGameweekBatch(
+  startGw: number,
+  endGw: number,
+  leagueEntries: any[],
+): Promise<GameweekPerformance[]> {
+  const batchPromises = [];
+
+  for (let gw = startGw; gw <= endGw; gw++) {
+    batchPromises.push(
+      Promise.all([
+        fetch(`https://draft.premierleague.com/api/event/${gw}/live`, {
+          next: { revalidate: 300 },
+        }).then((res) => res.json()),
+        ...leagueEntries.map((entry) =>
+          fetch(
+            `https://draft.premierleague.com/api/entry/${entry.entry_id}/event/${gw}`,
+            { next: { revalidate: 300 } },
+          )
+            .then((res) => res.json())
+            .then((data) => ({
+              entry_id: entry.entry_id,
+              league_entry: entry.id,
+              picks: data.picks,
+            }))
+            .catch(() => ({
+              entry_id: entry.entry_id,
+              league_entry: entry.id,
+              picks: [],
+            })),
+        ),
+      ])
+        .then(([liveData, ...playerPicks]) => ({
+          gameweek: gw,
+          liveData,
+          playerPicks,
+        }))
+        .catch(() => ({ gameweek: gw, liveData: null, playerPicks: [] })),
+    );
+  }
+
+  const results = await Promise.all(batchPromises);
+  const performances: GameweekPerformance[] = [];
+
+  results.forEach(({ gameweek, liveData, playerPicks }) => {
+    if (!liveData?.elements || !playerPicks?.length) return;
+
+    const gameweekScores = playerPicks.map((playerData: any) => {
+      const startingPlayers = (playerData.picks || []).filter(
+        (pick: any) => pick.position <= 11,
+      );
+
+      const totalPoints = startingPlayers.reduce((sum: number, pick: any) => {
+        const elementId = pick.element.toString();
+        const liveElement = liveData.elements[elementId];
+        return sum + (liveElement?.stats?.total_points || 0);
+      }, 0);
+
+      return {
+        league_entry: playerData.league_entry,
+        event_total: totalPoints,
+      };
+    });
+
+    const rankedData = assignRanks(gameweekScores);
+
+    rankedData.forEach((player) => {
+      performances.push({
+        event: gameweek,
+        league_entry: player.league_entry,
+        event_total: player.event_total,
+        rank: player.rank,
+        finished: true,
+      });
+    });
+  });
+
+  return performances;
+}
+
 async function fetchAllGameweekData(
   maxCompletedGameweek: number,
   leagueEntries: any[],
 ) {
   const allGameweekData: GameweekPerformance[] = [];
 
-  try {
-    const gameweekPromises = [];
-
-    for (let gw = 1; gw <= maxCompletedGameweek; gw++) {
-      gameweekPromises.push(
-        Promise.all([
-          fetch(`https://draft.premierleague.com/api/event/${gw}/live`, {
-            next: { revalidate: 300 },
-          }).then((res) => res.json()),
-          ...leagueEntries.map((entry) =>
-            fetch(
-              `https://draft.premierleague.com/api/entry/${entry.entry_id}/event/${gw}`,
-              { next: { revalidate: 300 } },
-            )
-              .then((res) => res.json())
-              .then((data) => ({
-                entry_id: entry.entry_id,
-                league_entry: entry.id,
-                picks: data.picks,
-              }))
-              .catch(() => ({
-                entry_id: entry.entry_id,
-                league_entry: entry.id,
-                picks: [],
-              })),
-          ),
-        ])
-          .then(([liveData, ...playerPicks]) => ({
-            gameweek: gw,
-            liveData: liveData.elements,
-            playerPicks,
-          }))
-          .catch((error) => {
-            console.warn(`Failed to fetch gameweek ${gw} data:`, error);
-            return { gameweek: gw, liveData: null, playerPicks: [] };
-          }),
-      );
-    }
-
-    const gameweekResults = await Promise.all(gameweekPromises);
-
-    gameweekResults.forEach(({ gameweek, liveData, playerPicks }) => {
-      if (!liveData || !playerPicks || playerPicks.length === 0) return;
-
-      const gameweekScores = playerPicks.map((playerData: any) => {
-        const startingPlayers = (playerData.picks || []).filter(
-          (pick: any) => pick.position <= 11,
-        );
-
-        const totalPoints = startingPlayers.reduce((sum: number, pick: any) => {
-          const elementId = pick.element.toString();
-          const liveElement = liveData[elementId];
-          const points = liveElement?.stats?.total_points || 0;
-          return sum + points;
-        }, 0);
-
-        return {
-          league_entry: playerData.league_entry,
-          event_total: totalPoints,
-        };
-      });
-
-      const rankedData = assignRanks(gameweekScores);
-
-      rankedData.forEach((player) => {
-        allGameweekData.push({
-          event: gameweek,
-          league_entry: player.league_entry,
-          event_total: player.event_total,
-          rank: player.rank,
-          finished: true,
-        });
-      });
-    });
-
-    return allGameweekData;
-  } catch (error) {
-    console.error('Error fetching historical gameweek data:', error);
-    return [];
+  for (
+    let batchStart = 1;
+    batchStart <= maxCompletedGameweek;
+    batchStart += BATCH_SIZE
+  ) {
+    const batchEnd = Math.min(
+      batchStart + BATCH_SIZE - 1,
+      maxCompletedGameweek,
+    );
+    const batchData = await fetchGameweekBatch(
+      batchStart,
+      batchEnd,
+      leagueEntries,
+    );
+    allGameweekData.push(...batchData);
   }
+
+  return allGameweekData;
 }
 
 export async function getGameweekData(): Promise<GameweekDataResponse> {
@@ -138,59 +156,22 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
 
   const { league_entries, standings } = leagueData;
   const { status } = statusData;
-  const stopEvent =
-    typeof leagueData?.league?.stop_event === 'number' &&
-    leagueData.league.stop_event > 0
-      ? leagueData.league.stop_event
-      : 38;
 
-  let currentEvent = 1;
-  let isCurrentFinished = false;
+  // Derive max gameweek from status array — instant, no extra HTTP calls
+  const maxGameweek = Math.max(...status.map((s: any) => s.event), 0);
+  const completedEvents = status.filter((s: any) => s.leagues_updated);
+  const maxCompletedGameweek =
+    completedEvents.length > 0
+      ? Math.max(...completedEvents.map((s: any) => s.event))
+      : 0;
 
-  if (standings && standings.length > 0) {
-    const hasCurrentData = standings[0].event_total > 0;
-    if (hasCurrentData) {
-      isCurrentFinished =
-        status.find((s: any) => s.event === currentEvent)?.leagues_updated ||
-        true;
-    }
-  }
-
-  let maxGameweek = 0;
-  for (let gw = 1; gw <= stopEvent; gw++) {
-    try {
-      const gwTest = await fetch(
-        `https://draft.premierleague.com/api/event/${gw}/live`,
-        { next: { revalidate: 300 } },
-      );
-      if (gwTest.ok) {
-        const gwData = await gwTest.json();
-        const elements = Object.values(gwData.elements || {}) as any[];
-        const hasRealData = elements.some(
-          (el: any) => (el?.stats?.total_points || 0) > 0,
-        );
-        if (hasRealData) {
-          maxGameweek = gw;
-        } else {
-          break;
-        }
-      } else {
-        break;
-      }
-    } catch {
-      break;
-    }
-  }
-
-  if (standings[0]?.event_total === 0) {
-    currentEvent = maxGameweek + 1;
-  } else {
-    currentEvent = maxGameweek;
-    isCurrentFinished = true;
-  }
+  const currentEvent = maxGameweek;
+  const isCurrentFinished = completedEvents.some(
+    (s: any) => s.event === currentEvent,
+  );
 
   const historicalData = await fetchAllGameweekData(
-    maxGameweek,
+    maxCompletedGameweek || maxGameweek,
     league_entries,
   );
 
