@@ -18,7 +18,7 @@ export default function HeaderNav() {
   const [open, setOpen] = React.useState(false);
 
   return (
-    <header className='sticky top-0 z-40 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg'>
+    <header className='sticky top-0 z-40 rounded-b-xl bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg'>
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         <div className='flex h-16 items-center justify-between'>
           {/* Logo */}

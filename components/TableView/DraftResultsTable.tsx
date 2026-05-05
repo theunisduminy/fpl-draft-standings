@@ -93,8 +93,8 @@ export default function DraftResultsTable() {
   if (loading || error || gameweeks.length === 0) {
     return (
       <BaseTable
-        title={config.title}
-        subtitle={config.subtitle}
+        title=''
+        subtitle=''
         data={formattedResults}
         columns={draftResultsTableConfig}
         loading={loading}
@@ -116,8 +116,8 @@ export default function DraftResultsTable() {
       />
 
       <BaseTable
-        title={`Gameweek ${selectedGameweek} Rankings`}
-        subtitle={config.subtitle}
+        title=''
+        subtitle=''
         data={formattedResults}
         columns={draftResultsTableConfig}
         loading={false}

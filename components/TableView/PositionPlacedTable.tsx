@@ -15,8 +15,8 @@ export default function PositionPlacedTable() {
 
   return (
     <BaseTable
-      title={config.title}
-      subtitle={config.subtitle}
+      title=''
+      subtitle=''
       data={data || []}
       columns={positionPlacedTableConfig}
       loading={loading}

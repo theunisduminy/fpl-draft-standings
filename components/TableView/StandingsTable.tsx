@@ -20,8 +20,8 @@ export default function StandingsTable() {
 
   return (
     <BaseTable
-      title={config.title}
-      subtitle={config.subtitle}
+      title=''
+      subtitle=''
       data={data || []}
       columns={standingsTableConfig}
       loading={loading}

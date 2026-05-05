@@ -89,10 +89,14 @@ export function BaseTable<T extends Record<string, any>>({
 
   return (
     <div className={`w-full space-y-4 ${className}`}>
-      <div>
-        <h2 className='text-lg font-semibold text-white md:text-xl'>{title}</h2>
-        {subtitle && <p className='mt-1 text-sm text-white/60'>{subtitle}</p>}
-      </div>
+      {title && (
+        <div>
+          <h2 className='text-lg font-semibold text-white md:text-xl'>
+            {title}
+          </h2>
+          {subtitle && <p className='mt-1 text-sm text-white/60'>{subtitle}</p>}
+        </div>
+      )}
 
       {children}
 
