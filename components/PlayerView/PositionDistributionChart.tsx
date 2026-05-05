@@ -199,6 +199,21 @@ export function PositionDistributionChart({
               ))}
             </BarChart>
           </ChartContainer>
+
+          {/* Legend */}
+          <div className='mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-white/10 pt-3'>
+            {Object.entries(POSITION_COLORS).map(([key, color]) => (
+              <div key={key} className='flex items-center gap-1.5'>
+                <div
+                  className='h-3 w-3 rounded-sm'
+                  style={{ backgroundColor: color }}
+                />
+                <span className='text-xs text-white/60'>
+                  {POSITION_LABELS[key]}
+                </span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
