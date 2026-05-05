@@ -49,7 +49,7 @@ export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
         </div>
       </div>
     ),
-    width: '55%',
+    width: '50%',
   },
   {
     header: 'F1 Score',
@@ -59,17 +59,17 @@ export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
       </span>
     ),
     align: 'center',
-    width: '22.5%',
+    width: '25%',
   },
   {
-    header: 'Total Pts',
+    header: 'Tot Pts',
     key: (player: PlayerDetails) => (
       <span className='text-base font-bold text-[#75fa95]'>
         {player.total_points || 0}
       </span>
     ),
     align: 'center',
-    width: '22.5%',
+    width: '25%',
   },
 ];
 
