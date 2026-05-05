@@ -1,24 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getGameweekData } from '@/utils/gameweek-data';
 
-// Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic';
 
-// Simplified matches API - delegates to centralized gameweek-data endpoint
-export const GET = async (req: Request) => {
+export const GET = async () => {
   try {
-    // Fetch data from our centralized endpoint
-    const baseUrl = new URL(req.url).origin;
-    const response = await fetch(`${baseUrl}/api/gameweek-data`, {
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch gameweek data');
-    }
-
-    const data = await response.json();
-
-    // Return gameweek performances for backwards compatibility
+    const data = await getGameweekData();
     return NextResponse.json(data.gameweekPerformances);
   } catch (error) {
     console.error('Error in matches API:', error);

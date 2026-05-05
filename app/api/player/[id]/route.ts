@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getGameweekData } from '@/utils/gameweek-data';
 
-// Force dynamic rendering for this API route
-export const dynamic = 'force-dynamic';
-
-// Interface for gameweek performance data (matching the updated matches API)
 interface GameweekPerformance {
   event: number;
   league_entry: number;
@@ -12,28 +9,18 @@ interface GameweekPerformance {
   finished: boolean;
 }
 
-// Main API handler
+export const dynamic = 'force-dynamic';
+
 export const GET = async (
   req: Request,
   { params }: { params: { id: string } },
 ) => {
   try {
-    // Get data from our centralized gameweek-data endpoint
-    const baseUrl = new URL(req.url).origin;
-    const gameweekDataRes = await fetch(`${baseUrl}/api/gameweek-data`, {
-      cache: 'no-store',
-    });
-
-    if (!gameweekDataRes.ok) {
-      throw new Error('Failed to fetch gameweek data');
-    }
-
-    const gameweekResponse = await gameweekDataRes.json();
+    const gameweekResponse = await getGameweekData();
     const { players, gameweekPerformances } = gameweekResponse;
 
     const playerId = parseInt(params.id, 10);
 
-    // Find the player in the standings
     const player = players.find((p: any) => p.id === playerId);
 
     if (!player) {
@@ -43,12 +30,10 @@ export const GET = async (
       );
     }
 
-    // Get gameweek performance data for this player
     const playerGameweeks = gameweekPerformances.filter(
       (gw: GameweekPerformance) => gw.league_entry === playerId && gw.finished,
     );
 
-    // Calculate performance over time
     const performance = playerGameweeks
       .map((gw: GameweekPerformance) => ({
         gameweek: gw.event,
@@ -60,7 +45,6 @@ export const GET = async (
           a.gameweek - b.gameweek,
       );
 
-    // Find best and worst performances
     let bestGameweek = { gameweek: 0, points: 0, rank: 0 };
     let worstGameweek = {
       gameweek: 0,
@@ -88,7 +72,6 @@ export const GET = async (
       });
     }
 
-    // Calculate position statistics
     const positionStats = {
       first: 0,
       second: 0,
@@ -129,7 +112,6 @@ export const GET = async (
       }
     });
 
-    // Calculate overall stats
     const totalGameweeks = playerGameweeks.length;
     const totalPoints = playerGameweeks.reduce(
       (sum: number, gw: GameweekPerformance) => sum + gw.event_total,
@@ -144,17 +126,14 @@ export const GET = async (
           ) / totalGameweeks
         : 0;
 
-    // Count number of rumblers (gameweeks where player finished last - rank 8)
     const rumblerCount = playerGameweeks.filter(
       (gw: GameweekPerformance) => gw.rank === 8,
     ).length;
 
-    // Count number of wins (gameweeks where player finished first - rank 1)
     const totalWins = playerGameweeks.filter(
       (gw: GameweekPerformance) => gw.rank === 1,
     ).length;
 
-    // Calculate consistency metric (lower standard deviation = more consistent)
     const pointsArray = playerGameweeks.map(
       (gw: GameweekPerformance) => gw.event_total,
     );
@@ -178,7 +157,7 @@ export const GET = async (
       stats: {
         totalGameweeks,
         totalWins,
-        totalPoints: totalPoints, // Use calculated total from gameweeks for consistency
+        totalPoints: totalPoints,
         averagePoints: parseFloat(averagePoints.toFixed(1)),
         averageRank: parseFloat(averageRank.toFixed(1)),
         bestGameweek,
@@ -189,7 +168,7 @@ export const GET = async (
       },
       performance,
       standingInfo: {
-        event_total: 0, // This would be current gameweek data
+        event_total: 0,
         last_rank: 0,
         league_entry: playerId,
         rank: player.f1_ranking,

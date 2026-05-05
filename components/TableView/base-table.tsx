@@ -101,13 +101,13 @@ export function BaseTable<T extends Record<string, any>>({
       >
         <CardContent className='p-0'>
           <ScrollArea className='custom-scrollbar w-full'>
-            <Table>
+            <Table className='w-full table-fixed'>
               <TableHeader>
                 <TableRow className='border-white/10 hover:bg-transparent'>
                   {columns.map((column, index) => (
                     <TableHead
                       key={index}
-                      className={`whitespace-nowrap px-4 py-4 text-xs font-semibold uppercase tracking-wider text-white/60 ${
+                      className={`whitespace-nowrap px-3 py-4 text-xs font-semibold uppercase tracking-wider text-white/60 md:px-4 ${
                         column.align === 'center'
                           ? 'text-center'
                           : column.align === 'right'
@@ -135,7 +135,7 @@ export function BaseTable<T extends Record<string, any>>({
                     {columns.map((column, colIndex) => (
                       <TableCell
                         key={colIndex}
-                        className={`px-4 py-5 text-sm text-white/90 ${
+                        className={`px-3 py-4 text-sm text-white/90 md:px-4 md:py-5 ${
                           column.align === 'center'
                             ? 'text-center'
                             : column.align === 'right'
