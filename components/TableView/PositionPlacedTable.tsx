@@ -32,11 +32,13 @@ export default function PositionPlacedTable() {
 
   return (
     <div className='w-full space-y-4'>
-      <PositionDistributionChart players={data.players} />
-      <FormGuide
-        performances={data.gameweekPerformances}
-        playerNames={playerNames}
-      />
+      <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+        <PositionDistributionChart players={data.players} />
+        <FormGuide
+          performances={data.gameweekPerformances}
+          playerNames={playerNames}
+        />
+      </div>
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
         <PositionTrajectory
           performances={data.gameweekPerformances}
