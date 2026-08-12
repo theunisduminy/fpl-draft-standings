@@ -1,11 +1,13 @@
 'use client';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { useTableData } from '@/hooks/use-table-data';
 import { BaseTable } from './base-table';
 import { standingsTableConfig, tableConfigs } from './table-configs';
 import { PlayerDetails } from '@/interfaces/players';
 
 export default function StandingsTable() {
+  const router = useRouter();
   const { data, loading, error, refetch } = useTableData<PlayerDetails[]>({
     endpoints: ['standings'],
     transform: (response) => response[0], // Extract first element from response array
@@ -15,7 +17,7 @@ export default function StandingsTable() {
 
   const handleRowClick = (player: PlayerDetails) => {
     // Navigate to player detail page
-    window.location.href = `/players/${player.id}`;
+    router.push(`/players/${player.id}`);
   };
 
   return (

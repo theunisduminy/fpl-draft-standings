@@ -13,15 +13,16 @@ export const dynamic = 'force-dynamic';
 
 export const GET = async (
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) => {
   try {
     const gameweekResponse = await getGameweekData();
     const { players, gameweekPerformances } = gameweekResponse;
 
-    const playerId = parseInt(params.id, 10);
+    const { id } = await params;
+    const playerId = parseInt(id, 10);
 
-    const player = players.find((p: any) => p.id === playerId);
+    const player = players.find((p) => p.id === playerId);
 
     if (!player) {
       return NextResponse.json(

@@ -35,10 +35,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function PlayerPerformanceChart({
-  data,
-  playerName,
-}: PlayerPerformanceChartProps) {
+export function PlayerPerformanceChart({ data }: PlayerPerformanceChartProps) {
   const chartData = data.map((item) => ({
     ...item,
     name: `GW ${item.gameweek}`,

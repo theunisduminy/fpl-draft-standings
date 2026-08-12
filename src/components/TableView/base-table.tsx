@@ -111,7 +111,7 @@ export function BaseTable<T extends Record<string, any>>({
                   {columns.map((column, index) => (
                     <TableHead
                       key={index}
-                      className={`whitespace-nowrap px-3 py-4 text-xs font-semibold uppercase tracking-wider text-white/60 md:px-4 ${
+                      className={`px-3 py-4 text-xs font-semibold tracking-wider whitespace-nowrap text-white/60 uppercase md:px-4 ${
                         column.align === 'center'
                           ? 'text-center'
                           : column.align === 'right'

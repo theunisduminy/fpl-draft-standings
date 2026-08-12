@@ -6,10 +6,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer,
   Tooltip,
-  Area,
-  AreaChart,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {

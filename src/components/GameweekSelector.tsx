@@ -19,7 +19,7 @@ export function GameweekSelector({
   return (
     <div className='w-full space-y-2'>
       <Label className='text-sm font-medium text-white/80'>{label}</Label>
-      <ScrollArea className='w-full whitespace-nowrap rounded-lg'>
+      <ScrollArea className='w-full rounded-lg whitespace-nowrap'>
         <ToggleGroup
           type='single'
           value={String(selectedGameweek)}

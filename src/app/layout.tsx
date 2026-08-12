@@ -65,7 +65,7 @@ export default function RootLayout({
       <body className='font-inter flex min-h-screen flex-col bg-[#1a0520] text-white antialiased'>
         <HeaderNav />
 
-        <main className='flex-1 pb-20 pt-4 md:pb-8 md:pt-8'>
+        <main className='flex-1 pt-4 pb-20 md:pt-8 md:pb-8'>
           <div className='mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'>
             {children}
           </div>

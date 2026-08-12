@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { RumblerGameweekData } from '@/interfaces/players';
 import { Beer, TrendingDown, Calendar, Quote } from 'lucide-react';
 
-export default function RumblerDataCards(): JSX.Element {
+export default function RumblerDataCards(): React.JSX.Element {
   const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
   const [currentBlurb, setCurrentBlurb] = useState<string>('');
 
@@ -186,7 +186,7 @@ export default function RumblerDataCards(): JSX.Element {
         <CardFooter className='p-4'>
           <div className='flex items-start gap-2'>
             <Quote className='mt-0.5 h-4 w-4 flex-shrink-0 text-white/30' />
-            <p className='text-sm italic text-white/60'>
+            <p className='text-sm text-white/60 italic'>
               &ldquo;{currentBlurb}&rdquo;
             </p>
           </div>

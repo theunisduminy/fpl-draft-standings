@@ -3,7 +3,6 @@
 import React from 'react';
 import { useTableData } from '@/hooks/use-table-data';
 import { SkeletonCard } from '@/components/SkeletonTable';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { RumblerFrequencyChart } from './RumblerFrequencyChart';
 import { AlertCircle } from 'lucide-react';
 import { RumblerGameweekData } from '@/interfaces/players';
