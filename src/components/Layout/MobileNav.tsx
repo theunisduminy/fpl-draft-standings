@@ -1,12 +1,13 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, BarChart3, Beer } from 'lucide-react';
+import { Trophy, BarChart3, Beer, User } from 'lucide-react';
 
 const navigation = [
   { name: 'Standings', href: '/', icon: Trophy },
   { name: 'Results', href: '/results', icon: BarChart3 },
   { name: 'Rumblers', href: '/rumblers', icon: Beer },
+  { name: 'Profile', href: '/profile', icon: User },
 ];
 
 export default function MobileNav() {
