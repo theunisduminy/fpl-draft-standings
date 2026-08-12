@@ -1,38 +1,69 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Better Draft
 
-## Getting Started
+A fairer league table for a Fantasy Premier League draft league. Every gameweek is ranked
+1–8 and awarded Formula One points (20, 15, 12, 10, 8, 6, 4, 2), so the season rewards
+consistency rather than one enormous week — plus a permanent record of whoever finished last.
 
-First, run the development server:
+Live at **[draftrank.vercel.app](https://draftrank.vercel.app)**.
+
+## Getting started
+
+Requires **Node 22** and **pnpm 10** (pinned via `packageManager`; use `corepack pnpm` if
+your shell's pnpm is a different major).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local   # then set FPL_LEAGUE_ID
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000>.
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+### Configuration
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+| Variable        | Required | Notes                                                                                                       |
+| --------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `FPL_LEAGUE_ID` | yes      | Your draft league ID, from the URL on draft.premierleague.com. **Season-scoped — it changes every August.** |
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+There is no database and no authentication. Everything is read live from the public Fantasy
+Premier League APIs.
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## Scripts
 
-## Learn More
+| Command             | Does                         |
+| ------------------- | ---------------------------- |
+| `pnpm dev`          | Development server           |
+| `pnpm build`        | Production build (Turbopack) |
+| `pnpm start`        | Serve the production build   |
+| `pnpm lint`         | ESLint (flat config)         |
+| `pnpm typecheck`    | `tsc --noEmit`               |
+| `pnpm format`       | Prettier, write              |
+| `pnpm format:check` | Prettier, check only         |
 
-To learn more about Next.js, take a look at the following resources:
+There is no test suite yet. Verify a change with `pnpm lint && pnpm typecheck && pnpm build`,
+then run it.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> Port 3000 is often taken by another project. `PORT=3100 pnpm start` is a safe fallback —
+> a `307 → /login` from `localhost:3000` means you are talking to a different app.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+> Debugging something that looks like last season's data? `rm -rf .next` first. Next.js
+> persists its `fetch` cache across builds.
 
-## Deploy on Vercel
+## Documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The `agents/` directory is the project's documentation, written for both humans and AI
+agents. [`CLAUDE.md`](./CLAUDE.md) points Claude Code at it.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+| Doc                                                  | Read it for                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
+| [`agents/AGENTS.md`](./agents/AGENTS.md)             | **Start here.** Conventions and rules — the law.           |
+| [`agents/STRATEGY.md`](./agents/STRATEGY.md)         | What we're building and why                                |
+| [`agents/ARCHITECTURE.md`](./agents/ARCHITECTURE.md) | Where code lives and how a request flows                   |
+| [`agents/FRONTEND.md`](./agents/FRONTEND.md)         | UI patterns                                                |
+| [`agents/API.md`](./agents/API.md)                   | Every endpoint and payload. **Read before any `fetch()`.** |
+| [`agents/TECH-STACK.md`](./agents/TECH-STACK.md)     | Locked stack decisions and versions                        |
+
+## API testing
+
+A [Bruno](https://usebruno.com) collection lives in `FPL Draft/` — `prem/` hits the upstream
+FPL APIs, `app/` hits `localhost:3000`.
