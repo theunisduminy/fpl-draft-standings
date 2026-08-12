@@ -98,7 +98,17 @@ export const lossBlurbs = [
 ];
 
 // Function to get a random blurb
-export function getRandomBlurb(): string {
-  const randomIndex = Math.floor(Math.random() * lossBlurbs.length);
-  return lossBlurbs[randomIndex];
+/**
+ * The blurb for a given gameweek — arbitrary, but stable.
+ *
+ * `getRandomBlurb` is impure, so calling it during render made the jab change
+ * on every re-render. Keying off the gameweek keeps the pick arbitrary while
+ * giving each gameweek its own line for good.
+ */
+export function getBlurbForGameweek(gameweek: number): string {
+  if (lossBlurbs.length === 0) return '';
+  // Multiply before the modulo so consecutive gameweeks don't get adjacent
+  // lines, which would read as a pattern.
+  const index = Math.abs(gameweek * 37) % lossBlurbs.length;
+  return lossBlurbs[index];
 }

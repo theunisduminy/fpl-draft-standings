@@ -1,10 +1,10 @@
 'use client';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTableData } from '@/hooks/use-table-data';
 import { SkeletonCard } from '@/components/SkeletonTable';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
-import { getRandomBlurb } from '@/utils/lossBlurb';
+import { getBlurbForGameweek } from '@/utils/lossBlurb';
 import {
   Card,
   CardContent,
@@ -20,8 +20,10 @@ import { RumblerGameweekData } from '@/interfaces/players';
 import { Beer, TrendingDown, Calendar, Quote } from 'lucide-react';
 
 export default function RumblerDataCards(): React.JSX.Element {
-  const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
-  const [currentBlurb, setCurrentBlurb] = useState<string>('');
+  // `null` means "the reader hasn't chosen yet", so we fall back to the most
+  // recent gameweek. Deriving the default beats storing it: setting state from
+  // inside useMemo triggers a cascading render, which React 19 flags.
+  const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
   const {
     data: gameweekData,
@@ -35,22 +37,14 @@ export default function RumblerDataCards(): React.JSX.Element {
 
   const gameweeks = useMemo(() => {
     if (!gameweekData || gameweekData.length === 0) return [];
-    const allGameweeks = gameweekData
-      .map((item) => item.gameweek)
-      .sort((a, b) => b - a);
+    return gameweekData.map((item) => item.gameweek).sort((a, b) => b - a);
+  }, [gameweekData]);
 
-    if (allGameweeks.length > 0 && selectedGameweek === 0) {
-      setSelectedGameweek(allGameweeks[0]);
-      setCurrentBlurb(getRandomBlurb());
-    }
-    return allGameweeks;
-  }, [gameweekData, selectedGameweek]);
+  const activeGameweek = selectedGameweek ?? gameweeks[0] ?? 0;
 
-  useEffect(() => {
-    if (gameweeks.length > 0) {
-      setCurrentBlurb(getRandomBlurb());
-    }
-  }, [selectedGameweek, gameweeks.length]);
+  // Picked from the gameweek rather than at random, so a given gameweek always
+  // carries the same jab — clicking away and back no longer reshuffles it.
+  const currentBlurb = getBlurbForGameweek(activeGameweek);
 
   if (loading) return <SkeletonCard />;
   if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
@@ -68,7 +62,7 @@ export default function RumblerDataCards(): React.JSX.Element {
   }
 
   const selectedData = gameweekData.find(
-    (gw) => gw.gameweek === selectedGameweek,
+    (gw) => gw.gameweek === activeGameweek,
   );
 
   const rumblerFrequency: Record<string, number> = {};
@@ -90,14 +84,14 @@ export default function RumblerDataCards(): React.JSX.Element {
       <div className='w-full space-y-4'>
         <GameweekSelector
           gameweeks={gameweeks}
-          selectedGameweek={selectedGameweek}
+          selectedGameweek={activeGameweek}
           onSelectGameweek={setSelectedGameweek}
           label='Select Gameweek'
         />
         <Card className='w-full border-white/10 bg-[#2a0d33]'>
           <CardHeader>
             <CardTitle className='text-white'>
-              Gameweek {selectedGameweek}
+              Gameweek {activeGameweek}
             </CardTitle>
             <CardDescription className='text-white/60'>
               No rumbler data for this gameweek
@@ -112,7 +106,7 @@ export default function RumblerDataCards(): React.JSX.Element {
     <div className='w-full space-y-4'>
       <GameweekSelector
         gameweeks={gameweeks}
-        selectedGameweek={selectedGameweek}
+        selectedGameweek={activeGameweek}
         onSelectGameweek={setSelectedGameweek}
         label='Select Gameweek'
       />

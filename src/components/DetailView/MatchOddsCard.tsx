@@ -12,6 +12,25 @@ interface MatchOddsCardProps {
   finishedMatches: Match[];
 }
 
+/**
+ * A stable pseudo-random number in [0, 1) derived from a string.
+ *
+ * The odds carry a deliberate nudge so two evenly matched managers don't show
+ * a flat 50/50. That nudge used to be `Math.random()`, which is impure during
+ * render — the displayed odds changed on every re-render. Seeding off the
+ * match identity keeps the jitter while making a given fixture always render
+ * the same number.
+ */
+function seededUnitInterval(seed: string): number {
+  // FNV-1a, 32-bit.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0) / 0x100000000;
+}
+
 interface MatchupOdds {
   home: {
     id: number;
@@ -192,18 +211,23 @@ export function MatchOddsCard({
     const homeAvgPct = totalAvg > 0 ? (homeAvg / totalAvg) * 100 : 50;
     const awayAvgPct = totalAvg > 0 ? (awayAvg / totalAvg) * 100 : 50;
 
+    // Seeded off the fixture, so the same match always renders the same odds.
+    const matchSeed = `${match.event}:${match.league_entry_1}:${match.league_entry_2}`;
+    const homeJitter = seededUnitInterval(`${matchSeed}:home`);
+    const awayJitter = seededUnitInterval(`${matchSeed}:away`);
+
     const homeProb =
       (homeAvgPct * 0.4 +
         homeWinPct * 0.2 +
         homeH2HPct * h2hFactor +
-        Math.random() * 10 * randomFactor) /
+        homeJitter * 10 * randomFactor) /
       (avgFactor + h2hFactor + randomFactor);
 
     const awayProb =
       (awayAvgPct * 0.4 +
         awayWinPct * 0.2 +
         awayH2HPct * h2hFactor +
-        Math.random() * 10 * randomFactor) /
+        awayJitter * 10 * randomFactor) /
       (avgFactor + h2hFactor + randomFactor);
 
     const totalProb = homeProb + awayProb;

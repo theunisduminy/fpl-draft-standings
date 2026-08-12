@@ -13,34 +13,37 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, BarChart3, Minus } from 'lucide-react';
 
 export default function DraftResultsTable() {
-  const [selectedGameweek, setSelectedGameweek] = useState<number>(0);
+  // `null` means "the reader hasn't chosen yet", so we fall back to the most
+  // recent gameweek. Deriving the default beats storing it: setting state from
+  // inside useMemo triggers a cascading render, which React 19 flags.
+  const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
   const { data, loading, error, refetch } = useTableData<GameweekDataResponse>({
     endpoints: ['gameweek-data'],
     transform: (response) => response[0],
   });
 
-  const gameweeks = useMemo(() => {
-    if (!data?.completedGameweeks) return [];
-    if (data.completedGameweeks.length > 0 && selectedGameweek === 0) {
-      setSelectedGameweek(data.completedGameweeks[0]);
-    }
-    return data.completedGameweeks;
-  }, [data?.completedGameweeks, selectedGameweek]);
+  const gameweeks = useMemo(
+    () => data?.completedGameweeks ?? [],
+    [data?.completedGameweeks],
+  );
+
+  // `completedGameweeks` arrives newest-first.
+  const activeGameweek = selectedGameweek ?? gameweeks[0] ?? 0;
 
   const formattedResults: GameweekResult[] = useMemo(() => {
-    if (!data || !selectedGameweek) return [];
+    if (!data || !activeGameweek) return [];
 
     const gameweekResults = data.gameweekPerformances
-      .filter((gw) => gw.event === selectedGameweek && gw.finished)
+      .filter((gw) => gw.event === activeGameweek && gw.finished)
       .sort((a, b) => a.rank - b.rank);
 
     return gameweekResults.map((gw) => {
       const player = data.players.find((p) => p.id === gw.league_entry);
       let positionMovement: number | undefined = undefined;
 
-      if (selectedGameweek > 1) {
-        const previousGameweek = selectedGameweek - 1;
+      if (activeGameweek > 1) {
+        const previousGameweek = activeGameweek - 1;
         const previousRank = data.gameweekPerformances.find(
           (prevGw) =>
             prevGw.event === previousGameweek &&
@@ -62,7 +65,7 @@ export default function DraftResultsTable() {
         position_movement: positionMovement,
       };
     });
-  }, [data, selectedGameweek]);
+  }, [data, activeGameweek]);
 
   const config = tableConfigs.draftResults;
 
@@ -110,7 +113,7 @@ export default function DraftResultsTable() {
     <div className='w-full space-y-6'>
       <GameweekSelector
         gameweeks={gameweeks}
-        selectedGameweek={selectedGameweek}
+        selectedGameweek={activeGameweek}
         onSelectGameweek={setSelectedGameweek}
         label='Select Gameweek'
       />
@@ -129,7 +132,7 @@ export default function DraftResultsTable() {
         <Card className='border-white/10 bg-[#2a0d33]'>
           <CardHeader className='pb-3'>
             <CardTitle className='text-base text-white md:text-lg'>
-              Gameweek {selectedGameweek} Summary
+              Gameweek {activeGameweek} Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
