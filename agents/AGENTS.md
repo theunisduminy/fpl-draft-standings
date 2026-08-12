@@ -89,6 +89,26 @@ only to our own `/api/*` routes.
 | Adding a new endpoint builder to `fplApi`                 | Writing an upstream URL anywhere other than `fpl-api.ts`                  |
 | Reading `process.env.FPL_LEAGUE_ID` inside `fpl-api.ts`   | `NEXT_PUBLIC_FPL_LEAGUE_ID`, or reading the env var anywhere else         |
 
+### The database half of the boundary
+
+The same rule, with a real credential behind it:
+
+- **`src/server/db/client.ts` is the only file that builds a database client**, and the only
+  one that reads `NEON_CONNECTION_STRING_PROD`. Never import `@/server/db/**` from a page,
+  route or action — go through `@/server/data/**`.
+- **Reads** live in `src/server/data/<domain>.ts`. **Writes** are Server Actions in
+  `src/server/actions/<domain>.ts` (`'use server'`), which validate their input, call the
+  DAL, and `revalidatePath`. A Server Action is a public POST endpoint: never trust its
+  caller.
+- **Identity comes from the session, never from the caller.** `getCurrentUser()` in
+  `src/server/auth/server.ts` returns `null` for any session whose email is not in
+  `ALLOWED_EMAILS`, so there is one answer to "who is this?" and it already accounts for
+  membership. Never accept a user id as an action argument.
+- **`neon_auth` is Neon's schema, not ours.** We read from it; we never define it.
+  `drizzle.config.ts` sets `schemaFilter: ['public']` to keep drizzle-kit out of it, and
+  `profiles.user_id` deliberately carries no foreign key into it.
+- Every file under `src/server/**` starts with `import 'server-only'`.
+
 ### Why
 
 Two reasons, and neither is secrecy — the upstream APIs are public. First, **one place to
@@ -133,8 +153,14 @@ awards points.
   every cross-directory import; relative imports are for siblings only.
 - **API routes** live at `src/app/api/<name>/route.ts`, export `GET`, and return
   `{ error, message }` with a 500 on failure — `apiHelper()` detects the `error` key.
-- **Shared types** live in `src/interfaces/`. **Pure helpers and the data layer** live in
-  `src/utils/`. **`cn`** lives in `src/lib/utils.ts`.
+- **Shared types** live in `src/interfaces/`. **Pure helpers and the FPL scoring layer** live
+  in `src/utils/`. **`cn`** lives in `src/lib/utils.ts`.
+- **Server-only code lives under `src/server/`** — `db/` (client + Drizzle schema), `data/`
+  (the DAL, one module per domain), `actions/` (Server Actions), `auth/` (session and the
+  allowlist). Every file there starts with `import 'server-only'`.
+- **New pages should read their own data** as `async` Server Components calling the DAL or
+  `getGameweekData()` directly. `src/app/profile/page.tsx` is the pattern; the older pages
+  still client-fetch and are being converted.
 - **UI primitives** from shadcn/ui live in `src/components/ui/` — use these before building
   anything custom (see [FRONTEND.md](./FRONTEND.md)).
 - **Feature components** are grouped by view: `TableView/`, `PlayerView/`, `RumblerView/`,
@@ -148,6 +174,13 @@ awards points.
 - Never treat `{}` or `[]` from upstream as "has data" — see above.
 - Never add `NEXT_PUBLIC_` to a variable that only the server needs.
 - Never commit `.env.local`. `.env.example` is the committed template.
+- Never import `@/server/db/**` from a page, route handler or Server Action.
+- Never import anything under `@/server/**` from a client component.
+- Never accept a user id from a form or query string — read it from the session.
+- Never edit an applied migration in `drizzle/` — add a new one.
+- Never point drizzle-kit at the `neon_auth` schema.
+- Never persist a derived value (an F1 score, a ranking) — store the facts and compute it.
+- Never store a gameweek that produced no performances; it must stay absent and be retried.
 
 ---
 
@@ -222,7 +255,7 @@ Port 3000 is frequently taken by another project on this machine — a `307 → 
 **`rm -rf .next` before trusting any data-shape debugging.** Next persists its fetch cache
 across builds and will happily serve you last season's payload.
 
-`pnpm lint` currently reports **0 errors and ~35 warnings**. The warnings are a known,
+`pnpm lint` currently reports **0 errors and ~29 warnings**. The warnings are a known,
 pre-existing backlog — see below. Do not add to them.
 
 ---
@@ -245,18 +278,23 @@ pre-existing backlog — see below. Do not add to them.
 the Next 16 / React 19 upgrade that surfaced them. They are a backlog to work off. Fix the
 violations, then promote the rule back to `error` in `eslint.config.mjs`.
 
-| Rule                                 | Count | What it means here                                                                                                                                                                                  |
-| ------------------------------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@typescript-eslint/no-explicit-any` | ~27   | Untyped upstream payloads. Fix by typing the shapes in [API.md](./API.md) into `src/interfaces/`.                                                                                                   |
-| `react-hooks/set-state-in-render`    | 3     | `setSelectedGameweek` called inside `useMemo` in `DraftResultsTable` and `RumblerCards`. Risk of cascading renders under React 19. Fix by deriving (`selected ?? gameweeks[0]`) instead of storing. |
-| `react-hooks/set-state-in-effect`    | 3     | Client-side data fetching in `useEffect`. Dissolves with the Server Components refactor.                                                                                                            |
-| `react-hooks/purity`                 | 2     | **`Math.random()` during render** in `MatchOddsCard`, so the displayed odds change on every re-render. A real bug; seed it deterministically from the match instead.                                |
+| Rule                                 | Count | What it means here                                                                                |
+| ------------------------------------ | ----- | ------------------------------------------------------------------------------------------------- |
+| `@typescript-eslint/no-explicit-any` | ~26   | Untyped upstream payloads. Fix by typing the shapes in [API.md](./API.md) into `src/interfaces/`. |
+| `react-hooks/set-state-in-effect`    | 2     | Client-side data fetching in `useEffect`. Dissolves with the Server Components refactor.          |
+| `react-hooks/exhaustive-deps`        | 1     | The deliberate dependency escape hatch in `use-table-data.ts`.                                    |
 
 Two further known defects, both pre-existing and neither yet fixed:
 
-- **`font-inter` is a dead class.** `src/app/layout.tsx` loads Inter and sets
-  `--font-inter` on `<html>`, but no theme entry maps `font-inter` to it, so the app renders
-  in the default sans stack. Deliberately left alone during the Tailwind 4 migration to
-  avoid changing typography; fold it into the design refresh.
+- **`font-inter` is a dead class.** `src/app/layout.tsx` loads Inter and sets `--font-inter`
+  on `<html>`, but no theme entry maps `font-inter` to it, so the app renders in the default
+  sans stack. Deliberately left alone during the Tailwind 4 migration to avoid changing
+  typography; fold it into the design refresh.
 - **Four routes are unused** by any component: `/api/current-event`, `/api/pl-teams`,
   `/api/pl-fixtures`, `/api/matches`. Keep or delete deliberately.
+
+And one piece of production configuration still outstanding:
+
+- **Neon Auth `trusted_origins` is empty.** `allow_localhost` is on, so development works,
+  but the Vercel origin must be added on the Neon project before sign-in works in
+  production.

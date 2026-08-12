@@ -4,7 +4,8 @@ Day-one reading for anyone joining the project. Captures what is in the tree rig
 each choice was made, and where to look when it matters.
 
 The short version: **Next.js 16 App Router on Vercel, reading two public Fantasy Premier
-League APIs through a server-only gateway. No database, no auth, no tests — yet.**
+League APIs through a server-only gateway, with Neon Postgres (Drizzle) for what upstream
+cannot provide and Neon Auth for the eight league members. No tests — yet.**
 
 > **Naming convention.** Component, library and framework names are kept canonical
 > (_Next.js_, not _Next.JS_). British English applies to prose only; brand names are not
@@ -40,25 +41,31 @@ UI conventions live in [`FRONTEND.md`](./FRONTEND.md). Read that before touching
 
 ## Data layer
 
-| Component               | Choice                                                  | Why                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Source of truth         | `draft.premierleague.com` + `fantasy.premierleague.com` | Public, unauthenticated, undocumented, unversioned, **season-scoped**. Shapes and lifecycle traps: [`API.md`](./API.md).                  |
-| Gateway                 | `src/utils/fpl-api.ts`                                  | The only file with upstream URLs or `FPL_LEAGUE_ID`.                                                                                      |
-| Data layer              | `src/utils/gameweek-data.ts`                            | Fetch, score, rank, aggregate.                                                                                                            |
-| Cache                   | In-memory `Map` TTL + Next `fetch` cache                | 1 h / 300 s. The `Map` is module scope, so it dies with every serverless instance.                                                        |
-| Server-only enforcement | `server-only` `0.0.1`                                   | Build fails if `fpl-api.ts` is pulled into a client bundle.                                                                               |
-| Database                | **None**                                                | Nothing needs persisting _yet_. The line to draw when it does: [`ARCHITECTURE.md`](./ARCHITECTURE.md#where-to-draw-the-persistence-line). |
-| Auth                    | **None**                                                | Public read-only app. Arrives with profiles and bets.                                                                                     |
+| Component               | Choice                                                  | Version                            | Why                                                                                                       |
+| ----------------------- | ------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Source of truth         | `draft.premierleague.com` + `fantasy.premierleague.com` | —                                  | Public, unauthenticated, undocumented, unversioned, **season-scoped**. Traps: [`API.md`](./API.md).       |
+| Gateway                 | `src/utils/fpl-api.ts`                                  | —                                  | The only file with upstream URLs or `FPL_LEAGUE_ID`.                                                      |
+| Scoring layer           | `src/utils/gameweek-data.ts`                            | —                                  | Fetch the gap, score, rank, aggregate.                                                                    |
+| Database                | Neon Postgres                                           | 18.4, `eu-central-1`               | Serverless Postgres with branching. Holds only immutable gameweek facts and data with no upstream source. |
+| Driver                  | `@neondatabase/serverless`                              | `1.1.0`                            | HTTP driver — no connection pool to manage on serverless.                                                 |
+| ORM                     | Drizzle                                                 | `0.45.2` (`drizzle-kit` `0.31.10`) | Schema as typed code, SQL-shaped queries, migrations included.                                            |
+| Auth                    | Neon Auth (managed Better Auth)                         | `@neondatabase/auth` `0.5.0-beta`  | Identity in our own database, and it branches with it. Beta — see below.                                  |
+| Cache                   | Postgres + in-memory `Map` + Next `fetch` cache         | forever / 1 h / 300 s              | Finished gameweeks persist; the two in-process layers die with the instance.                              |
+| Server-only enforcement | `server-only`                                           | `0.0.1`                            | Build fails if a `src/server/**` module reaches a client bundle.                                          |
 
-**The boundary is the law.** browser → `/api/*` → `gameweek-data.ts` → `fpl-api.ts` →
-upstream. The browser never calls the FPL APIs directly. Full rules:
+**The boundary is the law.** The browser never calls the FPL APIs or the database
+directly; `src/server/db/client.ts` is the only file that builds a db client. Full rules:
 [`AGENTS.md`](./AGENTS.md#the-core-boundary-upstream-api-access-is-server-only-always).
 
 ## Configuration
 
-| Variable        | Scope       | Notes                                                                                                                        |
-| --------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `FPL_LEAGUE_ID` | server-only | The draft league to report on. Currently `8337`. **Season-scoped — expect to change it every August.** Never `NEXT_PUBLIC_`. |
+| Variable                      | Scope       | Notes                                                                                                                           |
+| ----------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `FPL_LEAGUE_ID`               | server-only | The draft league to report on. Currently `8337`. **Season-scoped — expect to change it every August.** Never `NEXT_PUBLIC_`.    |
+| `NEON_CONNECTION_STRING_PROD` | server-only | Neon pooled connection string. A real credential — read only by `src/server/db/client.ts`.                                      |
+| `NEON_AUTH_BASE_URL`          | server-only | From the Neon project's Auth tab. **Includes the cluster segment** (e.g. `.c-6.`); the URL without it resolves but answers 500. |
+| `NEON_AUTH_COOKIE_SECRET`     | server-only | Signs session cookies. Min 32 chars — `openssl rand -base64 32`.                                                                |
+| `ALLOWED_EMAILS`              | server-only | Who may sign in. The league is eight known people, so membership is an allowlist, not open sign-up.                             |
 
 `.env.example` is the committed template; `.env.local` is gitignored.
 
@@ -107,10 +114,25 @@ work under v4. The latter is the shadcn-recommended replacement and is a plain C
 used as a React key. The wrapper uses recharts' public `TooltipContentProps` and
 `LegendPayload` types and React 19 ref-as-prop instead of `forwardRef`.
 
-**No database, for now.** Nothing the app currently shows is app-owned; it is all derived
-from upstream. That stops being true the moment profiles and bets land. The reasoning about
-what to persist — and what to deliberately never persist — is in
+**Neon, and why the database holds so little.** It is deliberately not a mirror of the FPL
+API. It stores immutable finished-gameweek facts (so a cold start costs one query instead of
+344 upstream calls) and data with no upstream source at all (profiles, later bets). The F1
+points table stays in code — it is policy, not fact, and persisting derived scores would
+mean a backfill every time it is tuned. Full reasoning:
 [`ARCHITECTURE.md`](./ARCHITECTURE.md#where-to-draw-the-persistence-line).
+
+**Neon Auth is beta, and that was a considered choice.** The package ships as `0.5.0-beta`
+and GA is "this quarter" with no firm date. Taken anyway because the requirements sit
+entirely inside the GA feature set (Next.js, Google OAuth, email OTP — no MFA, no real org
+model), and because **the escape hatch is cheap**: Neon Auth _is_ managed Better Auth, so if
+the managed layer disappoints we run Better Auth ourselves against the same Postgres, with
+the same tables. That is a very different risk profile from a proprietary auth service.
+Known gaps at adoption: no MFA, the organization plugin is "partial", and split
+frontend/backend deployments are unsupported.
+
+**Drizzle over Prisma.** Prisma's client is heavier on serverless cold starts, and Drizzle's
+schema-as-code maps cleanly onto the `schemaFilter: ['public']` boundary that keeps
+drizzle-kit away from the Neon-owned `neon_auth` schema.
 
 ---
 

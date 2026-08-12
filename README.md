@@ -21,12 +21,19 @@ Open <http://localhost:3000>.
 
 ### Configuration
 
-| Variable        | Required | Notes                                                                                                       |
-| --------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `FPL_LEAGUE_ID` | yes      | Your draft league ID, from the URL on draft.premierleague.com. **Season-scoped — it changes every August.** |
+See [`.env.example`](./.env.example) for the full template.
 
-There is no database and no authentication. Everything is read live from the public Fantasy
-Premier League APIs.
+| Variable                      | Required    | Notes                                                                                                       |
+| ----------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
+| `FPL_LEAGUE_ID`               | yes         | Your draft league ID, from the URL on draft.premierleague.com. **Season-scoped — it changes every August.** |
+| `NEON_CONNECTION_STRING_PROD` | yes         | Neon pooled connection string.                                                                              |
+| `NEON_AUTH_BASE_URL`          | for sign-in | From the Neon project's Auth tab. Includes the cluster segment (e.g. `.c-6.`).                              |
+| `NEON_AUTH_COOKIE_SECRET`     | for sign-in | `openssl rand -base64 32`                                                                                   |
+| `ALLOWED_EMAILS`              | for sign-in | Who may sign in, comma-separated.                                                                           |
+
+The public pages read live from the Fantasy Premier League APIs. Postgres holds only
+finished-gameweek scores (so a cold start doesn't refetch a whole season) and member
+profiles. Sign-in is Neon Auth with Google, restricted to `ALLOWED_EMAILS`.
 
 ## Scripts
 

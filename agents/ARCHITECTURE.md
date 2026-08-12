@@ -22,51 +22,72 @@ If `STRATEGY.md` is the destination and `AGENTS.md` is the highway code, this fi
 
 ## 1. System overview
 
-Better Draft is a **Next.js 16 App Router application** with **no database and no
-authentication**. Every fact it displays is derived, at request time, from two public
-Fantasy Premier League APIs. It is deployed to Vercel at
+Better Draft is a **Next.js 16 App Router application** backed by **Neon Postgres**
+(accessed with Drizzle) and **Neon Auth**. It is deployed to Vercel at
 [draftrank.vercel.app](https://draftrank.vercel.app).
 
-There is one audience-bounded zone: **the whole app is public and read-only.** Anyone with
-the URL sees the same league.
+Two audience-bounded zones:
 
-The product surface is four routes:
+- **Public** — the standings, results, rumbler and player pages. No sign-in, same view for
+  everyone.
+- **Members** (`/profile`, and the bets work to come) — signed in via Neon Auth and on the
+  `ALLOWED_EMAILS` allowlist.
+
+The product surface:
 
 - `/` — the standings table (F1 scoring) and position distribution
 - `/results` — per-gameweek results, charts and detail views
 - `/rumblers` — the last-place hall of shame
 - `/players/[playerId]` — one manager's season: performance, positions, form
+- `/profile` — claim which manager you are (members only)
 
-Everything authoritative lives **upstream**. This app owns no data — it owns a _scoring
-opinion_ (rank each gameweek, award F1 points) and the presentation of it.
+**The split of ownership matters.** The league roster, scores and fixtures are upstream's
+and are read from the FPL API. What the database holds is exactly two things: **a cache of
+immutable facts** (finished gameweek scores, so we don't refetch a season of history on
+every cold start) and **data with no upstream source at all** (profiles, and later bets).
+The F1 scoring table itself is neither — it is _our policy_, and it lives in code.
 
 ---
 
 ## 2. The trust boundary
 
-There are no secrets here — both upstream APIs are public and unauthenticated. The boundary
-exists for **cost and cohesion**, not confidentiality, and it is still the law.
+The upstream APIs hold no secrets — they are public and unauthenticated, and that half of
+the boundary exists for **cost and cohesion**. The database half is different: the
+connection string is a real credential, and it must never reach the browser.
 
 ```
 ┌──────────────────────────── browser ─────────────────────────────┐
 │  React client components ('use client')                          │
 │     • useTableData() → fetchWithDelay() → apiHelper()            │
-│     • fetch('/api/...')            → for all data                │
-│     • NEVER imports @/utils/fpl-api or @/utils/gameweek-data     │
+│     • @/lib/auth/client  → sign in/out only, never data          │
+│     • NEVER imports @/server/** or @/utils/{fpl-api,gameweek-data}│
 │       → enforced by `import 'server-only'`                       │
 └─────────────────────────────────│─────────────────────────────────┘
-                                  │  HTTP
+                                  │  HTTP (cookies carry the session)
 ┌─────────────────────────────────▼─────────────────────────────────┐
 │  Next.js server (App Router)                                     │
-│   src/app/api/**/route.ts   ── shapes responses, owns { error }   │
-│   src/utils/gameweek-data.ts ── fetch · score · rank · aggregate  │
-│                                 TTL cache + promise dedup         │
-│   src/utils/fpl-api.ts       ── ONLY file with upstream URLs and  │
-│                                 FPL_LEAGUE_ID (`server-only`)     │
-└─────────────────────────────────│─────────────────────────────────┘
-                                  ▼
-        draft.premierleague.com   ·   fantasy.premierleague.com
+│   src/app/**/page.tsx        ── Server Components read directly   │
+│   src/app/api/**/route.ts    ── shapes responses, owns { error }  │
+│   src/server/actions/**      ── 'use server'; validates, writes   │
+│   src/server/auth/server.ts  ── session + ALLOWED_EMAILS gate     │
+│   src/server/data/**         ── the DAL: one module per domain    │
+│   src/server/db/client.ts    ── ONLY file that builds a db client │
+│   src/utils/gameweek-data.ts ── score · rank · aggregate          │
+│   src/utils/fpl-api.ts       ── ONLY file with upstream URLs      │
+└──────────────│──────────────────────────────│─────────────────────┘
+               ▼                              ▼
+   Neon Postgres (+ neon_auth)   draft.premierleague.com · fantasy.…
 ```
+
+Two rules follow, and neither has exceptions:
+
+- **`src/server/db/client.ts` is the only file that constructs a database client**, and the
+  only one that reads `NEON_CONNECTION_STRING_PROD`. Everything else goes through
+  `src/server/data/**`. Never import `@/server/db/**` from a route, action or page.
+- **Identity is resolved server-side**, in `src/server/auth/server.ts`, from the session —
+  never from a form field or a client-supplied id. `getCurrentUser()` returns `null` for a
+  session whose email is not on `ALLOWED_EMAILS`, so callers cannot accidentally treat an
+  unapproved session as approved.
 
 Full rules, and the allowed/forbidden table:
 [`AGENTS.md` — the core boundary](./AGENTS.md#the-core-boundary-upstream-api-access-is-server-only-always).
@@ -108,6 +129,8 @@ Every data-bearing page follows the same path today:
 ├── eslint.config.mjs          flat config; the warning backlog is declared here
 ├── postcss.config.mjs         @tailwindcss/postcss only (no autoprefixer in v4)
 ├── components.json            shadcn/ui — config: "", css: src/app/globals.css
+├── drizzle.config.ts          migrations; schemaFilter: ['public'] only
+├── drizzle/                   generated SQL migrations — never edit an applied one
 └── src/
     ├── app/
     │   ├── layout.tsx         root shell: fonts, nav, footer, analytics
@@ -124,10 +147,23 @@ Every data-bearing page follows the same path today:
     │   ├── RumblerView/       rumbler cards, dashboard, frequency chart
     │   ├── Layout/            HeaderNav, MobileNav, Footer
     │   └── DetailView/        gameweek summary, score chart, match odds
+    ├── server/                ★ server-only. Never imported by a client component.
+    │   ├── db/
+    │   │   ├── client.ts      ★ the ONLY file that builds a db client
+    │   │   └── schema.ts      Drizzle schema for `public` (not `neon_auth`)
+    │   ├── data/              the DAL — one module per domain
+    │   │   ├── gameweeks.ts   persisted finished-gameweek facts
+    │   │   └── profiles.ts    league entry <-> Neon Auth user
+    │   ├── actions/           'use server' — validate, write, revalidate
+    │   │   └── profile.ts
+    │   └── auth/
+    │       └── server.ts      ★ session + ALLOWED_EMAILS gate
     ├── hooks/
     │   └── use-table-data.ts  ★ the client-fetch hook every view uses
     ├── interfaces/            players.ts, match.ts, standings.ts
-    ├── lib/utils.ts           cn()
+    ├── lib/
+    │   ├── utils.ts           cn()
+    │   └── auth/client.ts     browser auth client (sign in/out only)
     └── utils/
         ├── fpl-api.ts         ★ server-only. Upstream URLs + FPL_LEAGUE_ID. The gateway.
         ├── gameweek-data.ts   ★ the data layer: fetch, score, rank, aggregate, cache
@@ -166,20 +202,31 @@ The app's whole reason to exist. In `src/utils/gameweek-data.ts`:
 
 ## 6. Caching, and what it costs
 
-Two layers sit in front of the upstream APIs:
+Three layers now sit in front of the upstream APIs:
 
-| Layer                  | Where                    | TTL     | Survives a cold start?  |
-| ---------------------- | ------------------------ | ------- | ----------------------- |
-| Next.js `fetch` cache  | `.next/cache`            | 300 s   | Yes (and across builds) |
-| In-memory result cache | `src/utils/cache.ts` Map | 3 600 s | **No**                  |
+| Layer                  | Where                      | TTL     | Survives a cold start?  |
+| ---------------------- | -------------------------- | ------- | ----------------------- |
+| Next.js `fetch` cache  | `.next/cache`              | 300 s   | Yes (and across builds) |
+| In-memory result cache | `src/utils/cache.ts` Map   | 3 600 s | **No**                  |
+| **Finished gameweeks** | **Neon `gameweek_scores`** | forever | **Yes**                 |
 
 Plus promise deduplication in `getGameweekData()`, so concurrent requests on one instance
 share a single computation.
 
-**The cost that matters:** a full recompute is `2 + 9 × completedGameweeks` upstream calls —
-**344 by the end of a season**. Because the `Map` is module scope, every new serverless
-instance on Vercel pays that bill in full. Batching (5 gameweeks at a time) bounds the
-concurrency, not the total.
+**The cost this removes:** recomputing a whole season is `2 + 9 × completedGameweeks`
+upstream calls — **344 by May**. Both in-process caches are module scope, so every new
+serverless instance on Vercel used to pay that bill in full.
+
+`getGameweekData()` now reads the gameweeks it already holds from Postgres, fetches only
+the gap, and stores what it fetched. Steady state is therefore **9 calls a week** (one new
+gameweek), not 344 — and a cold start costs one query rather than a full rebuild. The
+batching still applies to whatever is genuinely missing, so a first run, or a rebuilt
+database, behaves exactly as it always did.
+
+The guard that keeps this safe: a gameweek that produced **no** performances is never
+recorded. An unscored gameweek must stay absent so it is retried, rather than being frozen
+into the database as a set of zeros — which is the persistent version of the bug where all
+eight managers tied on rank 1 and banked a win.
 
 > [!WARNING]
 > The Next.js `fetch` cache **persists in `.next/cache` across builds**. A stale
@@ -209,12 +256,30 @@ The trap to avoid is persisting **derived** values. Store the facts — gameweek
 entry, points, rank — and compute the F1 score from them at read time. Store `f1_score` and
 the day you tune the points table you own a backfill.
 
-Because profiles, bets and weekly emails have no upstream source at all, a database is
-arriving regardless. The sequencing question is only whether the gameweek cache lands with
-it or after it.
+**This is implemented**, in `src/server/data/gameweeks.ts`. Rows one and six of the table
+above are the two tables in `public`; every other row still reads live.
 
-> _TODO (owner)_ — decide the store (Supabase is the house default; see the Vertiqal
-> `agents-setup` convention) and add `MIGRATIONS.md` when it lands.
+### Migrations
+
+Schema changes are Drizzle migrations under `drizzle/`:
+
+```bash
+pnpm db:generate   # write a migration from the schema
+pnpm db:migrate    # apply it
+pnpm db:studio     # browse the data
+```
+
+Two rules:
+
+- **Never edit an applied migration** — add a new one.
+- **`drizzle.config.ts` sets `schemaFilter: ['public']`.** The `neon_auth` schema is owned
+  and migrated by Neon Auth. Pointing drizzle-kit at it would make it try to "correct"
+  tables it does not own. We read from `neon_auth`; we never define it.
+
+For the same reason `profiles.user_id` has **no foreign key** to `neon_auth.user`, even
+though it holds that id. Neon Auth is beta and manages its own migrations; a hard
+cross-schema constraint would make its rebuilds our problem. With eight known members the
+integrity cost of leaving it off is nil.
 
 ---
 
@@ -232,28 +297,36 @@ it or after it.
 | Add a shadcn primitive                  | `pnpm dlx shadcn@latest add <component>`  | `components.json` is already v4-shaped                        |
 | Debug "the data looks like last season" | `rm -rf .next`                            | §6 above, then [`API.md`](./API.md)                           |
 | Point the app at a different league     | `.env.local` → `FPL_LEAGUE_ID`            | [`API.md`](./API.md#the-league-id-is-an-environment-variable) |
+| Add a table or change the schema        | `src/server/db/schema.ts`                 | `pnpm db:generate` then `pnpm db:migrate`                     |
+| Add a database read                     | `src/server/data/<domain>.ts`             | Never `@/server/db/**` from a page or route                   |
+| Add a write                             | `src/server/actions/<domain>.ts`          | Validate, call the DAL, `revalidatePath`                      |
+| Gate something behind sign-in           | `src/server/auth/server.ts`               | `getCurrentUser()` is `null` if not allowlisted               |
+| Add someone to the league               | `.env.local` → `ALLOWED_EMAILS`           | They claim a manager at `/profile`                            |
 
 ---
 
 ## 8. What's not here yet
 
-Tracked in [`STRATEGY.md`](./STRATEGY.md#tracks); none of it exists in the tree today.
+Tracked in [`STRATEGY.md`](./STRATEGY.md#tracks).
 
-- **Server Components for reads.** Pages become `async` and call `getGameweekData()`
-  directly; `use-table-data.ts` and `apiHelper.ts` shrink or disappear. This is also what
-  retires the `react-hooks/set-state-in-effect` warnings.
+- **Server Components for the public pages.** `/profile` is the only page reading its own
+  data today; the standings, results and rumbler pages still client-fetch through
+  `use-table-data.ts`. Converting them retires that hook, `apiHelper.ts`, most of the
+  `/api/*` routes, and the remaining `set-state-in-effect` warnings. **`/profile` is the
+  pattern to copy.**
 - **Typed upstream payloads.** `src/interfaces/` grows real types for league details,
-  event status, live elements and picks, retiring ~27 `any`s.
-- **Persistence.** A database for finished gameweeks (§6), plus the tables that profiles
-  and bets require. When it lands, the server-only DAL pattern from the house
-  `agents-setup` convention applies, and `MIGRATIONS.md` joins this folder.
-- **Member profiles and weekly bets.** The first feature needing identity — and therefore
-  the first needing auth. Note that `league_entries` gives us stable per-manager IDs to
-  hang a profile off without inventing our own.
+  event status, live elements and picks, retiring ~26 `any`s.
+- **Weekly bets.** The reason profiles exist. Needs a `bets` table (proposer, opponent,
+  gameweek, stake/wager text, outcome) and a resolution flow. Profiles and the
+  server-action write path are the foundation; the UX is still loosely specified.
 - **Weekly results email.** A scheduled job reading the finished gameweek and sending a
   summary. WhatsApp delivery is unresolved — the Business API needs a template and a
   number, so a shareable web summary may be the pragmatic first step.
-- **Tests and CI.** See [`AGENTS.md` — Testing](./AGENTS.md#testing).
+- **Production auth config.** `trusted_origins` on the Neon Auth project is currently empty
+  and `allow_localhost` is on. The Vercel origin must be added before sign-in works in
+  production.
+- **Tests and CI.** See [`AGENTS.md` — Testing](./AGENTS.md#testing). The DAL and the
+  scoring logic are both pure enough to test cheaply.
 
 When you add any of these, update the folder map and the entry-point table in the same
 change.
