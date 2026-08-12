@@ -1,24 +1,28 @@
 import { NextResponse } from 'next/server';
+import { fplApi } from '@/utils/fpl-api';
 
-async function fetchData() {
+/** All 380 Premier League fixtures for the season. */
+export const GET = async () => {
   try {
-    const res = await fetch('https://fantasy.premierleague.com/api/fixtures', {
+    const res = await fetch(fplApi.fixtures(), {
       next: {
         revalidate: 3600, // 1 hour
       },
     });
-    return await res.json();
-  } catch (err) {
-    console.error(err);
-    throw err;
-  }
-}
 
-export const GET = async (req: Request, res: Response) => {
-  try {
-    const fixtures = await fetchData();
-    return NextResponse.json(fixtures);
+    if (!res.ok) {
+      throw new Error(`Fixtures request failed with ${res.status}`);
+    }
+
+    return NextResponse.json(await res.json());
   } catch (error) {
-    return NextResponse.json({ message: error }, { status: 500 });
+    console.error('Error in pl-fixtures API:', error);
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch Premier League fixtures',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 },
+    );
   }
 };

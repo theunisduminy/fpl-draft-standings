@@ -3,9 +3,10 @@ import {
   GameweekPerformance,
   GameweekDataResponse,
 } from '@/interfaces/players';
+import { GameWeekStatus } from '@/interfaces/match';
+import { fplApi, getLeagueId } from './fpl-api';
 import { getCache, setCache } from './cache';
 
-const LEAGUE_ID = 75224;
 const F1_POINTS = [20, 15, 12, 10, 8, 6, 4, 2];
 const CACHE_KEY = 'gameweek-data';
 const CACHE_TTL_SECONDS = 3600; // 1 hour — FPL data only changes once per gameweek
@@ -13,6 +14,27 @@ const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
 
 // Promise deduplication: concurrent requests share the same computation
 let pendingPromise: Promise<GameweekDataResponse> | null = null;
+
+/**
+ * Between seasons `/pl/event-status` answers 404 with the bare string
+ * "Game not started" — not the usual `{ status: [...] }` object. Treat that as
+ * "no gameweeks have been played yet" so the app renders an empty season
+ * instead of failing.
+ */
+async function fetchEventStatus(): Promise<GameWeekStatus[]> {
+  const res = await fetch(fplApi.eventStatus(), { next: { revalidate: 300 } });
+
+  if (res.status === 404) {
+    return [];
+  }
+
+  if (!res.ok) {
+    throw new Error(`Event status request failed with ${res.status}`);
+  }
+
+  const body = await res.json();
+  return Array.isArray(body?.status) ? body.status : [];
+}
 
 function assignRanks(
   data: Array<{ event_total: number; league_entry: number }>,
@@ -40,14 +62,13 @@ async function fetchGameweekBatch(
   for (let gw = startGw; gw <= endGw; gw++) {
     batchPromises.push(
       Promise.all([
-        fetch(`https://draft.premierleague.com/api/event/${gw}/live`, {
+        fetch(fplApi.eventLive(gw), {
           next: { revalidate: 300 },
         }).then((res) => res.json()),
         ...leagueEntries.map((entry) =>
-          fetch(
-            `https://draft.premierleague.com/api/entry/${entry.entry_id}/event/${gw}`,
-            { next: { revalidate: 300 } },
-          )
+          fetch(fplApi.entryEvent(entry.entry_id, gw), {
+            next: { revalidate: 300 },
+          })
             .then((res) => res.json())
             .then((data) => ({
               entry_id: entry.entry_id,
@@ -74,9 +95,22 @@ async function fetchGameweekBatch(
   const performances: GameweekPerformance[] = [];
 
   results.forEach(({ gameweek, liveData, playerPicks }) => {
-    if (!liveData?.elements || !playerPicks?.length) return;
+    // `elements` is an object, so a bare truthiness check passes on the empty
+    // `{}` the API returns for a gameweek that has not been scored yet. Without
+    // the key count, every entry scores 0, ties on rank 1, and banks a win.
+    if (!liveData?.elements || Object.keys(liveData.elements).length === 0) {
+      return;
+    }
 
-    const gameweekScores = playerPicks.map((playerData: any) => {
+    // Likewise, entries whose picks failed to load must not be scored as zeros
+    // — an unplayed gameweek has to be absent, not a joint-first finish.
+    const scoredEntries = playerPicks.filter(
+      (playerData: any) => playerData?.picks?.length,
+    );
+
+    if (scoredEntries.length === 0) return;
+
+    const gameweekScores = scoredEntries.map((playerData: any) => {
       const startingPlayers = (playerData.picks || []).filter(
         (pick: any) => pick.position <= 11,
       );
@@ -147,36 +181,37 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
   }
 
   pendingPromise = (async () => {
-    const [leagueRes, statusRes] = await Promise.all([
-      fetch(`https://draft.premierleague.com/api/league/${LEAGUE_ID}/details`, {
+    const leagueId = getLeagueId();
+
+    const [leagueRes, status] = await Promise.all([
+      fetch(fplApi.leagueDetails(leagueId), {
         next: { revalidate: 300 },
       }),
-      fetch('https://draft.premierleague.com/api/pl/event-status', {
-        next: { revalidate: 300 },
-      }),
+      fetchEventStatus(),
     ]);
 
-    if (!leagueRes.ok || !statusRes.ok) {
-      throw new Error('Failed to fetch data from Premier League API');
+    if (!leagueRes.ok) {
+      throw new Error(
+        `League ${leagueId} details request failed with ${leagueRes.status}. ` +
+          'League IDs are season-scoped — check FPL_LEAGUE_ID is current.',
+      );
     }
 
     const leagueData = await leagueRes.json();
-    const statusData = await statusRes.json();
 
     const { league_entries, standings } = leagueData;
-    const { status } = statusData;
 
     // Derive max gameweek from status array — instant, no extra HTTP calls
-    const maxGameweek = Math.max(...status.map((s: any) => s.event), 0);
-    const completedEvents = status.filter((s: any) => s.leagues_updated);
+    const maxGameweek = Math.max(...status.map((s) => s.event), 0);
+    const completedEvents = status.filter((s) => s.leagues_updated);
     const maxCompletedGameweek =
       completedEvents.length > 0
-        ? Math.max(...completedEvents.map((s: any) => s.event))
+        ? Math.max(...completedEvents.map((s) => s.event))
         : 0;
 
     const currentEvent = maxGameweek;
     const isCurrentFinished = completedEvents.some(
-      (s: any) => s.event === currentEvent,
+      (s) => s.event === currentEvent,
     );
 
     const historicalData = await fetchAllGameweekData(

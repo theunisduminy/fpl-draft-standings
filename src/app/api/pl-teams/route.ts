@@ -1,27 +1,29 @@
 import { NextResponse } from 'next/server';
+import { fplApi } from '@/utils/fpl-api';
 
-async function fetchData() {
+/** The 20 Premier League clubs, lifted out of the classic-FPL static dataset. */
+export const GET = async () => {
   try {
-    const res = await fetch(
-      'https://fantasy.premierleague.com/api/bootstrap-static',
-      {
-        next: {
-          revalidate: 3600, // 1 hour
-        },
+    const res = await fetch(fplApi.bootstrapStatic(), {
+      next: {
+        revalidate: 3600, // 1 hour
       },
-    );
-    return await res.json();
-  } catch (err) {
-    console.error(err);
-    throw err;
-  }
-}
+    });
 
-export const GET = async (req: Request, res: Response) => {
-  try {
-    const { teams } = await fetchData();
+    if (!res.ok) {
+      throw new Error(`Bootstrap-static request failed with ${res.status}`);
+    }
+
+    const { teams } = await res.json();
     return NextResponse.json(teams);
   } catch (error) {
-    return NextResponse.json({ message: error }, { status: 500 });
+    console.error('Error in pl-teams API:', error);
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch Premier League teams',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 },
+    );
   }
 };
