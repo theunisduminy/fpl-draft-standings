@@ -4,6 +4,11 @@ import {
   GameweekDataResponse,
 } from '@/interfaces/players';
 import { GameWeekStatus } from '@/interfaces/match';
+import {
+  getFinalisedGameweeks,
+  getStoredPerformances,
+  storeFinalisedGameweeks,
+} from '@/server/data/gameweeks';
 import { fplApi, getLeagueId } from './fpl-api';
 import { getCache, setCache } from './cache';
 
@@ -143,30 +148,37 @@ async function fetchGameweekBatch(
   return performances;
 }
 
-async function fetchAllGameweekData(
-  maxCompletedGameweek: number,
+/**
+ * Fetch only the gameweeks we don't already hold.
+ *
+ * A finished gameweek is immutable, so anything already in the database is
+ * read back rather than refetched. Recomputing the whole season costs
+ * `9 x gameweeks` upstream calls — 344 by May — and the in-memory cache does
+ * not survive a cold start, so without this every new serverless instance paid
+ * that bill in full.
+ *
+ * Batching still applies to whatever genuinely is missing, so a first run (or
+ * a rebuilt database) behaves exactly as it used to.
+ */
+async function fetchMissingGameweeks(
+  missing: number[],
   leagueEntries: any[],
-) {
-  const allGameweekData: GameweekPerformance[] = [];
+): Promise<GameweekPerformance[]> {
+  const fetched: GameweekPerformance[] = [];
 
-  for (
-    let batchStart = 1;
-    batchStart <= maxCompletedGameweek;
-    batchStart += BATCH_SIZE
-  ) {
-    const batchEnd = Math.min(
-      batchStart + BATCH_SIZE - 1,
-      maxCompletedGameweek,
-    );
+  for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+    const batch = missing.slice(i, i + BATCH_SIZE);
+    // The batch helper takes a range; consecutive gameweeks are the norm, and
+    // a sparse batch just means a few wasted slots in one round.
     const batchData = await fetchGameweekBatch(
-      batchStart,
-      batchEnd,
+      batch[0],
+      batch[batch.length - 1],
       leagueEntries,
     );
-    allGameweekData.push(...batchData);
+    fetched.push(...batchData.filter((p) => missing.includes(p.event)));
   }
 
-  return allGameweekData;
+  return fetched;
 }
 
 export async function getGameweekData(): Promise<GameweekDataResponse> {
@@ -214,11 +226,35 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
       (s) => s.event === currentEvent,
     );
 
-    const historicalData = await fetchAllGameweekData(
-      maxCompletedGameweek || maxGameweek,
+    const throughGameweek = maxCompletedGameweek || maxGameweek;
+
+    // Read what we already hold, fetch only the gap, then store the gap.
+    const [finalised, storedPerformances] = await Promise.all([
+      getFinalisedGameweeks(),
+      getStoredPerformances(),
+    ]);
+
+    const missing: number[] = [];
+    for (let gw = 1; gw <= throughGameweek; gw++) {
+      if (!finalised.has(gw)) missing.push(gw);
+    }
+
+    const freshPerformances = await fetchMissingGameweeks(
+      missing,
       league_entries,
     );
 
+    if (freshPerformances.length > 0) {
+      await storeFinalisedGameweeks(freshPerformances);
+    }
+
+    const historicalData = [...storedPerformances, ...freshPerformances];
+
+    // Fallback for the just-finished gameweek when its live data or picks
+    // aren't retrievable. Deliberately not persisted: `standings[].event_total`
+    // is a different source from the starting-XI sum we store everywhere else,
+    // and mixing the two in the cache would make the history inconsistent.
+    // Leaving it out means this gameweek is retried next run, which is correct.
     if (isCurrentFinished && standings) {
       const hasCurrentGameweekData = historicalData.some(
         (gw) => gw.event === currentEvent,
