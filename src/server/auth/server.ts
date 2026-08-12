@@ -2,6 +2,8 @@ import 'server-only';
 
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 
+import { getLeagueMemberByEmail } from '@/server/data/league-members';
+
 /**
  * Neon Auth (managed Better Auth). Identity lives in this project's own
  * `neon_auth` schema, which Neon owns and migrates — we read it, never define
@@ -28,50 +30,42 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-/**
- * The league is eight known people, so membership is an allowlist rather than
- * open sign-up.
- *
- * Checked server-side on every access, never in the UI: hiding a button is
- * presentation, this is the gate. Addresses are compared case-insensitively
- * because email casing is not meaningful.
- */
-export function isAllowedEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-
-  const allowed = (process.env.ALLOWED_EMAILS ?? '')
-    .split(/[,\s]+/)
-    .filter(Boolean)
-    .map((entry) => entry.toLowerCase());
-
-  return allowed.includes(email.toLowerCase());
-}
-
 export type SignedInUser = {
   id: string;
   email: string;
   name: string | null;
   image: string | null;
+  /** Which manager they are, from the curated `league_members` mapping. */
+  leagueEntry: number;
 };
 
 /**
- * The signed-in user, or `null` — including when a real session belongs to an
- * address that is not on the allowlist. Callers therefore cannot accidentally
- * treat an unapproved session as approved; there is one answer to "who is
- * this?" and it already accounts for membership.
+ * The signed-in league member, or `null`.
+ *
+ * Membership is the `league_members` table: a session whose email has no row
+ * there resolves to `null`, exactly like being signed out. Callers therefore
+ * cannot accidentally treat a stranger's valid Google session as a member —
+ * there is one answer to "who is this?" and it already accounts for both
+ * authentication and membership.
+ *
+ * The manager comes back with the user because the mapping is the same lookup;
+ * nothing downstream has to re-derive it, and nothing accepts it as input.
  */
 export async function getCurrentUser(): Promise<SignedInUser | null> {
   const session = await auth.getSession();
   const user = session?.data?.user;
 
-  if (!user?.email || !isAllowedEmail(user.email)) {
-    return null;
-  }
+  if (!user?.email) return null;
+
+  const member = await getLeagueMemberByEmail(user.email);
+
+  if (!member) return null;
 
   return {
     id: user.id,
     email: user.email,
     name: user.name ?? null,
     image: user.image ?? null,
+    leagueEntry: member.leagueEntry,
   };
 }

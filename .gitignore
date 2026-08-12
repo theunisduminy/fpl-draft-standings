@@ -36,3 +36,6 @@ next-env.d.ts
 
 # claude code (machine-local)
 .claude/settings.local.json
+
+# league member mapping (real email addresses)
+league-members.json

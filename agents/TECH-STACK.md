@@ -65,7 +65,6 @@ directly; `src/server/db/client.ts` is the only file that builds a db client. Fu
 | `NEON_CONNECTION_STRING_PROD` | server-only | Neon pooled connection string. A real credential — read only by `src/server/db/client.ts`.                                      |
 | `NEON_AUTH_BASE_URL`          | server-only | From the Neon project's Auth tab. **Includes the cluster segment** (e.g. `.c-6.`); the URL without it resolves but answers 500. |
 | `NEON_AUTH_COOKIE_SECRET`     | server-only | Signs session cookies. Min 32 chars — `openssl rand -base64 32`.                                                                |
-| `ALLOWED_EMAILS`              | server-only | Who may sign in. The league is eight known people, so membership is an allowlist, not open sign-up.                             |
 
 `.env.example` is the committed template; `.env.local` is gitignored.
 

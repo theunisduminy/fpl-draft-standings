@@ -1,13 +1,10 @@
 import type { Metadata } from 'next';
 
 import { getCurrentUser } from '@/server/auth/server';
-import { getProfileByUserId, listProfiles } from '@/server/data/profiles';
+import { getProfileByUserId } from '@/server/data/profiles';
 import { getGameweekData } from '@/utils/gameweek-data';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
-import {
-  ClaimEntryForm,
-  type ClaimableManager,
-} from '@/components/Profile/ClaimEntryForm';
+import { ProfileForm } from '@/components/Profile/ProfileForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const metadata: Metadata = { title: 'Profile' };
@@ -31,32 +28,25 @@ export default async function ProfilePage() {
         </CardHeader>
         <CardContent className='space-y-4'>
           <p className='text-sm text-white/60'>
-            Profiles are for the eight managers in this league. Sign in with the
-            Google account whose address is on the league list.
+            Profiles are for the managers in this league. Sign in with the
+            Google account that is on the league list.
           </p>
           <AuthPanel signedIn={false} />
+          <p className='text-xs text-white/40'>
+            Signed in and still seeing this? Your address is not mapped to a
+            manager yet — ask the league admin to add you.
+          </p>
         </CardContent>
       </Card>
     );
   }
 
-  const [{ players }, profile, allProfiles] = await Promise.all([
+  const [{ players }, profile] = await Promise.all([
     getGameweekData(),
     getProfileByUserId(user.id),
-    listProfiles(),
   ]);
 
-  const claimedByOthers = new Set(
-    allProfiles
-      .filter((row) => row.userId !== user.id)
-      .map((row) => row.leagueEntry),
-  );
-
-  const managers: ClaimableManager[] = players.map((player) => ({
-    id: player.id,
-    label: `${player.player_name} ${player.player_surname} — ${player.team_name}`,
-    claimedByOther: claimedByOthers.has(player.id),
-  }));
+  const manager = players.find((player) => player.id === user.leagueEntry);
 
   return (
     <div className='mx-auto mt-8 max-w-xl space-y-6'>
@@ -66,12 +56,22 @@ export default async function ProfilePage() {
           <AuthPanel signedIn />
         </CardHeader>
         <CardContent className='space-y-6'>
-          <p className='text-sm text-white/50'>Signed in as {user.email}</p>
-          <ClaimEntryForm
-            managers={managers}
-            currentEntry={profile?.leagueEntry ?? null}
-            currentDisplayName={profile?.displayName ?? null}
-            currentBio={profile?.bio ?? null}
+          <div className='rounded-lg bg-[#1a0520] p-3'>
+            <p className='text-xs text-white/40'>You are</p>
+            <p className='text-base font-bold text-white'>
+              {manager
+                ? `${manager.player_name} ${manager.player_surname}`
+                : `League entry ${user.leagueEntry}`}
+            </p>
+            {manager && (
+              <p className='text-sm text-white/50'>{manager.team_name}</p>
+            )}
+            <p className='mt-2 text-xs text-white/30'>{user.email}</p>
+          </div>
+
+          <ProfileForm
+            displayName={profile?.displayName ?? null}
+            bio={profile?.bio ?? null}
           />
         </CardContent>
       </Card>

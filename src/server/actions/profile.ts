@@ -3,54 +3,45 @@
 import { revalidatePath } from 'next/cache';
 
 import { getCurrentUser } from '@/server/auth/server';
-import { getProfileByLeagueEntry, upsertProfile } from '@/server/data/profiles';
-import { getGameweekData } from '@/utils/gameweek-data';
+import { upsertProfile } from '@/server/data/profiles';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+const MAX_DISPLAY_NAME = 60;
+const MAX_BIO = 500;
+
 /**
- * Claim a manager in the league for the signed-in user.
+ * Update the signed-in member's own profile.
  *
  * A Server Action is a public POST endpoint, so nothing here trusts its
- * caller: the user comes from the session (never from the form), the league
- * entry is validated against the real roster, and an entry already claimed by
- * somebody else is rejected.
+ * caller. The user comes from the session, and there is no manager field to
+ * tamper with — which manager someone is comes from the curated
+ * `league_members` mapping, so it is not an input to validate. It is not an
+ * input at all.
  */
-export async function claimLeagueEntry(
-  formData: FormData,
-): Promise<ActionResult> {
+export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const user = await getCurrentUser();
 
   if (!user) {
     return { ok: false, error: 'You need to be signed in to do that.' };
   }
 
-  const leagueEntry = Number(formData.get('leagueEntry'));
-
-  if (!Number.isInteger(leagueEntry) || leagueEntry <= 0) {
-    return { ok: false, error: 'Pick a manager from the list.' };
-  }
-
-  // The roster is upstream's, not ours — check against it rather than
-  // trusting whatever id the form posted.
-  const { players } = await getGameweekData();
-
-  if (!players.some((player) => player.id === leagueEntry)) {
-    return { ok: false, error: 'That manager is not in this league.' };
-  }
-
-  const existing = await getProfileByLeagueEntry(leagueEntry);
-
-  if (existing && existing.userId !== user.id) {
-    return { ok: false, error: 'Someone has already claimed that manager.' };
-  }
-
   const displayName = (formData.get('displayName') as string | null)?.trim();
   const bio = (formData.get('bio') as string | null)?.trim();
 
+  if (displayName && displayName.length > MAX_DISPLAY_NAME) {
+    return {
+      ok: false,
+      error: `Display name must be ${MAX_DISPLAY_NAME} characters or fewer.`,
+    };
+  }
+
+  if (bio && bio.length > MAX_BIO) {
+    return { ok: false, error: `Bio must be ${MAX_BIO} characters or fewer.` };
+  }
+
   await upsertProfile({
     userId: user.id,
-    leagueEntry,
     displayName: displayName || user.name,
     bio: bio || null,
   });

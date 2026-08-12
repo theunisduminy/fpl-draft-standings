@@ -53,7 +53,38 @@ export const gameweeks = pgTable('gameweeks', {
 });
 
 /**
- * Links a Neon Auth user to their manager in the league.
+ * Who is in the league, and which manager each of them is.
+ *
+ * This is **curated, not claimed**. The league is eight known people, so the
+ * mapping is admin-seeded rather than self-service: nobody picks which manager
+ * they are, which removes the whole class of shenanigans that a claim flow
+ * invites (grabbing someone else's record, swapping after a bad week).
+ *
+ * It is the single source of truth for two questions that used to have
+ * separate answers:
+ *
+ *   - **May this person sign in?** — is their email in this table?
+ *   - **Which manager are they?** — `league_entry`.
+ *
+ * Adding someone to the league is therefore one row, not an env var edit and
+ * a redeploy.
+ */
+export const leagueMembers = pgTable('league_members', {
+  /** Lowercased on the way in — email casing is not meaningful. */
+  email: text('email').primaryKey(),
+  /** `league_entries[].id` upstream. One member per manager, and vice versa. */
+  leagueEntry: integer('league_entry').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
+ * The parts of a profile its owner controls.
+ *
+ * Deliberately holds no `league_entry`: which manager someone is comes from
+ * `league_members`, keyed by the email on their session. Storing it here too
+ * would be a second, forgeable copy of the same fact.
  *
  * `userId` references `neon_auth.user.id`, but **without a foreign key**.
  * Neon Auth is beta and manages that schema's migrations itself; a hard
@@ -62,8 +93,6 @@ export const gameweeks = pgTable('gameweeks', {
  */
 export const profiles = pgTable('profiles', {
   userId: uuid('user_id').primaryKey(),
-  /** `league_entries[].id` upstream. One profile per manager. */
-  leagueEntry: integer('league_entry').notNull().unique(),
   displayName: text('display_name'),
   bio: text('bio'),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -76,4 +105,5 @@ export const profiles = pgTable('profiles', {
 
 export type GameweekScoreRow = typeof gameweekScores.$inferSelect;
 export type NewGameweekScoreRow = typeof gameweekScores.$inferInsert;
+export type LeagueMemberRow = typeof leagueMembers.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;

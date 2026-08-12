@@ -102,8 +102,9 @@ The same rule, with a real credential behind it:
   caller.
 - **Identity comes from the session, never from the caller.** `getCurrentUser()` in
   `src/server/auth/server.ts` returns `null` for any session whose email is not in
-  `ALLOWED_EMAILS`, so there is one answer to "who is this?" and it already accounts for
-  membership. Never accept a user id as an action argument.
+  `league_members`, so there is one answer to "who is this?" and it already accounts for
+  both authentication and membership. Never accept a user id — or a league entry — as an
+  action argument.
 - **`neon_auth` is Neon's schema, not ours.** We read from it; we never define it.
   `drizzle.config.ts` sets `schemaFilter: ['public']` to keep drizzle-kit out of it, and
   `profiles.user_id` deliberately carries no foreign key into it.

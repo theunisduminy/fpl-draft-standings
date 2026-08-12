@@ -31,7 +31,7 @@ Two audience-bounded zones:
 - **Public** — the standings, results, rumbler and player pages. No sign-in, same view for
   everyone.
 - **Members** (`/profile`, and the bets work to come) — signed in via Neon Auth and on the
-  `ALLOWED_EMAILS` allowlist.
+  `league_members` mapping table.
 
 The product surface:
 
@@ -69,7 +69,7 @@ connection string is a real credential, and it must never reach the browser.
 │   src/app/**/page.tsx        ── Server Components read directly   │
 │   src/app/api/**/route.ts    ── shapes responses, owns { error }  │
 │   src/server/actions/**      ── 'use server'; validates, writes   │
-│   src/server/auth/server.ts  ── session + ALLOWED_EMAILS gate     │
+│   src/server/auth/server.ts  ── session + league_members gate     │
 │   src/server/data/**         ── the DAL: one module per domain    │
 │   src/server/db/client.ts    ── ONLY file that builds a db client │
 │   src/utils/gameweek-data.ts ── score · rank · aggregate          │
@@ -86,8 +86,8 @@ Two rules follow, and neither has exceptions:
   `src/server/data/**`. Never import `@/server/db/**` from a route, action or page.
 - **Identity is resolved server-side**, in `src/server/auth/server.ts`, from the session —
   never from a form field or a client-supplied id. `getCurrentUser()` returns `null` for a
-  session whose email is not on `ALLOWED_EMAILS`, so callers cannot accidentally treat an
-  unapproved session as approved.
+  session whose email has no row in `league_members`, so callers cannot accidentally treat
+  a stranger's valid Google session as a member.
 
 Full rules, and the allowed/forbidden table:
 [`AGENTS.md` — the core boundary](./AGENTS.md#the-core-boundary-upstream-api-access-is-server-only-always).
@@ -153,11 +153,12 @@ Every data-bearing page follows the same path today:
     │   │   └── schema.ts      Drizzle schema for `public` (not `neon_auth`)
     │   ├── data/              the DAL — one module per domain
     │   │   ├── gameweeks.ts   persisted finished-gameweek facts
-    │   │   └── profiles.ts    league entry <-> Neon Auth user
+    │   │   ├── league-members.ts  ★ curated email -> manager mapping
+    │   │   └── profiles.ts    display name and bio
     │   ├── actions/           'use server' — validate, write, revalidate
     │   │   └── profile.ts
     │   └── auth/
-    │       └── server.ts      ★ session + ALLOWED_EMAILS gate
+    │       └── server.ts      ★ session + league_members gate
     ├── hooks/
     │   └── use-table-data.ts  ★ the client-fetch hook every view uses
     ├── interfaces/            players.ts, match.ts, standings.ts
@@ -239,14 +240,15 @@ eight managers tied on rank 1 and banked a win.
 The open question is what to store rather than re-derive. The line that falls out of the
 data itself:
 
-| Data                                       | Mutability                       | Verdict                                |
-| ------------------------------------------ | -------------------------------- | -------------------------------------- |
-| A **finished** gameweek's scores and ranks | Immutable once `leagues_updated` | **Persist.** Write once, read forever. |
-| The **in-flight** gameweek                 | Changes every few minutes        | **Read live.** Never cache hard.       |
-| League entries (names, teams)              | Changes ~never mid-season        | Read live; cheap, one call.            |
-| Clubs, fixtures, element metadata          | Changes rarely                   | Read live behind a long TTL.           |
-| The **F1 points table**                    | Our policy, not a fact           | **Keep in code.** Never in a DB.       |
-| Profiles, weekly bets, email subscriptions | No upstream source exists        | **Persist.** Nothing else can.         |
+| Data                                             | Mutability                       | Verdict                                             |
+| ------------------------------------------------ | -------------------------------- | --------------------------------------------------- |
+| A **finished** gameweek's scores and ranks       | Immutable once `leagues_updated` | **Persist.** Write once, read forever.              |
+| The **in-flight** gameweek                       | Changes every few minutes        | **Read live.** Never cache hard.                    |
+| League entries (names, teams)                    | Changes ~never mid-season        | Read live; cheap, one call.                         |
+| Clubs, fixtures, element metadata                | Changes rarely                   | Read live behind a long TTL.                        |
+| The **F1 points table**                          | Our policy, not a fact           | **Keep in code.** Never in a DB.                    |
+| Profiles, weekly bets, email subscriptions       | No upstream source exists        | **Persist.** Nothing else can.                      |
+| Who is in the league, and which manager they are | Curated by an admin              | **Persist.** Upstream has no notion of our members. |
 
 The win is concentrated in row one: persisting finished gameweeks turns a 344-call cold
 recompute into a single indexed query, and makes the whole season's history available
@@ -301,7 +303,7 @@ integrity cost of leaving it off is nil.
 | Add a database read                     | `src/server/data/<domain>.ts`             | Never `@/server/db/**` from a page or route                   |
 | Add a write                             | `src/server/actions/<domain>.ts`          | Validate, call the DAL, `revalidatePath`                      |
 | Gate something behind sign-in           | `src/server/auth/server.ts`               | `getCurrentUser()` is `null` if not allowlisted               |
-| Add someone to the league               | `.env.local` → `ALLOWED_EMAILS`           | They claim a manager at `/profile`                            |
+| Add someone to the league               | `league-members.json`                     | `pnpm db:seed:members`                                        |
 
 ---
 
