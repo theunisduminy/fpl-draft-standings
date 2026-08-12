@@ -258,8 +258,36 @@ The trap to avoid is persisting **derived** values. Store the facts — gameweek
 entry, points, rank — and compute the F1 score from them at read time. Store `f1_score` and
 the day you tune the points table you own a backfill.
 
-**This is implemented**, in `src/server/data/gameweeks.ts`. Rows one and six of the table
-above are the two tables in `public`; every other row still reads live.
+**This is implemented**, in `src/server/data/gameweeks.ts`. Rows one, six and seven of the
+table above are the tables in `public`; every other row still reads live.
+
+### Everything persisted is scoped by league
+
+A league id **is** a season id. A renewed league gets a new id, and its
+`league_entries[].id` and `entry_id` values are minted fresh alongside it — ours were all
+created in one sequential block the day the league formed, and both previous league ids now
+return 404.
+
+So `league_id` is part of the key on every persisted table:
+
+| Table             | Key                                                         |
+| ----------------- | ----------------------------------------------------------- |
+| `gameweek_scores` | PK `(league_id, gameweek, league_entry)`                    |
+| `gameweeks`       | PK `(league_id, gameweek)`                                  |
+| `league_members`  | PK `(league_id, email)`, unique `(league_id, league_entry)` |
+| `profiles`        | PK `(user_id)` — deliberately season-independent            |
+
+Without it, next season's gameweek 1 collides with this season's and the cache serves the
+wrong year's scores, and a member mapping survives pointing at a number that may by then
+belong to somebody else — wrong, while still satisfying every constraint.
+
+Every query in `src/server/data/**` filters on `getLeagueId()`. Last season's rows are
+therefore **inert rather than wrong**: they stay put and are never read.
+
+**The email is the stable identity across seasons; the entry id is not.** That is why
+`profiles` is keyed on the Neon Auth user id and holds no league entry — display names and
+bios survive the August rollover untouched, while the manager mapping is re-seeded. See
+[`league-members.README.md`](../league-members.README.md) for the annual procedure.
 
 ### Migrations
 

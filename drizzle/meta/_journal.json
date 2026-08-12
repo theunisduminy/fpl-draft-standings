@@ -15,6 +15,13 @@
       "when": 1786546112712,
       "tag": "0001_league_member_mappings",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786546834046,
+      "tag": "0002_scope_by_league",
+      "breakpoints": true
     }
   ]
 }

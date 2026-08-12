@@ -4,6 +4,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -26,6 +27,12 @@ import {
 export const gameweekScores = pgTable(
   'gameweek_scores',
   {
+    /**
+     * The season, identified by its league. Without it, next season's
+     * gameweek 1 collides with this season's and the cache silently serves
+     * the wrong year's scores.
+     */
+    leagueId: integer('league_id').notNull(),
     gameweek: integer('gameweek').notNull(),
     /** `league_entries[].id` upstream — the league entry, not the `entry_id`. */
     leagueEntry: integer('league_entry').notNull(),
@@ -35,7 +42,11 @@ export const gameweekScores = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.gameweek, table.leagueEntry] })],
+  (table) => [
+    primaryKey({
+      columns: [table.leagueId, table.gameweek, table.leagueEntry],
+    }),
+  ],
 );
 
 /**
@@ -45,12 +56,17 @@ export const gameweekScores = pgTable(
  * distinguishable from "GW7 is finished and genuinely had no scores" — the
  * distinction that the empty-`elements` bug turned on.
  */
-export const gameweeks = pgTable('gameweeks', {
-  gameweek: integer('gameweek').primaryKey(),
-  finalisedAt: timestamp('finalised_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const gameweeks = pgTable(
+  'gameweeks',
+  {
+    leagueId: integer('league_id').notNull(),
+    gameweek: integer('gameweek').notNull(),
+    finalisedAt: timestamp('finalised_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.leagueId, table.gameweek] })],
+);
 
 /**
  * Who is in the league, and which manager each of them is.
@@ -69,15 +85,34 @@ export const gameweeks = pgTable('gameweeks', {
  * Adding someone to the league is therefore one row, not an env var edit and
  * a redeploy.
  */
-export const leagueMembers = pgTable('league_members', {
-  /** Lowercased on the way in — email casing is not meaningful. */
-  email: text('email').primaryKey(),
-  /** `league_entries[].id` upstream. One member per manager, and vice versa. */
-  leagueEntry: integer('league_entry').notNull().unique(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const leagueMembers = pgTable(
+  'league_members',
+  {
+    /**
+     * The season, identified by its league. **Both FPL identifiers are
+     * season-scoped:** a renewed league gets a new id, and its
+     * `league_entries[].id` and `entry_id` values are minted fresh with it —
+     * ours were all created in one sequential block the day the league formed.
+     *
+     * Without this column a mapping would survive into next season pointing at
+     * a number that either no longer exists or, worse, now belongs to somebody
+     * else — wrong, while still satisfying every constraint.
+     */
+    leagueId: integer('league_id').notNull(),
+    /** Lowercased on the way in — email casing is not meaningful. */
+    email: text('email').notNull(),
+    /** `league_entries[].id` upstream — the league entry, not the `entry_id`. */
+    leagueEntry: integer('league_entry').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueId, table.email] }),
+    // One manager per person, per season — in both directions.
+    unique().on(table.leagueId, table.leagueEntry),
+  ],
+);
 
 /**
  * The parts of a profile its owner controls.

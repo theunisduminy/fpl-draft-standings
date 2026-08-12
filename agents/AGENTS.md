@@ -181,6 +181,8 @@ awards points.
 - Never edit an applied migration in `drizzle/` — add a new one.
 - Never point drizzle-kit at the `neon_auth` schema.
 - Never persist a derived value (an F1 score, a ranking) — store the facts and compute it.
+- Never persist a row without `league_id`, or query one without filtering on it. A league id
+  is a season id; both FPL identifiers are minted fresh each August.
 - Never store a gameweek that produced no performances; it must stay absent and be retried.
 
 ---

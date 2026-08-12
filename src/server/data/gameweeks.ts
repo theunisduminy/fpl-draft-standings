@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { asc } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 import { getDb } from '@/server/db/client';
 import { gameweekScores, gameweeks } from '@/server/db/schema';
+import { getLeagueId } from '@/utils/fpl-api';
 import type { GameweekPerformance } from '@/interfaces/players';
 
 /**
@@ -12,22 +13,32 @@ import type { GameweekPerformance } from '@/interfaces/players';
  * A finished gameweek never changes, so once it is stored we never ask the FPL
  * API about it again. This is what turns a cold standings computation from
  * ~344 upstream calls into one query plus whatever is genuinely new.
+ *
+ * **Everything here is scoped to the current league**, because a league id is
+ * effectively a season id — see the schema. Nothing in this module reads or
+ * writes across seasons, so last season's rows are inert rather than wrong.
  */
 
-/** Gameweek numbers we have already finalised and stored. */
+/** Gameweek numbers already finalised and stored for the current season. */
 export async function getFinalisedGameweeks(): Promise<Set<number>> {
+  const leagueId = getLeagueId();
+
   const rows = await getDb()
     .select({ gameweek: gameweeks.gameweek })
-    .from(gameweeks);
+    .from(gameweeks)
+    .where(eq(gameweeks.leagueId, leagueId));
 
   return new Set(rows.map((row) => row.gameweek));
 }
 
-/** Every stored score, shaped as the app's existing performance record. */
+/** Every stored score for the current season, shaped as a performance record. */
 export async function getStoredPerformances(): Promise<GameweekPerformance[]> {
+  const leagueId = getLeagueId();
+
   const rows = await getDb()
     .select()
     .from(gameweekScores)
+    .where(eq(gameweekScores.leagueId, leagueId))
     .orderBy(asc(gameweekScores.gameweek), asc(gameweekScores.rank));
 
   return rows.map((row) => ({
@@ -52,20 +63,17 @@ export async function storeFinalisedGameweeks(
 ): Promise<number[]> {
   if (performances.length === 0) return [];
 
-  const byGameweek = new Map<number, GameweekPerformance[]>();
-  for (const performance of performances) {
-    const bucket = byGameweek.get(performance.event) ?? [];
-    bucket.push(performance);
-    byGameweek.set(performance.event, bucket);
-  }
-
-  const stored = [...byGameweek.keys()].sort((a, b) => a - b);
+  const leagueId = getLeagueId();
+  const stored = [...new Set(performances.map((p) => p.event))].sort(
+    (a, b) => a - b,
+  );
   const db = getDb();
 
   await db
     .insert(gameweekScores)
     .values(
       performances.map((performance) => ({
+        leagueId,
         gameweek: performance.event,
         leagueEntry: performance.league_entry,
         points: performance.event_total,
@@ -76,8 +84,29 @@ export async function storeFinalisedGameweeks(
 
   await db
     .insert(gameweeks)
-    .values(stored.map((gameweek) => ({ gameweek })))
+    .values(stored.map((gameweek) => ({ leagueId, gameweek })))
     .onConflictDoNothing();
 
   return stored;
+}
+
+/** Remove a stored gameweek, so the next read refetches it from the API. */
+export async function forgetGameweek(gameweek: number): Promise<void> {
+  const leagueId = getLeagueId();
+  const db = getDb();
+
+  await db
+    .delete(gameweekScores)
+    .where(
+      and(
+        eq(gameweekScores.leagueId, leagueId),
+        eq(gameweekScores.gameweek, gameweek),
+      ),
+    );
+
+  await db
+    .delete(gameweeks)
+    .where(
+      and(eq(gameweeks.leagueId, leagueId), eq(gameweeks.gameweek, gameweek)),
+    );
 }
