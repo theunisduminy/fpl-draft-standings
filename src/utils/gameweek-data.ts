@@ -315,16 +315,23 @@ async function computeSeason(): Promise<GameweekDataResponse> {
 
   // The official cumulative total, which is the same measure as the sum above
   // but authoritative — it accounts for anything upstream scores differently
-  // from a starting-XI sum. Only applied when upstream actually has standings:
-  // `standings` is `[]` until the season starts, and before this guard that
-  // emptiness left every manager on 0 points beside a real F1 score, which
-  // reads as a bug rather than as pre-season.
-  standings?.forEach((standing) => {
-    const player = playerMetrics[standing.league_entry];
-    if (player) {
-      player.total_points = standing.total;
-    }
-  });
+  // from a starting-XI sum.
+  //
+  // Only applied once upstream has a season to report. `standings` is **not**
+  // empty before then: once the draft completes it returns a row per manager
+  // with `total: 0` and every other field null. Overwriting with those zeros
+  // wiped the derived sum and left the table showing real F1 scores beside
+  // 0 points, which reads as a bug rather than as pre-season.
+  const upstreamHasPlayed = standings?.some((standing) => standing.total > 0);
+
+  if (upstreamHasPlayed) {
+    standings.forEach((standing) => {
+      const player = playerMetrics[standing.league_entry];
+      if (player) {
+        player.total_points = standing.total;
+      }
+    });
+  }
 
   const players = Object.values(playerMetrics);
   players.sort((a, b) => b.f1_score - a.f1_score);
