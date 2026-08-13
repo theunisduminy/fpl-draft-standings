@@ -15,12 +15,16 @@ import {
   getStoredPerformances,
   storeFinalisedGameweeks,
 } from '@/server/data/gameweeks';
+import { unstable_cache } from 'next/cache';
+
 import { fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
 import { getCache, setCache } from './cache';
 
 const F1_POINTS = [20, 15, 12, 10, 8, 6, 4, 2];
 const CACHE_KEY = 'gameweek-data';
+/** Revalidate the shared season cache with `revalidateTag` on this. */
+export const GAMEWEEK_DATA_TAG = 'gameweek-data';
 const CACHE_TTL_SECONDS = 3600; // 1 hour — FPL data only changes once per gameweek
 const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
 
@@ -200,18 +204,15 @@ async function fetchMissingGameweeks(
   return fetched;
 }
 
-export async function getGameweekData(): Promise<GameweekDataResponse> {
-  const cached = getCache<GameweekDataResponse>(CACHE_KEY);
-  if (cached) {
-    return cached;
-  }
-
-  // If another request is already computing, wait for it instead of duplicating work
-  if (pendingPromise) {
-    return pendingPromise;
-  }
-
-  pendingPromise = (async () => {
+/**
+ * Compute the season from scratch: upstream, database, scoring, aggregation.
+ *
+ * Expensive — two upstream calls and two database round trips before any
+ * gameweek work, which measured ~2s from here. Always reach it through
+ * `getGameweekData()`, never directly.
+ */
+async function computeSeason(): Promise<GameweekDataResponse> {
+  {
     const leagueId = getLeagueId();
 
     const [{ league_entries, standings }, status] = await Promise.all([
@@ -393,9 +394,41 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
       rumblerData: rumblerData.sort((a, b) => b.gameweek - a.gameweek),
     };
 
+    return response;
+  }
+}
+
+/**
+ * The season, through Next's Data Cache.
+ *
+ * The in-memory cache below is per-process, so on a serverless host it dies
+ * with every instance and most visitors paid the full ~2s recompute. This
+ * layer is shared across instances and survives them, so a cold instance gets
+ * a hit instead of two upstream calls and two database round trips.
+ *
+ * Revalidate with `revalidateTag(GAMEWEEK_DATA_TAG)` after a write that
+ * changes the season.
+ */
+const readSeason = unstable_cache(computeSeason, [CACHE_KEY], {
+  revalidate: CACHE_TTL_SECONDS,
+  tags: [GAMEWEEK_DATA_TAG],
+});
+
+export async function getGameweekData(): Promise<GameweekDataResponse> {
+  const cached = getCache<GameweekDataResponse>(CACHE_KEY);
+  if (cached) {
+    return cached;
+  }
+
+  // If another request is already computing, wait for it instead of duplicating work
+  if (pendingPromise) {
+    return pendingPromise;
+  }
+
+  pendingPromise = readSeason().then((response) => {
     setCache(CACHE_KEY, response, CACHE_TTL_SECONDS);
     return response;
-  })();
+  });
 
   try {
     return await pendingPromise;

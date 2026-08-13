@@ -8,6 +8,8 @@ import {
   type EntryId,
   type LeagueEntryId,
 } from '@/interfaces/fpl';
+import { unstable_cache } from 'next/cache';
+
 import { fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
 import { getCache, setCache } from './cache';
@@ -26,6 +28,8 @@ import { getCache, setCache } from './cache';
 
 const CACHE_KEY = 'squads';
 const CACHE_TTL_SECONDS = 900; // 15 min — waivers move players, but not often
+/** Revalidate the shared squad cache with `revalidateTag` on this. */
+export const SQUADS_TAG = 'squads';
 
 /** Positions, in the order a team sheet is read. */
 const POSITION_ORDER = ['GKP', 'DEF', 'MID', 'FWD'];
@@ -96,10 +100,7 @@ async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
   }
 }
 
-export async function getSquads(): Promise<SquadsResponse> {
-  const cached = getCache<SquadsResponse>(CACHE_KEY);
-  if (cached) return cached;
-
+async function computeSquads(): Promise<SquadsResponse> {
   const leagueId = getLeagueId();
 
   const [league, ownership, bootstrap, choices] = await Promise.all([
@@ -169,12 +170,31 @@ export async function getSquads(): Promise<SquadsResponse> {
     };
   });
 
-  const response: SquadsResponse = {
+  return {
     squads,
     freeAgentCount,
     drafted: squads.some((squad) => squad.players.length > 0),
   };
+}
 
+/**
+ * Squads, through Next's Data Cache.
+ *
+ * The draft bootstrap alone is ~850 KB and measured 1.2–2.0s, which was
+ * effectively all of this page's cold render. Caching the joined result — a
+ * few KB — keeps that off the request path for every instance, not just the
+ * one that warmed its own memory.
+ */
+const readSquads = unstable_cache(computeSquads, [CACHE_KEY], {
+  revalidate: CACHE_TTL_SECONDS,
+  tags: [SQUADS_TAG],
+});
+
+export async function getSquads(): Promise<SquadsResponse> {
+  const cached = getCache<SquadsResponse>(CACHE_KEY);
+  if (cached) return cached;
+
+  const response = await readSquads();
   setCache(CACHE_KEY, response, CACHE_TTL_SECONDS);
   return response;
 }
