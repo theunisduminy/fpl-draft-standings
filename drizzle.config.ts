@@ -22,7 +22,11 @@ export default defineConfig({
   out: './drizzle',
   schemaFilter: ['public'],
   dbCredentials: {
-    url: process.env.NEON_CONNECTION_STRING_PROD!,
+    // Same precedence as `src/server/db/client.ts`: the sandbox branch wins
+    // when it is set. They must agree — migrating one database while the app
+    // reads another is how you get a schema the running code cannot query.
+    url: (process.env.NEON_CONNECTION_STRING_SANDBOX ||
+      process.env.NEON_CONNECTION_STRING_PROD)!,
   },
   strict: true,
   verbose: true,
