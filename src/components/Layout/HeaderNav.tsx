@@ -2,38 +2,44 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import * as React from 'react';
-import { Menu } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 
 const navigation = [
-  { name: 'Standings', href: '/', target: '_self' },
-  { name: 'Results', href: '/results', target: '_self' },
-  { name: 'Rumblers', href: '/rumblers', target: '_self' },
-  { name: 'Squads', href: '/squads', target: '_self' },
-  { name: 'Profile', href: '/profile', target: '_self' },
+  { name: 'Standings', href: '/' },
+  { name: 'Results', href: '/results' },
+  { name: 'Rumblers', href: '/rumblers' },
+  { name: 'Squads', href: '/squads' },
+  { name: 'Profile', href: '/profile' },
 ];
 
+/**
+ * The top bar: brand on the left, links on the right from `md` up.
+ *
+ * There is deliberately no mobile menu here. `MobileNav` already puts every
+ * destination in a fixed bottom bar below `md`, so a hamburger would be a
+ * second way to reach the same five links — more chrome, nothing new behind it.
+ *
+ * The container matches the one in `src/app/layout.tsx` exactly (`max-w-7xl`
+ * and the same padding scale) so the brand lines up with the page heading
+ * beneath it.
+ */
 export default function HeaderNav() {
   const pathname = usePathname();
-  const [open, setOpen] = React.useState(false);
 
   return (
     <header className='sticky top-0 z-40 rounded-b-xl bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg'>
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         <div className='flex h-16 items-center justify-between'>
-          {/* Logo */}
-          <Link href='/' className='flex items-center gap-2'>
-            <span className='sr-only'>Draft League Standings</span>
+          <Link href='/' className='flex items-center gap-2.5'>
             <img
               className='h-8 w-auto md:h-10'
               src='/better-draft.png'
-              alt='draft standings logo'
+              alt=''
             />
+            <span className='text-lg font-bold tracking-tight text-[#310639] md:text-xl'>
+              Better Draft
+            </span>
           </Link>
 
-          {/* Desktop Navigation */}
           <nav className='hidden md:flex md:gap-1'>
             {navigation.map((link) => {
               const isActive = pathname === link.href;
@@ -41,6 +47,7 @@ export default function HeaderNav() {
                 <Link
                   key={link.name}
                   href={link.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`relative rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                     isActive
                       ? 'bg-[#310639] text-white'
@@ -55,46 +62,6 @@ export default function HeaderNav() {
               );
             })}
           </nav>
-
-          {/* Mobile Menu Sheet */}
-          <div className='md:hidden'>
-            <Sheet open={open} onOpenChange={setOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='text-[#310639] hover:bg-[#310639]/10'
-                >
-                  <Menu className='h-6 w-6' />
-                  <span className='sr-only'>Open menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side='right'
-                className='w-[280px] border-white/10 bg-[#1a0520]'
-              >
-                <nav className='flex flex-col gap-2 pt-8'>
-                  {navigation.map((link) => {
-                    const isActive = pathname === link.href;
-                    return (
-                      <Link
-                        key={link.name}
-                        href={link.href}
-                        onClick={() => setOpen(false)}
-                        className={`rounded-lg px-4 py-3 text-sm font-medium transition-all ${
-                          isActive
-                            ? 'bg-[#00edfd]/20 text-[#00edfd]'
-                            : 'text-white/70 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
-                        {link.name}
-                      </Link>
-                    );
-                  })}
-                </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
         </div>
       </div>
     </header>

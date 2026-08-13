@@ -124,6 +124,14 @@ body {
   margin: 0;
 }
 
+/* Reserve the scrollbar gutter on every page, scrolling or not.
+   Without it a short page (results) has no scrollbar and a tall one
+   (standings) does, so the viewport changes width between routes and every
+   `mx-auto` container — the header included — visibly shifts on navigation. */
+html {
+  scrollbar-gutter: stable;
+}
+
 @layer base {
   * {
     @apply border-border;

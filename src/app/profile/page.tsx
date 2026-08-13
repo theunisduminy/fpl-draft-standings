@@ -6,6 +6,7 @@ import { getGameweekData } from '@/utils/gameweek-data';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
 import { ProfileForm } from '@/components/Profile/ProfileForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageShell } from '@/components/Layout/PageShell';
 
 export const metadata: Metadata = { title: 'Profile' };
 
@@ -22,22 +23,24 @@ export default async function ProfilePage() {
 
   if (!user) {
     return (
-      <Card className='mx-auto mt-8 max-w-md border-white/10 bg-[#2a0d33]'>
-        <CardHeader>
-          <CardTitle className='text-white'>Sign in</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <p className='text-sm text-white/60'>
-            Profiles are for the managers in this league. Sign in with the
-            Google account that is on the league list.
-          </p>
-          <AuthPanel signedIn={false} />
-          <p className='text-xs text-white/40'>
-            Signed in and still seeing this? Your address is not mapped to a
-            manager yet — ask the league admin to add you.
-          </p>
-        </CardContent>
-      </Card>
+      <PageShell
+        title='Sign in'
+        subtitle='Profiles are for the managers in this league'
+        width='narrow'
+      >
+        <Card className='border-white/10 bg-[#2a0d33]'>
+          <CardContent className='space-y-4 pt-6'>
+            <p className='text-sm text-white/60'>
+              Sign in with the Google account that is on the league list.
+            </p>
+            <AuthPanel signedIn={false} />
+            <p className='text-xs text-white/40'>
+              Signed in and still seeing this? Your address is not mapped to a
+              manager yet — ask the league admin to add you.
+            </p>
+          </CardContent>
+        </Card>
+      </PageShell>
     );
   }
 
@@ -49,10 +52,10 @@ export default async function ProfilePage() {
   const manager = players.find((player) => player.id === user.leagueEntry);
 
   return (
-    <div className='mx-auto mt-8 max-w-xl space-y-6'>
+    <PageShell title='Your profile' subtitle={user.email} width='narrow'>
       <Card className='border-white/10 bg-[#2a0d33]'>
         <CardHeader className='flex-row items-center justify-between space-y-0'>
-          <CardTitle className='text-white'>Your profile</CardTitle>
+          <CardTitle className='text-white'>Details</CardTitle>
           <AuthPanel signedIn />
         </CardHeader>
         <CardContent className='space-y-6'>
@@ -66,7 +69,6 @@ export default async function ProfilePage() {
             {manager && (
               <p className='text-sm text-white/50'>{manager.team_name}</p>
             )}
-            <p className='mt-2 text-xs text-white/30'>{user.email}</p>
           </div>
 
           <ProfileForm
@@ -75,6 +77,6 @@ export default async function ProfilePage() {
           />
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }
