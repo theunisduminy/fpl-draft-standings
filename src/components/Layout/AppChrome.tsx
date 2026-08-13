@@ -24,10 +24,10 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
       <HeaderNav />
       <SideNav />
 
-      {/* `pb-28` below `md` clears the floating `MobileNav`: 64px of bar, plus
-          its inset, plus the iOS home indicator. It used to be `pb-20`, which
-          was right when the bar sat flush against the viewport edge. */}
-      <main className='flex-1 pt-4 pb-28 md:pt-8 md:pb-8 lg:pt-4 lg:pl-64'>
+      {/* `pb-24` below `md` clears `MobileNav`: 64px of bar plus its padding.
+          The bar sits flush on the bottom edge and carries the iOS safe-area
+          inset itself, so nothing extra is owed here. */}
+      <main className='flex-1 pt-4 pb-24 md:pt-8 md:pb-8 lg:pt-4 lg:pl-64'>
         <div className='mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'>
           {children}
         </div>

@@ -47,7 +47,8 @@ right version.
 
 **Node.js 22** (developed against v22.18.0; Next 16 requires `>=20.9.0`).
 
-> _TODO (owner)_ — there is no `.nvmrc` and no CI. Add both so local, CI, and Vercel agree.
+`.nvmrc` pins the patch version and CI reads it with `node-version-file`, so local, CI and
+Vercel agree on the runtime. Change one and change the other.
 
 ---
 
@@ -167,7 +168,18 @@ The same rule, with a real credential behind it:
   `src/server/auth/server.ts` returns `null` for any session whose email is not in
   `league_members`, so there is one answer to "who is this?" and it already accounts for
   both authentication and membership. Never accept a user id — or a league entry — as an
-  action argument.
+  action argument **to say who is acting**. A league entry naming _whose public data to
+  display_ is a subject, not an identity, and is fine: `readGameweekSquad` takes one. The
+  test is whether the argument could grant the caller someone else's authority. If it
+  could, it comes from the session.
+- **An action may serve a read, but only one a page genuinely cannot do.** The default
+  stands: pages read their own data. The exception is data chosen by an interaction long
+  after the render, where pre-fetching every possible answer is absurd —
+  `readGameweekSquad` in `src/server/actions/gameweek.ts` is the only one, and it exists
+  because eight managers × 38 gameweeks of picks is hundreds of upstream calls to answer a
+  question the reader may never ask. An `/api/*` route is not the alternative: the proxy
+  307s it, and past that it has no membership check. Such an action re-checks
+  `getCurrentUser()` itself and validates every argument.
 - **`neon_auth` is Neon's schema, not ours.** We read from it; we never define it.
   `drizzle.config.ts` sets `schemaFilter: ['public']` to keep drizzle-kit out of it, and
   `profiles.user_id` deliberately carries no foreign key into it.
@@ -235,7 +247,8 @@ awards points.
 ## File conventions
 
 - **Everything lives under `src/`.** `src/app` (routes), `src/components`,
-  `src/interfaces`, `src/lib`, `src/utils`. `public/` and config files stay at the repo root.
+  `src/interfaces`, `src/lib`, `src/utils`, `src/hooks` (client hooks only, and only for
+  what CSS cannot do). `public/` and config files stay at the repo root.
 - **The `@/` alias points at `src/`** (`tsconfig.json` → `"@/*": ["./src/*"]`). Use it for
   every cross-directory import; relative imports are for siblings only.
 - **API routes** live at `src/app/api/<name>/route.ts`, export `GET`, and return
@@ -355,8 +368,13 @@ here has already been broken once in production:
 Adding a rule to the scoring layer means adding the test that pins it. Component tests are a
 separate decision; there is no jsdom environment configured and no need for one yet.
 
-> _TODO (owner)_ — no CI workflow yet. Add one running `pnpm lint`, `pnpm typecheck` and
-> `pnpm test`.
+CI is `.github/workflows/ci.yml`: `pnpm lint`, `typecheck`, `test` and `format:check` on
+every pull request and every push to `main`. Each step carries `if: '!cancelled()'` so one
+push reports every failure rather than one per round trip.
+
+**`pnpm build` is deliberately not in CI.** It needs `FPL_LEAGUE_ID` and the database
+credentials, and Vercel already builds every branch with them. Adding it here would mean
+putting production secrets in GitHub to learn something Vercel tells us for free.
 
 ---
 
@@ -412,22 +430,25 @@ from client-side data fetching, which the Server Components refactor removed out
 
 Two further known defects, both pre-existing and neither yet fixed:
 
-- **`font-inter` is a dead class.** `src/app/layout.tsx` loads Inter and sets `--font-inter`
-  on `<html>`, but no theme entry maps `font-inter` to it, so the app renders in the default
-  sans stack. Deliberately left alone during the Tailwind 4 migration to avoid changing
-  typography; fold it into the design refresh.
-- **Four components are defined but never imported**: `MatchOddsCard`, `GameweekScoreChart`,
-  `GameweekSummaryCard`, `StreaksTracker`. Deliberately deferred.
+Both of the defects that used to be listed here are fixed. Inter is now mapped into the
+theme as `--font-sans`, so it is the sans face everywhere and no element needs a font
+class — the `font-inter` class it replaced never generated anything. And the four
+never-imported components (`MatchOddsCard`, `GameweekScoreChart`, `GameweekSummaryCard`,
+`StreaksTracker`) are deleted; git remembers them if they are ever wanted back.
 
-**`/api/auth/[...path]` is now the only route handler**, and it is Neon Auth's. Every other
-one has been deleted: `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and
-`/api/player/[id]` went with the Server Components refactor, and `/api/current-event`,
-`/api/pl-teams`, `/api/pl-fixtures` and `/api/matches` followed once nothing imported them.
+**There are two route handlers.** `/api/auth/[...path]` is Neon Auth's, and
+`/api/cron/revalidate` drops the cached season on a schedule. Everything else has been
+deleted: `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and `/api/player/[id]` went
+with the Server Components refactor, and `/api/current-event`, `/api/pl-teams`,
+`/api/pl-fixtures` and `/api/matches` followed once nothing imported them.
 
 The deciding argument is worth keeping, because it applies to the next one somebody wants to
 add: **`src/proxy.ts` matches `/api/*` too**, so an unauthenticated caller gets a 307 to the
-sign-in page. A route "for an external consumer" cannot have one until that changes. Adding
-an `/api/*` route means designing its authentication first, not afterwards.
+sign-in page. Adding an `/api/*` route means designing its authentication first, not
+afterwards. The cron route is what that looks like in practice: its caller has no session,
+so the matcher excludes `/api/cron`, and the route itself checks a bearer `CRON_SECRET` in
+constant time. The exclusion buys authentication written by hand — it does not make the
+path public, and nothing else may be excluded without the same work.
 
 Production auth configuration is now done: `trusted_origins` on the Neon project contains
 `https://draftrank.vercel.app`, and `allow_localhost` is on for development.

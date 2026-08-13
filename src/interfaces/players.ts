@@ -47,6 +47,13 @@ export interface PlayerDetails {
   total_points: number;
   f1_score: number;
   f1_ranking: number;
+  /**
+   * Where they would stand if the league ranked on points instead of finishes.
+   *
+   * Carried as a field rather than derived per view: two surfaces need it, and
+   * a ranking recomputed from a filtered list is a different ranking.
+   */
+  points_ranking: number;
   total_wins: number;
   position_placed: PositionTally;
 }

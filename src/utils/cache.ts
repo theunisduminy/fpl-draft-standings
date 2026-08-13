@@ -34,7 +34,8 @@ export function setCache<T>(key: string, data: T, ttlSeconds: number): void {
  *
  * Both domains that need this were wiring up the same three layers by hand,
  * which is how their TTLs drift apart. Revalidate early with
- * `revalidateTag(key)`.
+ * `revalidateTag(key, 'max')`; Next 16 requires that second argument, and
+ * `'max'` serves the stale value while the fresh one computes.
  */
 export function cachedRead<T>(
   key: string,

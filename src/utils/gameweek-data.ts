@@ -3,7 +3,7 @@ import type {
   GameweekDataResponse,
 } from '@/interfaces/players';
 import { GameWeekStatus } from '@/interfaces/match';
-import type { EntryPick, EventLive, LeagueEntry } from '@/interfaces/fpl';
+import type { EventLive, LeagueEntry } from '@/interfaces/fpl';
 import {
   getFinalisedGameweeks,
   getStoredPerformances,
@@ -17,6 +17,7 @@ import {
   type EntryPicks,
 } from './scoring';
 import { fplApi, getLeagueId } from './fpl-api';
+import { fetchEntryPicks } from './gameweek-squad';
 import { fetchLeagueDetails } from './league';
 import { cachedRead } from './cache';
 
@@ -62,18 +63,12 @@ async function fetchGameweekBatch(
         // different numbers for the same person; the branded types are what
         // stop them being swapped here.
         ...leagueEntries.map((entry): Promise<EntryPicks> =>
-          fetch(fplApi.entryEvent(entry.entry_id, gw), {
-            next: { revalidate: 300 },
-          })
-            .then((res) => res.json())
-            .then((data) => ({
-              league_entry: entry.id,
-              picks: (data.picks ?? []) as EntryPick[],
-            }))
-            .catch(() => ({
-              league_entry: entry.id,
-              picks: [],
-            })),
+          fetchEntryPicks(entry.entry_id, gw)
+            .then((picks) => ({ league_entry: entry.id, picks }))
+            // A manager whose picks cannot be read drops out with an empty
+            // list, which `scoreGameweek` treats as "not played" rather than
+            // scoring a partial league.
+            .catch(() => ({ league_entry: entry.id, picks: [] })),
         ),
       ])
         .then(([liveData, ...playerPicks]) => ({
@@ -232,7 +227,8 @@ async function computeSeason(): Promise<GameweekDataResponse> {
  *
  * Both cache layers live in `cachedRead`; see there for why a per-process map
  * still earns its place in front of the shared one. Revalidate early with
- * `revalidateTag('gameweek-data')`.
+ * `revalidateTag('gameweek-data', 'max')` — which is what the cron route does
+ * every evening.
  */
 export const getGameweekData = cachedRead(
   CACHE_KEY,

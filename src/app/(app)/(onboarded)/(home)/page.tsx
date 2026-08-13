@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { getGameweekData } from '@/utils/gameweek-data';
+import { SeasonLead } from '@/components/TableView/SeasonLead';
 import { StandingsTabs } from '@/components/TableView/StandingsTabs';
 import { StandingsSkeleton } from '@/components/TableView/StandingsSkeleton';
 import { SkeletonRegion } from '@/components/SkeletonRegion';
@@ -44,5 +45,10 @@ export default function Home() {
 async function Standings() {
   const data = await getGameweekData();
 
-  return <StandingsTabs data={data} />;
+  return (
+    <div className='space-y-6'>
+      <SeasonLead players={data.players} />
+      <StandingsTabs data={data} />
+    </div>
+  );
 }

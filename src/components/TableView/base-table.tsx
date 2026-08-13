@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 import {
   Card,
   CardContent,
@@ -21,9 +22,45 @@ export interface TableColumn<T> {
   header: string;
   key: keyof T | ((item: T) => React.ReactNode);
   align?: 'left' | 'center' | 'right';
+  /**
+   * Column width as Tailwind classes, breakpoints included:
+   * `'w-[45%] md:w-[34%]'`.
+   *
+   * Classes rather than an inline `style`, because a column that changes width
+   * at a breakpoint cannot be expressed inline — and two mechanisms on one
+   * table cannot be mixed safely, since an inline width beats any class.
+   */
   width?: string;
+  /**
+   * Hide this column below a breakpoint, header and cells together.
+   *
+   * One flag rather than `hidden md:table-cell` written into both `width` and
+   * `cellClassName`: the two halves have to agree, and a per-row function that
+   * ignores its row is not really a per-row class.
+   */
+  hideBelow?: 'sm' | 'md' | 'lg';
   className?: string;
   cellClassName?: (item: T, index: number) => string;
+}
+
+/** Header and cell padding, exported so `TableSkeleton` cannot drift from it. */
+export const TABLE_HEAD_CLASS =
+  'px-3 py-3 text-xs font-semibold tracking-wider whitespace-nowrap text-white/60 uppercase md:px-4';
+export const TABLE_CELL_CLASS =
+  'px-3 py-3 text-sm text-white/90 md:px-4 md:py-3.5';
+
+/** `hidden` plus the matching `table-cell` at the breakpoint, or nothing. */
+function hiddenClasses(hideBelow: TableColumn<unknown>['hideBelow']): string {
+  if (!hideBelow) return '';
+  return `hidden ${hideBelow}:table-cell`;
+}
+
+function alignClass(align: TableColumn<unknown>['align']): string {
+  return align === 'center'
+    ? 'text-center'
+    : align === 'right'
+      ? 'text-right'
+      : 'text-left';
 }
 
 export interface BaseTableProps<T> {
@@ -99,14 +136,13 @@ export function BaseTable<T extends Record<string, any>>({
                   {columns.map((column, index) => (
                     <TableHead
                       key={index}
-                      className={`px-3 py-4 text-xs font-semibold tracking-wider whitespace-nowrap text-white/60 uppercase md:px-4 ${
-                        column.align === 'center'
-                          ? 'text-center'
-                          : column.align === 'right'
-                            ? 'text-right'
-                            : 'text-left'
-                      } ${column.className || ''}`}
-                      style={column.width ? { width: column.width } : undefined}
+                      className={cn(
+                        TABLE_HEAD_CLASS,
+                        alignClass(column.align),
+                        column.width,
+                        hiddenClasses(column.hideBelow),
+                        column.className,
+                      )}
                     >
                       {column.header}
                     </TableHead>
@@ -127,13 +163,12 @@ export function BaseTable<T extends Record<string, any>>({
                     {columns.map((column, colIndex) => (
                       <TableCell
                         key={colIndex}
-                        className={`px-3 py-4 text-sm text-white/90 md:px-4 md:py-5 ${
-                          column.align === 'center'
-                            ? 'text-center'
-                            : column.align === 'right'
-                              ? 'text-right'
-                              : 'text-left'
-                        } ${column.cellClassName ? column.cellClassName(item, index) : ''}`}
+                        className={cn(
+                          TABLE_CELL_CLASS,
+                          alignClass(column.align),
+                          hiddenClasses(column.hideBelow),
+                          column.cellClassName?.(item, index),
+                        )}
                       >
                         {typeof column.key === 'function'
                           ? column.key(item)

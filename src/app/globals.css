@@ -90,6 +90,12 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  /* `layout.tsx` loads Inter and puts it on `--font-inter`, but nothing mapped
+     it into the theme, so the app quietly rendered in the default stack. This
+     entry is what connects them: it makes Inter the sans face everywhere,
+     including Tailwind's own preflight, so no element needs a font class. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -161,6 +167,18 @@ html {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: hsl(var(--accent));
   border-radius: 3px;
+}
+
+/* vaul paints a 200%-wide block of the drawer's own background just past its
+   edge, so a drawer dragged beyond its stop still looks attached to the side of
+   the window. Our side drawer floats — inset, fully rounded — so that block is
+   a purple slab beside it instead. Kill it for the side directions only; the
+   bottom sheet is flush with the bottom edge, where the filler is both
+   invisible and doing its job. Three attribute selectors, because vaul injects
+   its own rule at runtime and a tie would go to whichever landed last. */
+[data-slot='drawer-content'][data-vaul-drawer][data-vaul-drawer-direction='right']::after,
+[data-slot='drawer-content'][data-vaul-drawer][data-vaul-drawer-direction='left']::after {
+  content: none;
 }
 
 /* Glassmorphism utility */

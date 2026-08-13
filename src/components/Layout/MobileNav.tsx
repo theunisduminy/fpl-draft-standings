@@ -16,15 +16,16 @@ const navigation = [
 /**
  * The mobile navigation: `SideNav`, laid on its side.
  *
- * Same convention, deliberately — a floating `glass` panel with a hairline
- * border, not a flush bar washed in the gradient. The gradient appears only on
- * the active item, as a 3px rail and a cyan icon, so the loudest thing on a
+ * Same `glass` treatment and hairline border, and the gradient appears only on
+ * the active item — a 3px rail and a cyan icon — so the loudest thing on a
  * phone screen is the standings rather than the chrome. The two navigations are
  * one design at two orientations; change one and change the other.
  *
- * The bottom offset clears the iOS home indicator via `safe-area-inset-bottom`,
- * falling back to the same 0.75rem inset used on the sides. `AppChrome` pads
- * `<main>` below `md` to match — a fixed bar hides the end of the page
+ * It floats at the sides like `SideNav` does, with a 0.25rem gap beneath it —
+ * enough to read as floating, too little to show a strip of page. There is
+ * deliberately no `safe-area-inset-bottom` offset; that gap plus the panel's
+ * own 0.375rem of padding is what the iOS home indicator gets. `AppChrome`
+ * pads `<main>` below `md` to match — a fixed bar hides the end of the page
  * otherwise.
  */
 export default function MobileNav() {
@@ -33,7 +34,7 @@ export default function MobileNav() {
   return (
     <nav
       aria-label='Main'
-      className='glass fixed right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-50 rounded-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] md:hidden'
+      className='glass fixed right-3 bottom-1 left-3 z-50 rounded-2xl border border-white/10 shadow-[0_-8px_32px_rgba(0,0,0,0.4)] md:hidden'
     >
       <ul className='mx-auto flex h-16 max-w-md items-stretch justify-around p-1.5'>
         {navigation.map((link) => {
