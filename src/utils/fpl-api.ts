@@ -46,6 +46,28 @@ export function getLeagueId(): number {
   return leagueId;
 }
 
+/**
+ * Read one upstream endpoint as JSON, or throw.
+ *
+ * The only sanctioned way to assert an upstream payload's shape, so the cast
+ * happens in one place and every caller gets the same error format and the
+ * same revalidate contract. Endpoints with a documented non-JSON failure mode
+ * — `event-status` answers 404 with a bare string — need their own handling
+ * rather than this.
+ */
+export async function fetchUpstream<T>(
+  url: string,
+  revalidateSeconds: number,
+): Promise<T> {
+  const res = await fetch(url, { next: { revalidate: revalidateSeconds } });
+
+  if (!res.ok) {
+    throw new Error(`Request to ${url} failed with ${res.status}`);
+  }
+
+  return (await res.json()) as T;
+}
+
 export const fplApi = {
   /**
    * Per-gameweek processing status for the draft game.

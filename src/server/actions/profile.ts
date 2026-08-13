@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 
 import { getCurrentUser } from '@/server/auth/server';
 import { upsertProfile } from '@/server/data/profiles';
+import { isKnownTeamCode } from '@/utils/pl-teams';
+import { parseTeamCode, type TeamCode } from '@/interfaces/fpl';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -29,24 +31,49 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const displayName = (formData.get('displayName') as string | null)?.trim();
   const bio = (formData.get('bio') as string | null)?.trim();
 
-  if (displayName && displayName.length > MAX_DISPLAY_NAME) {
+  // Both are compulsory, and this is where that is true. The `required`
+  // attributes on the form are a convenience; `(onboarded)/layout.tsx` reads
+  // the saved row, so a profile saved past the markup would just bounce back.
+  if (!displayName) {
+    return { ok: false, error: 'A display name is required.' };
+  }
+
+  if (!bio) {
+    return { ok: false, error: 'A bio is required. Anything at all.' };
+  }
+
+  if (displayName.length > MAX_DISPLAY_NAME) {
     return {
       ok: false,
       error: `Display name must be ${MAX_DISPLAY_NAME} characters or fewer.`,
     };
   }
 
-  if (bio && bio.length > MAX_BIO) {
+  if (bio.length > MAX_BIO) {
     return { ok: false, error: `Bio must be ${MAX_BIO} characters or fewer.` };
   }
 
-  await upsertProfile({
-    userId: user.id,
-    displayName: displayName || user.name,
-    bio: bio || null,
-  });
+  // Optional, unlike the two above — but if it is set it has to be real. A
+  // `<select>` proves nothing: this is a POST endpoint and the body is whatever
+  // the caller sent, so the code is checked against the ones upstream returned.
+  const rawTeam = (formData.get('favouriteTeam') as string | null)?.trim();
+  let favouriteTeam: TeamCode | null = null;
 
-  revalidatePath('/profile');
+  if (rawTeam) {
+    const parsed = parseTeamCode(rawTeam);
+
+    if (!parsed || !(await isKnownTeamCode(parsed))) {
+      return { ok: false, error: 'That is not a Premier League club.' };
+    }
+
+    favouriteTeam = parsed;
+  }
+
+  await upsertProfile({ userId: user.id, displayName, bio, favouriteTeam });
+
+  // The onboarding gate lives in a layout above every page, so a first save
+  // changes what the whole app is allowed to render, not just this route.
+  revalidatePath('/', 'layout');
 
   return { ok: true };
 }

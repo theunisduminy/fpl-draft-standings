@@ -10,7 +10,7 @@ import {
   Target,
 } from 'lucide-react';
 
-import type { PlayerProfile } from '@/utils/player-profile';
+import type { PlayerProfile } from '@/interfaces/players';
 
 interface PlayerSummaryCardProps {
   player: PlayerProfile;

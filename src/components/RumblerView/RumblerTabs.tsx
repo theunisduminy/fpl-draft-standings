@@ -2,10 +2,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Beer, BarChart3 } from 'lucide-react';
 import RumblerDataCards from './RumblerCards';
-import RumblerDashboard from './RumblerDashboard';
+import { RumblerFrequencyChart } from './RumblerFrequencyChart';
 import { RumblerGameweekData } from '@/interfaces/players';
 
-/** Client-side purely for the tab state; the data arrives from the server. */
+/** Client-side for the tab state; the data arrives as a prop, not a fetch. */
 export function RumblerTabs({ data }: { data: RumblerGameweekData[] }) {
   return (
     <Tabs defaultValue='rumblers' className='w-full'>
@@ -29,7 +29,7 @@ export function RumblerTabs({ data }: { data: RumblerGameweekData[] }) {
         <RumblerDataCards gameweekData={data} />
       </TabsContent>
       <TabsContent value='frequency' className='mt-6'>
-        <RumblerDashboard data={data} />
+        <RumblerFrequencyChart data={data} />
       </TabsContent>
     </Tabs>
   );

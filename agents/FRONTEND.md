@@ -88,10 +88,24 @@ one-file change.
 These are **route-level** concerns now, not component state. A component that receives its
 data as a prop has no loading state and no error state to render.
 
-- **Loading → an in-page `<Suspense>`** with `SkeletonCard` / `SkeletonStats` from
-  `src/components/SkeletonTable.tsx` as the fallback. Never a bare spinner, never a
-  layout-shifting `null`. Put the boundary **in the page, not in a `loading.tsx`** — see
-  [`AGENTS.md`](./AGENTS.md#file-conventions) for why that breaks 404 status codes.
+- **Loading → an in-page `<Suspense>`**, plus a `loading.tsx` on routes that cannot 404.
+  Never a bare spinner, never a layout-shifting `null`. See
+  [`AGENTS.md`](./AGENTS.md#file-conventions) for why a `loading.tsx` above a route that
+  _can_ 404 turns it into a 200.
+
+  Three rules make the fallback worth having:
+
+  1. **Wrap it in `SkeletonRegion`.** It carries the one `role='status'` + `aria-busy` and
+     the single sr-only "Loading"; the bars themselves are `aria-hidden`. Without it a
+     screen reader meets a grid of unlabelled empty cells.
+  2. **`delayed` on the `loading.tsx` only, never the in-page fallback.** A soft-nav paints
+     the route shell first, then the in-page one; if both delay, the second restarts the
+     animation and flickers at the handoff.
+  3. **Mirror the real layout.** Build the skeleton from the real wrappers — `TableSkeleton`
+     renders the actual `<Table>` inside the actual `Card` — so nothing is a measured guess
+     and the data landing causes no layout shift. Static text (headings, card titles, the
+     selector label) renders for real; only what the data fills is a placeholder.
+
 - **Error → `src/app/error.tsx`**, which renders `ErrorDisplay` and wires `onRetry` to
   Next's `reset()`, re-rendering the segment on the server. A page throws; it does not
   catch.

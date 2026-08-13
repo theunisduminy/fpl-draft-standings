@@ -92,6 +92,66 @@ needs the season calls `getGameweekData()` directly and hands the result down as
 | Adding a new endpoint builder to `fplApi`                  | Writing an upstream URL anywhere other than `fpl-api.ts`                  |
 | Reading `process.env.FPL_LEAGUE_ID` inside `fpl-api.ts`    | `NEXT_PUBLIC_FPL_LEAGUE_ID`, or reading the env var anywhere else         |
 
+### The auth gate: `src/proxy.ts`, and why deleting it breaks sign-in silently
+
+**The whole app is behind sign-in.** `src/proxy.ts` — Next 16's name for what used to be
+`middleware.ts` — redirects every signed-out request to `/auth/sign-in`. There is no public
+view.
+
+That file is not just route protection, and this is the part that bites:
+
+- **It is the only thing that completes the OAuth handshake.** Neon returns the browser to
+  the callback URL carrying `?neon_auth_session_verifier=…`, and the library code that
+  trades that param for the `__Secure-neon-auth.session_token` cookie
+  (`exchangeOAuthToken`) is reachable from the proxy and nowhere else. The
+  `/api/auth/[...path]` mount never sees that navigation — it arrives at a page route.
+- **Without it, sign-in half-succeeds and looks like a database problem.** Neon creates real
+  `user`, `account` and `session` rows, no cookie is ever set, every page renders signed
+  out, and the person signs in again. The only symptom is duplicate session rows seconds
+  apart. This cost a debugging session; do not re-learn it.
+
+**`callbackURL` must be a path the matcher covers**, or the verifier lands somewhere the
+proxy never runs and you are back to the silent failure above.
+
+### Three levels of access, and where each is enforced
+
+The proxy is only the first of them. Do not confuse the three:
+
+| Level         | Means                                      | Enforced by                    |
+| ------------- | ------------------------------------------ | ------------------------------ |
+| **Signed in** | a valid Neon session — any Google account  | `src/proxy.ts`                 |
+| **A member**  | that email is in `league_members`          | `getCurrentUser()` → `null`    |
+| **Onboarded** | a display name **and** a bio are on record | `(app)/(onboarded)/layout.tsx` |
+
+The last two are enforced together, in one layout: `(onboarded)` redirects to `/profile`
+unless `getCurrentUser()` returns a user whose `profileComplete` is true. So a stranger with
+a valid Google session gets the "not on the league list" page rather than the standings, and
+a member with a blank profile gets the form.
+
+**Onboarding is a route group, not an `if` in each page.** A layout cannot see the pathname,
+and a gate that redirects to `/profile` must not run on `/profile` — that is an infinite
+redirect. Grouping solves it structurally: `/profile` sits in `(app)` but outside
+`(onboarded)`, so it keeps the navigation chrome while staying reachable with an empty
+profile. A new page belongs in `(onboarded)` unless it is itself a step someone must pass
+through before they are onboarded.
+
+Two things follow. **The gate reads the database on every page**, so `getCurrentUser()` runs
+its membership and profile reads concurrently — keep it that way. And **completeness is
+decided in one place**, `isProfileComplete` in `src/server/auth/server.ts`; the `required`
+attributes on the form are a courtesy, and `updateProfile` re-checks, because a Server
+Action is a public POST endpoint.
+
+The matcher excludes Next's static output and `public/` assets, so the sign-in page keeps
+its logo. It deliberately does **not** exclude `/api/auth/**` — the library skips those
+itself, and the sign-in POST has to reach them while the caller is signed out.
+
+**The navigation lives below the gate, not above it.** Every real page sits in the `(app)`
+route group, whose layout wraps them in `AppChrome` (header, sidebar, bottom nav, footer,
+and the one `max-w-7xl` container). `/auth/sign-in` sits outside that group, so it renders
+against the root layout — fonts and background only. A signed-out visitor must never see a
+nav bar; every link in it would bounce straight back to the sign-in page. New pages go in
+`(app)`; the only reason to add anything beside it is another pre-auth screen.
+
 ### The database half of the boundary
 
 The same rule, with a real credential behind it:
@@ -186,14 +246,25 @@ awards points.
 - **Server-only code lives under `src/server/`** — `db/` (client + Drizzle schema), `data/`
   (the DAL, one module per domain), `actions/` (Server Actions), `auth/` (session and the
   allowlist). Every file there starts with `import 'server-only'`.
+- **The auth gate is `src/proxy.ts`**, beside `src/app/`. Next 16 deprecated the
+  `middleware.ts` name; do not reintroduce it, and do not add a second one — Next supports
+  only one such file.
 - **Pages read their own data** as `async` Server Components calling the DAL or
-  `getGameweekData()` directly. Every page now follows this; `src/app/page.tsx` is the
+  `getGameweekData()` directly. Every page now follows this; `src/app/(app)/(onboarded)/(home)/page.tsx` is the
   pattern, including where to put the Suspense boundary.
-- **Put the Suspense boundary inside the page, not in a `loading.tsx`.** A `loading.tsx`
-  creates a boundary for its segment _and every route beneath it_; flushing that shell
-  commits the HTTP status before the page has decided whether it is a 404, so `notFound()`
-  renders the right page with a **200**. An in-page `<Suspense>` around the data-dependent
-  subtree streams just the same and leaves routes that can 404 alone.
+- **Never put a `loading.tsx` above a route that can 404.** A `loading.tsx` creates a
+  boundary for its segment _and every route beneath it_; flushing that shell commits the
+  HTTP status before the page has decided whether it is a 404, so `notFound()` renders the
+  right page with a **200**. Awaiting the existence check before returning any JSX does
+  **not** save you — verified against Next 16.3.0.
+
+  So `/players/[playerId]` has no `loading.tsx` and never gets one. The four routes that
+  cannot 404 each have their own; `/` needs the `(home)` route group (now nested inside
+  `(app)`) to get one, because at the group root it would cover `/players/**` too.
+
+- **Every page carries an in-page `<Suspense>` as well**, around the data-dependent subtree
+  only. Pair it with `PageShell`, which paints the heading above the boundary — the title is
+  a static string, so nobody should wait on the FPL API to see it.
 - **UI primitives** from shadcn/ui live in `src/components/ui/` — use these before building
   anything custom (see [FRONTEND.md](./FRONTEND.md)).
 - **Feature components** are grouped by view: `TableView/`, `PlayerView/`, `RumblerView/`,
@@ -207,6 +278,12 @@ awards points.
 - Never treat `{}` or `[]` from upstream as "has data" — see above.
 - Never add `NEXT_PUBLIC_` to a variable that only the server needs.
 - Never commit `.env.local`. `.env.example` is the committed template.
+- Never delete `src/proxy.ts`, and never narrow its matcher without checking the OAuth
+  callback path still matches — see the auth gate section above.
+- Never call a page "members only" on the strength of the proxy alone; that is what
+  `(onboarded)` and `getCurrentUser()` are for.
+- Never add a page beside `profile/` in `(app)` unless it is genuinely a pre-onboarding
+  step — outside `(onboarded)` means outside the membership check too.
 - Never import `@/server/db/**` from a page, route handler or Server Action.
 - Never import anything under `@/server/**` from a client component.
 - Never accept a user id from a form or query string — read it from the session.
@@ -338,8 +415,5 @@ Two further known defects, both pre-existing and neither yet fixed:
 - **Four components are defined but never imported**: `MatchOddsCard`, `GameweekScoreChart`,
   `GameweekSummaryCard`, `StreaksTracker`. Same decision, deliberately deferred.
 
-And one piece of production configuration still outstanding:
-
-- **Neon Auth `trusted_origins` is empty.** `allow_localhost` is on, so development works,
-  but the Vercel origin must be added on the Neon project before sign-in works in
-  production.
+Production auth configuration is now done: `trusted_origins` on the Neon project contains
+`https://draftrank.vercel.app`, and `allow_localhost` is on for development.

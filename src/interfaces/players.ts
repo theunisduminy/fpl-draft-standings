@@ -1,5 +1,34 @@
 import type { LeagueEntryId } from './fpl';
 
+/**
+ * Finishing positions 1st-8th, in order, as object keys.
+ *
+ * The league is eight managers, so a rank maps to `POSITION_KEYS[rank - 1]`.
+ * One list, because both the season aggregate and a single manager's profile
+ * tally the same thing and must not drift.
+ */
+export const POSITION_KEYS = [
+  'first',
+  'second',
+  'third',
+  'fourth',
+  'fifth',
+  'sixth',
+  'seventh',
+  'eighth',
+] as const;
+
+export type PositionKey = (typeof POSITION_KEYS)[number];
+
+/** A count per finishing position. */
+export type PositionTally = Record<PositionKey, number>;
+
+export function emptyPositionTally(): PositionTally {
+  return Object.fromEntries(
+    POSITION_KEYS.map((key) => [key, 0]),
+  ) as PositionTally;
+}
+
 // Legacy Player interface - kept for backwards compatibility
 export interface Player {
   player_first_name: string;
@@ -19,16 +48,38 @@ export interface PlayerDetails {
   f1_score: number;
   f1_ranking: number;
   total_wins: number;
-  position_placed: {
-    first: number;
-    second: number;
-    third: number;
-    fourth: number;
-    fifth: number;
-    sixth: number;
-    seventh: number;
-    eighth: number;
-  };
+  position_placed: PositionTally;
+}
+
+/** One gameweek picked out of a season: best, worst, or a point on a chart. */
+export interface GameweekHighlight {
+  gameweek: number;
+  points: number;
+  rank: number;
+}
+
+/** One manager's season, reduced. Derived at read time, never stored. */
+export interface PlayerStats {
+  totalGameweeks: number;
+  totalWins: number;
+  totalPoints: number;
+  averagePoints: number;
+  averageRank: number;
+  bestGameweek: GameweekHighlight;
+  worstGameweek: GameweekHighlight;
+  rumblerCount: number;
+  /** Standard deviation of weekly points — lower is steadier. */
+  consistency: number;
+  positionStats: PositionTally;
+}
+
+export interface PlayerProfile {
+  player_name: string;
+  team_name: string;
+  f1_score: number;
+  f1_ranking: number;
+  stats: PlayerStats;
+  performance: GameweekHighlight[];
 }
 
 // Gameweek performance data

@@ -6,8 +6,12 @@ import PositionPlacedTable from './PositionPlacedTable';
 import { GameweekDataResponse } from '@/interfaces/players';
 
 /**
- * Tabs on mobile, stacked on desktop. Client-side purely for the tab state —
- * the data arrives as a prop, already computed on the server.
+ * Tabs on mobile, stacked on desktop.
+ *
+ * Client-side for the tab state. The data arrives as a prop rather than being
+ * fetched here, but note the panels below still ship to the browser: their
+ * chart leaves are all `'use client'` for recharts, so there is no server
+ * subtree to preserve by passing them in as slots.
  */
 export function StandingsTabs({ data }: { data: GameweekDataResponse }) {
   return (

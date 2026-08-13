@@ -3,26 +3,29 @@ import type { Metadata } from 'next';
 
 import { getGameweekData } from '@/utils/gameweek-data';
 import DraftResults from '@/components/TableView/DraftResultsTable';
-import { SkeletonCard } from '@/components/SkeletonTable';
+import { ResultsSkeleton } from '@/components/TableView/ResultsSkeleton';
+import { SkeletonRegion } from '@/components/SkeletonRegion';
+import { PageShell } from '@/components/Layout/PageShell';
 
 export const metadata: Metadata = { title: 'Results' };
 
 // Reads live upstream data, so it is never prerendered.
 export const dynamic = 'force-dynamic';
 
-// The boundary is in the page, not a `loading.tsx` — see `src/app/page.tsx`.
+// Heading above the boundary, skeleton below — see `src/app/(app)/(onboarded)/(home)/page.tsx`.
 export default function ResultsView() {
   return (
-    <div className='w-full space-y-6'>
-      <div className='space-y-1'>
-        <h1 className='text-2xl font-bold text-white md:text-3xl'>Results</h1>
-        <p className='text-sm text-white/60'>Gameweek by gameweek breakdown</p>
-      </div>
-
-      <Suspense fallback={<SkeletonCard />}>
+    <PageShell title='Results' subtitle='Gameweek by gameweek breakdown'>
+      <Suspense
+        fallback={
+          <SkeletonRegion>
+            <ResultsSkeleton />
+          </SkeletonRegion>
+        }
+      >
         <Results />
       </Suspense>
-    </div>
+    </PageShell>
   );
 }
 

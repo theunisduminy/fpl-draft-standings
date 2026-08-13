@@ -53,6 +53,17 @@ export type EntryId = Brand<number, 'EntryId'>;
 export type ElementId = Brand<number, 'ElementId'>;
 
 /**
+ * `teams[].code` — a Premier League club, **stable across seasons**.
+ *
+ * The only FPL identifier in this file that is not season-scoped, and the
+ * reason it is the one we persist. The sibling `teams[].id` is 1–20 assigned
+ * alphabetically and re-minted every August: Arsenal is `id` 1 and `code` 3
+ * today, but a promoted club whose name sorts first would take `id` 1 next
+ * season and silently repoint every stored row. `code` 3 is Arsenal for good.
+ */
+export type TeamCode = Brand<number, 'TeamCode'>;
+
+/**
  * Brand a number that is already known to be a league entry.
  *
  * For values crossing into the app from somewhere the type system cannot see:
@@ -67,6 +78,24 @@ export const asEntryId = (value: number): EntryId => value as EntryId;
 
 /** Brand a number already known to be an element ID. */
 export const asElementId = (value: number): ElementId => value as ElementId;
+
+/** Brand a number already known to be a team code — a database column, a payload. */
+export const asTeamCode = (value: number): TeamCode => value as TeamCode;
+
+/**
+ * Parse an untrusted team code — a form field.
+ *
+ * Being a real integer is necessary but nowhere near sufficient: the caller
+ * still has to check it against the codes upstream actually returned, because
+ * any number would survive this. See `updateProfile`.
+ */
+export function parseTeamCode(raw: string): TeamCode | null {
+  if (!/^\d+$/.test(raw)) return null;
+
+  const value = Number(raw);
+
+  return value > 0 ? asTeamCode(value) : null;
+}
 
 /**
  * Parse an untrusted league entry ID — a route param, a query string.
@@ -172,6 +201,32 @@ export interface DraftTeam {
   name: string;
   short_name: string;
 }
+
+/**
+ * One club from the classic bootstrap's `teams`.
+ *
+ * `id` is deliberately absent. It is season-scoped and we have no use for it —
+ * everything here keys on {@link TeamCode}, so leaving `id` off the type means
+ * nobody can reach for the wrong one.
+ */
+export interface PlTeam {
+  code: TeamCode;
+  name: string;
+  short_name: string;
+}
+
+/**
+ * A playing position, in the order a team sheet is read.
+ *
+ * `UNK` is the fallback for an element the bootstrap cannot resolve, so that
+ * every consumer handles a real member of the union rather than an arbitrary
+ * string. Keeping this closed means a new position is a compile error at every
+ * `Record<Position, …>` — the ordering and the badge colours cannot silently
+ * fall through.
+ */
+export const POSITION_ORDER = ['GKP', 'DEF', 'MID', 'FWD', 'UNK'] as const;
+
+export type Position = (typeof POSITION_ORDER)[number];
 
 /** A playing position. `singular_name_short` is `GKP` / `DEF` / `MID` / `FWD`. */
 export interface DraftElementType {

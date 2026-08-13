@@ -1,16 +1,20 @@
 import {
-  asElementId,
-  asEntryId,
+  POSITION_ORDER,
   type DraftBootstrap,
   type DraftChoice,
+  type DraftElement,
+  type DraftElementType,
+  type DraftTeam,
   type ElementId,
   type ElementStatus,
   type EntryId,
   type LeagueEntryId,
+  type Position,
 } from '@/interfaces/fpl';
-import { fplApi, getLeagueId } from './fpl-api';
+
+import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
-import { getCache, setCache } from './cache';
+import { cachedRead } from './cache';
 
 /**
  * Who owns whom, and how they got there.
@@ -27,9 +31,6 @@ import { getCache, setCache } from './cache';
 const CACHE_KEY = 'squads';
 const CACHE_TTL_SECONDS = 900; // 15 min — waivers move players, but not often
 
-/** Positions, in the order a team sheet is read. */
-const POSITION_ORDER = ['GKP', 'DEF', 'MID', 'FWD'];
-
 export type Acquisition =
   /** Drafted by this manager, and still theirs. */
   | { kind: 'drafted'; round: number; pick: number; wasAuto: boolean }
@@ -41,11 +42,8 @@ export type Acquisition =
 export interface SquadPlayer {
   element: ElementId;
   name: string;
-  /** `GKP` | `DEF` | `MID` | `FWD`, from the draft bootstrap. */
-  position: string;
+  position: Position;
   club: string;
-  /** Last season's total, which is all the draft bootstrap carries pre-season. */
-  totalPoints: number;
   acquisition: Acquisition;
 }
 
@@ -67,16 +65,6 @@ export interface SquadsResponse {
   drafted: boolean;
 }
 
-async function fetchJson<T>(url: string, revalidate: number): Promise<T> {
-  const res = await fetch(url, { next: { revalidate } });
-
-  if (!res.ok) {
-    throw new Error(`Request to ${url} failed with ${res.status}`);
-  }
-
-  return (await res.json()) as T;
-}
-
 /**
  * The draft choices, or `[]` if the draft has not run.
  *
@@ -86,7 +74,7 @@ async function fetchJson<T>(url: string, revalidate: number): Promise<T> {
  */
 async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
   try {
-    const body = await fetchJson<{ choices?: DraftChoice[] }>(
+    const body = await fetchUpstream<{ choices?: DraftChoice[] }>(
       fplApi.draftChoices(leagueId),
       900,
     );
@@ -96,37 +84,39 @@ async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
   }
 }
 
-export async function getSquads(): Promise<SquadsResponse> {
-  const cached = getCache<SquadsResponse>(CACHE_KEY);
-  if (cached) return cached;
-
+async function computeSquads(): Promise<SquadsResponse> {
   const leagueId = getLeagueId();
 
   const [league, ownership, bootstrap, choices] = await Promise.all([
     fetchLeagueDetails(leagueId),
-    fetchJson<{ element_status: ElementStatus[] }>(
+    fetchUpstream<{ element_status: ElementStatus[] }>(
       fplApi.elementStatus(leagueId),
       900,
     ),
     // The static dataset is ~850 KB and changes about as often as a transfer
     // window, so it gets a much longer window than ownership does.
-    fetchJson<DraftBootstrap>(fplApi.draftBootstrap(), 21600),
+    fetchUpstream<DraftBootstrap>(fplApi.draftBootstrap(), 21600),
     fetchDraftChoices(leagueId),
   ]);
 
-  const elements = new Map(
-    bootstrap.elements.map((element) => [Number(element.id), element]),
+  // Every map below is keyed by the branded ID it actually holds, so the join
+  // cannot quietly cross identities. The brands are erased at runtime, so
+  // this costs nothing and a `Number()` here would buy nothing but the bug.
+  const elements = new Map<ElementId, DraftElement>(
+    bootstrap.elements.map((element) => [element.id, element]),
   );
-  const clubs = new Map(bootstrap.teams.map((team) => [team.id, team]));
-  const positions = new Map(
+  const clubs = new Map<number, DraftTeam>(
+    bootstrap.teams.map((team) => [team.id, team]),
+  );
+  const positions = new Map<number, DraftElementType>(
     bootstrap.element_types.map((type) => [type.id, type]),
   );
-  const choiceByElement = new Map(
-    choices.map((choice) => [Number(choice.element), choice]),
+  const choiceByElement = new Map<ElementId, DraftChoice>(
+    choices.map((choice) => [choice.element, choice]),
   );
 
   // Keyed by entry_id, because that is what `element_status[].owner` gives us.
-  const owned = new Map<number, ElementId[]>();
+  const owned = new Map<EntryId, ElementId[]>();
   let freeAgentCount = 0;
 
   for (const status of ownership.element_status) {
@@ -135,26 +125,47 @@ export async function getSquads(): Promise<SquadsResponse> {
       continue;
     }
 
-    const forEntry = owned.get(Number(status.owner)) ?? [];
-    forEntry.push(asElementId(Number(status.element)));
-    owned.set(Number(status.owner), forEntry);
+    const forEntry = owned.get(status.owner) ?? [];
+    forEntry.push(status.element);
+    owned.set(status.owner, forEntry);
+  }
+
+  function toSquadPlayer(element: ElementId, owner: EntryId): SquadPlayer {
+    const details = elements.get(element);
+    const choice = choiceByElement.get(element);
+
+    let acquisition: Acquisition;
+
+    if (!choice) {
+      acquisition = { kind: 'free-agent' };
+    } else if (choice.entry === owner) {
+      acquisition = {
+        kind: 'drafted',
+        round: choice.round,
+        pick: choice.pick,
+        wasAuto: choice.was_auto,
+      };
+    } else {
+      acquisition = { kind: 'acquired', draftedRound: choice.round };
+    }
+
+    return {
+      element,
+      name: details?.web_name ?? `Player ${element}`,
+      position: details
+        ? toPosition(positions.get(details.element_type)?.singular_name_short)
+        : 'UNK',
+      club: details ? (clubs.get(details.team)?.short_name ?? '—') : '—',
+      acquisition,
+    };
   }
 
   // The one place the two manager identities meet: ownership is looked up by
   // `entry_id`, but the squad is keyed by `id` — the league entry — because
   // that is what the rest of the app calls a player.
   const squads = league.league_entries.map((entry): Squad => {
-    const players = (owned.get(Number(entry.entry_id)) ?? [])
-      .map((element) =>
-        toSquadPlayer(
-          element,
-          asEntryId(Number(entry.entry_id)),
-          elements,
-          clubs,
-          positions,
-          choiceByElement,
-        ),
-      )
+    const players = (owned.get(entry.entry_id) ?? [])
+      .map((element) => toSquadPlayer(element, entry.entry_id))
       .sort(byPositionThenName);
 
     return {
@@ -169,63 +180,35 @@ export async function getSquads(): Promise<SquadsResponse> {
     };
   });
 
-  const response: SquadsResponse = {
+  return {
     squads,
     freeAgentCount,
     drafted: squads.some((squad) => squad.players.length > 0),
   };
-
-  setCache(CACHE_KEY, response, CACHE_TTL_SECONDS);
-  return response;
 }
 
-function toSquadPlayer(
-  element: ElementId,
-  owner: EntryId,
-  elements: Map<number, DraftBootstrap['elements'][number]>,
-  clubs: Map<number, DraftBootstrap['teams'][number]>,
-  positions: Map<number, DraftBootstrap['element_types'][number]>,
-  choiceByElement: Map<number, DraftChoice>,
-): SquadPlayer {
-  const details = elements.get(Number(element));
-  const choice = choiceByElement.get(Number(element));
+/**
+ * Squads, cached.
+ *
+ * The draft bootstrap alone is ~850 KB and measured 1.2-2.0s, which was
+ * effectively all of this page's cold render. Caching the joined result — a
+ * few KB — keeps that off the request path for every instance, not just the
+ * one that warmed its own memory.
+ */
+export const getSquads = cachedRead(
+  CACHE_KEY,
+  CACHE_TTL_SECONDS,
+  computeSquads,
+);
 
-  let acquisition: Acquisition;
-
-  if (!choice) {
-    acquisition = { kind: 'free-agent' };
-  } else if (Number(choice.entry) === Number(owner)) {
-    acquisition = {
-      kind: 'drafted',
-      round: choice.round,
-      pick: choice.pick,
-      wasAuto: choice.was_auto,
-    };
-  } else {
-    acquisition = { kind: 'acquired', draftedRound: choice.round };
-  }
-
-  return {
-    element,
-    name: details?.web_name ?? `Player ${element}`,
-    position: details
-      ? (positions.get(details.element_type)?.singular_name_short ?? '—')
-      : '—',
-    club: details ? (clubs.get(details.team)?.short_name ?? '—') : '—',
-    totalPoints: details?.total_points ?? 0,
-    acquisition,
-  };
+/** Upstream sends the position as a bare string; keep it in the union. */
+function toPosition(raw: string | undefined): Position {
+  return POSITION_ORDER.includes(raw as Position) ? (raw as Position) : 'UNK';
 }
 
 function byPositionThenName(a: SquadPlayer, b: SquadPlayer): number {
   const positionDelta =
-    indexOfPosition(a.position) - indexOfPosition(b.position);
+    POSITION_ORDER.indexOf(a.position) - POSITION_ORDER.indexOf(b.position);
 
   return positionDelta !== 0 ? positionDelta : a.name.localeCompare(b.name);
-}
-
-function indexOfPosition(position: string): number {
-  const index = POSITION_ORDER.indexOf(position);
-
-  return index === -1 ? POSITION_ORDER.length : index;
 }

@@ -5,9 +5,6 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // Components and Style
 import './globals.css';
-import Footer from '@/components/Layout/Footer';
-import HeaderNav from '@/components/Layout/HeaderNav';
-import MobileNav from '@/components/Layout/MobileNav';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import { config } from '@fortawesome/fontawesome-svg-core';
 config.autoAddCss = false;
@@ -61,16 +58,11 @@ export default function RootLayout({
       className={`${inter.variable} h-full scroll-smooth antialiased`}
     >
       <body className='font-inter flex min-h-screen flex-col bg-[#1a0520] text-white antialiased'>
-        <HeaderNav />
-
-        <main className='flex-1 pt-4 pb-20 md:pt-8 md:pb-8'>
-          <div className='mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'>
-            {children}
-          </div>
-        </main>
-
-        <Footer />
-        <MobileNav />
+        {/* Navigation is deliberately NOT here — it lives in `AppChrome`, which
+            `(app)/layout.tsx` wraps every real page in. `/auth/sign-in` renders
+            against this layout alone, so a signed-out visitor gets the fonts,
+            the background and nothing to click but the sign-in button. */}
+        {children}
 
         <Analytics />
         <SpeedInsights />
