@@ -75,7 +75,6 @@ export default function RumblerDataCards({
           gameweeks={gameweeks}
           selectedGameweek={activeGameweek}
           onSelectGameweek={setSelectedGameweek}
-          label='Select Gameweek'
         />
         <Card className='w-full border-white/10 bg-[#2a0d33]'>
           <CardHeader>
@@ -97,7 +96,6 @@ export default function RumblerDataCards({
         gameweeks={gameweeks}
         selectedGameweek={activeGameweek}
         onSelectGameweek={setSelectedGameweek}
-        label='Select Gameweek'
       />
 
       <Card className='w-full overflow-hidden border-white/10 bg-[#2a0d33]'>

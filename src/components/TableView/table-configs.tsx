@@ -1,6 +1,7 @@
 import React from 'react';
 import { TableColumn } from './base-table';
 import { PlayerDetails } from '@/interfaces/players';
+import type { LeagueEntryId } from '@/interfaces/fpl';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 
@@ -148,7 +149,8 @@ export interface GameweekResult {
   player_name: string;
   team_name: string;
   points: number;
-  league_entry: number;
+  /** The manager, branded — the drawer feeds it straight back to upstream. */
+  league_entry: LeagueEntryId;
   position_movement?: number;
 }
 
@@ -183,30 +185,43 @@ export const renderPositionMovement = (movement?: number) => {
   );
 };
 
+/**
+ * Team name is a column from `md` up and a sub-line under the player below it.
+ * The widths are Tailwind classes rather than the `width` prop because they
+ * have to change at the breakpoint, and an inline style cannot.
+ */
 export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
   {
     header: 'Player',
     key: (result: GameweekResult) => (
-      <div className='flex items-center gap-3'>
+      <div className='flex min-w-0 items-center gap-3'>
         {renderRankBadge(result.rank, 'md')}
-        <div>
-          <div className='font-medium text-white'>
-            {truncate(result.player_name, 12)}
+        <div className='min-w-0'>
+          <div className='truncate font-medium text-white'>
+            {result.player_name}
           </div>
-          <div className='text-xs text-white/50'>
-            {truncate(result.team_name, 14)}
+          <div className='truncate text-xs text-white/50 md:hidden'>
+            {result.team_name}
           </div>
         </div>
       </div>
     ),
-    width: '55%',
+    className: 'w-[45%] md:w-[34%]',
+  },
+  {
+    header: 'Team',
+    key: (result: GameweekResult) => (
+      <div className='truncate text-white/70'>{result.team_name}</div>
+    ),
+    className: 'hidden w-[24%] md:table-cell',
+    cellClassName: () => 'hidden md:table-cell',
   },
   {
     header: 'Move',
     key: (result: GameweekResult) =>
       renderPositionMovement(result.position_movement),
     align: 'center',
-    width: '22.5%',
+    className: 'w-[20%] md:w-[15%]',
   },
   {
     header: 'Points',
@@ -224,7 +239,7 @@ export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
       </span>
     ),
     align: 'center',
-    width: '22.5%',
+    className: 'w-[20%] md:w-[15%]',
   },
 ];
 

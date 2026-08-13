@@ -1,27 +1,29 @@
 'use client';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Label } from '@/components/ui/label';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface GameweekSelectorProps {
   gameweeks: number[];
   selectedGameweek: number;
   onSelectGameweek: (gameweek: number) => void;
-  label?: string;
 }
 
+/**
+ * A row of gameweek pills. Deliberately unlabelled: a strip of "GW 1, GW 2 …"
+ * with one highlighted explains itself, and the label was stealing a line of
+ * vertical space above the fold on mobile.
+ */
 export function GameweekSelector({
   gameweeks,
   selectedGameweek,
   onSelectGameweek,
-  label = 'Select Gameweek',
 }: GameweekSelectorProps) {
   return (
-    <div className='w-full space-y-2'>
-      <Label className='text-sm font-medium text-white/80'>{label}</Label>
+    <div className='w-full'>
       <ScrollArea className='w-full rounded-lg whitespace-nowrap'>
         <ToggleGroup
           type='single'
+          aria-label='Gameweek'
           value={String(selectedGameweek)}
           onValueChange={(value) => {
             if (value) onSelectGameweek(Number(value));

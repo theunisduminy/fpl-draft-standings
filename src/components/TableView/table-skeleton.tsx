@@ -42,7 +42,7 @@ export function TableSkeleton({
                 {Array.from({ length: columns }).map((_, col) => (
                   <TableHead
                     key={col}
-                    className='px-3 py-4 md:px-4'
+                    className='px-3 py-3 md:px-4'
                     style={{ width: col === 0 ? '50%' : undefined }}
                   >
                     <SkeletonText size='label' width='sm' />
@@ -54,7 +54,10 @@ export function TableSkeleton({
               {Array.from({ length: rows }).map((_, row) => (
                 <TableRow key={row} className='border-white/5'>
                   {Array.from({ length: columns }).map((_, col) => (
-                    <TableCell key={col} className='px-3 py-4 md:px-4 md:py-5'>
+                    <TableCell
+                      key={col}
+                      className='px-3 py-3 md:px-4 md:py-3.5'
+                    >
                       {col === 0 && leadingBadge ? (
                         <div className='flex items-center gap-3'>
                           <Skeleton className='h-6 w-6 shrink-0 rounded-full' />

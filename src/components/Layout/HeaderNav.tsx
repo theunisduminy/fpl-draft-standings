@@ -18,6 +18,11 @@ const navigation = [
  * destination in a fixed bottom bar below `md`, so a hamburger would be a
  * second way to reach the same five links — more chrome, nothing new behind it.
  *
+ * **It only sticks from `md` up**, where it carries the links. Below that it is
+ * a brand mark and nothing else, so pinning it would spend 64px of a phone
+ * screen on a logo while `MobileNav` already keeps every destination one thumb
+ * away at the bottom. It scrolls away instead.
+ *
  * The container matches the one in `src/app/layout.tsx` exactly (`max-w-7xl`
  * and the same padding scale) so the brand lines up with the page heading
  * beneath it.
@@ -26,7 +31,7 @@ export default function HeaderNav() {
   const pathname = usePathname();
 
   return (
-    <header className='sticky top-0 z-40 rounded-b-xl bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg lg:hidden'>
+    <header className='z-40 rounded-b-xl bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg md:sticky md:top-0 lg:hidden'>
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         <div className='flex h-16 items-center justify-between'>
           <Link href='/' className='flex items-center gap-2.5'>

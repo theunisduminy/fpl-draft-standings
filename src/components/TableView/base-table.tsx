@@ -99,7 +99,7 @@ export function BaseTable<T extends Record<string, any>>({
                   {columns.map((column, index) => (
                     <TableHead
                       key={index}
-                      className={`px-3 py-4 text-xs font-semibold tracking-wider whitespace-nowrap text-white/60 uppercase md:px-4 ${
+                      className={`px-3 py-3 text-xs font-semibold tracking-wider whitespace-nowrap text-white/60 uppercase md:px-4 ${
                         column.align === 'center'
                           ? 'text-center'
                           : column.align === 'right'
@@ -127,7 +127,7 @@ export function BaseTable<T extends Record<string, any>>({
                     {columns.map((column, colIndex) => (
                       <TableCell
                         key={colIndex}
-                        className={`px-3 py-4 text-sm text-white/90 md:px-4 md:py-5 ${
+                        className={`px-3 py-3 text-sm text-white/90 md:px-4 md:py-3.5 ${
                           column.align === 'center'
                             ? 'text-center'
                             : column.align === 'right'

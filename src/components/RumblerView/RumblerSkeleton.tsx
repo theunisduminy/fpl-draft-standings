@@ -15,13 +15,10 @@ export function RumblerSkeleton() {
       <Skeleton className='h-9 w-full rounded-lg md:w-[400px]' />
 
       <div className='mt-6 w-full space-y-4'>
-        <div className='w-full space-y-2'>
-          <p className='text-sm font-medium text-white/80'>Select Gameweek</p>
-          <div className='flex gap-1.5 pb-2'>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className='h-9 w-[70px] shrink-0 rounded-lg' />
-            ))}
-          </div>
+        <div className='flex w-full gap-1.5 pb-2'>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className='h-9 w-[70px] shrink-0 rounded-lg' />
+          ))}
         </div>
 
         <Card className='w-full overflow-hidden border-white/10 bg-[#2a0d33]'>
