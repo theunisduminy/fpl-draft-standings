@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786544491229,
+      "tag": "0000_gameweek_facts_and_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786546112712,
+      "tag": "0001_league_member_mappings",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786546834046,
+      "tag": "0002_scope_by_league",
+      "breakpoints": true
+    }
+  ]
+}

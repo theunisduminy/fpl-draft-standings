@@ -1,0 +1,70 @@
+---
+description: Details about the project
+globs: 
+---
+# FPL Draft Standings Overview
+
+FPL Draft Standings is a web application for tracking and analyzing Fantasy Premier League (FPL) draft league standings and fixtures. The application provides comprehensive insights into draft league performance, match details, and player statistics.
+
+## Architecture Guidelines
+
+- Uses Next.js App Router for routing and layout management
+- TypeScript is used for type safety and improved developer experience
+- Utilizes shadcn/ui for consistent and modern UI components
+- Implements responsive design for mobile and desktop views
+- Uses Tailwind CSS for styling
+
+## Directory Structure
+
+### App Directory (`app/`)
+- `api/` - API routes for data fetching
+  - `matches/` - Endpoints for match-related data
+  - `pl-fixtures/` - Premier League fixtures data
+- `page.tsx` - Main application landing page
+
+### Components Directory (`components/`)
+- `Layout/` - Core layout components
+  - `Footer.tsx` - Application footer
+- `TableView/` - Data presentation components
+  - `DraftFixturesTable.tsx` - Fixtures display
+- `RumblerView/` - Specific league or draft view components
+  - `RumblerDashboard.tsx` - Dashboard for draft league
+- `ui/` - Shared UI components using shadcn/ui
+  - `badge.tsx`
+  - `button.tsx`
+  - `card.tsx`
+  - `chart.tsx`
+
+### Utilities and Helpers
+- `utils/apiHelper.ts` - API interaction utilities
+- `interfaces/` - TypeScript type definitions
+  - `match.ts` - Match-related type definitions
+
+### Styling and Configuration
+- `tailwind.config.js` - Tailwind CSS configuration
+- `styles/` - Global styling
+- `components.json` - shadcn/ui component configuration
+
+## Development Guidelines
+- Use `pnpm` for package management
+- Follow TypeScript configurations in `tsconfig.json`
+- Implement proper error handling and loading states
+- Use responsive design principles
+- Optimize performance for data-heavy views
+
+## Key Features
+- Draft league standings tracking
+- Premier League fixtures display
+- Responsive and modern UI
+- Detailed match and player statistics
+
+## Environment Configuration
+- Next.js project with App Router
+- TypeScript for type safety
+- Tailwind CSS for styling
+- shadcn/ui for UI components
+
+## Performance and Optimization
+- Utilizes Next.js built-in performance optimizations
+- Implements skeleton loading states
+- Responsive design for various device sizes
