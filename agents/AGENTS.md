@@ -189,11 +189,19 @@ awards points.
 - **Pages read their own data** as `async` Server Components calling the DAL or
   `getGameweekData()` directly. Every page now follows this; `src/app/page.tsx` is the
   pattern, including where to put the Suspense boundary.
-- **Put the Suspense boundary inside the page, not in a `loading.tsx`.** A `loading.tsx`
-  creates a boundary for its segment _and every route beneath it_; flushing that shell
-  commits the HTTP status before the page has decided whether it is a 404, so `notFound()`
-  renders the right page with a **200**. An in-page `<Suspense>` around the data-dependent
-  subtree streams just the same and leaves routes that can 404 alone.
+- **Never put a `loading.tsx` above a route that can 404.** A `loading.tsx` creates a
+  boundary for its segment _and every route beneath it_; flushing that shell commits the
+  HTTP status before the page has decided whether it is a 404, so `notFound()` renders the
+  right page with a **200**. Awaiting the existence check before returning any JSX does
+  **not** save you — verified against Next 16.3.0.
+
+  So `/players/[playerId]` has no `loading.tsx` and never gets one. The four routes that
+  cannot 404 each have their own; `/` needs the `(home)` route group to get one, because at
+  the app root it would cover `/players/**` too.
+
+- **Every page carries an in-page `<Suspense>` as well**, around the data-dependent subtree
+  only. Pair it with `PageShell`, which paints the heading above the boundary — the title is
+  a static string, so nobody should wait on the FPL API to see it.
 - **UI primitives** from shadcn/ui live in `src/components/ui/` — use these before building
   anything custom (see [FRONTEND.md](./FRONTEND.md)).
 - **Feature components** are grouped by view: `TableView/`, `PlayerView/`, `RumblerView/`,

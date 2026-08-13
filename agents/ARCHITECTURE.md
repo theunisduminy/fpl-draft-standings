@@ -118,11 +118,15 @@ Two consequences worth stating outright:
 - **One read per page.** `/` previously issued two overlapping browser fetches
   (`/api/standings` and `/api/gameweek-data`); both trees now render from a single object.
 
-> **Where the Suspense boundary goes matters.** It belongs _inside the page_, not in a
-> `loading.tsx`. A `loading.tsx` creates a boundary for its segment and everything beneath
-> it, and flushing that shell commits the HTTP status before the page has decided whether
-> it is a 404 — so `/players/99999` renders the not-found page with a **200**. Verified
-> against Next 16.3.0.
+> **A `loading.tsx` must never sit above a route that can 404.** It creates a boundary for
+> its segment and everything beneath it, and flushing that shell commits the HTTP status
+> before the page has decided whether it is a 404 — so `/players/99999` renders the
+> not-found page with a **200**. Awaiting the existence check before returning any JSX does
+> not save you; the shell above still flushes. Verified against Next 16.3.0.
+>
+> Hence the `(home)` route group: `/` gets a `loading.tsx` scoped to itself instead of one
+> at the app root that would cover `/players/**`. Every page also carries an in-page
+> `<Suspense>`, with `PageShell` painting the heading above it.
 
 ---
 
