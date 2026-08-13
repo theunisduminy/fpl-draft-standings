@@ -40,7 +40,10 @@ const navigation = [
 
 export default function Footer() {
   return (
-    <footer className='hidden border-t border-white/10 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] py-6 md:block'>
+    // Margin, not padding, from `lg` up. The sidebar is fixed, so padding
+    // would clear the text but still run this bright gradient underneath the
+    // dark panel. A margin starts the footer where the sidebar ends.
+    <footer className='hidden border-t border-white/10 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] py-6 md:block lg:ml-64 lg:rounded-tl-xl'>
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         <div className='flex flex-col items-center gap-4 md:flex-row md:justify-between'>
           <p className='text-center text-xs font-semibold text-[#310639]'>
