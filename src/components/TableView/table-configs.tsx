@@ -33,46 +33,74 @@ export const renderRankBadge = (rank: number, size: 'sm' | 'md' = 'sm') => {
   );
 };
 
-// Standings Table Configuration
-export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
-  {
-    header: 'Player',
-    key: (player: PlayerDetails) => (
-      <div className='flex items-center gap-3'>
-        {renderRankBadge(player.f1_ranking)}
-        <div>
-          <div className='font-medium text-white'>
-            {truncate(player.player_name, 12)}
-          </div>
-          <div className='text-xs text-white/50'>
-            {truncate(player.team_name, 14)}
+/**
+ * The standings columns, given where each manager stands on points.
+ *
+ * A function rather than a constant because the points rank is derived from
+ * the same list the table is rendering, and it is the column that carries the
+ * page's argument: the league ranks on finishes, so "2nd on points" beside a
+ * first place is the interesting disagreement.
+ */
+export function standingsColumns(
+  pointsRanks: Map<LeagueEntryId, number>,
+): TableColumn<PlayerDetails>[] {
+  return [
+    {
+      header: 'Player',
+      key: (player: PlayerDetails) => (
+        <div className='flex min-w-0 items-center gap-3'>
+          {renderRankBadge(player.f1_ranking)}
+          <div className='min-w-0'>
+            <div className='truncate font-medium text-white'>
+              {player.player_name}
+            </div>
+            <div className='truncate text-xs text-white/50'>
+              {player.team_name}
+            </div>
           </div>
         </div>
-      </div>
-    ),
-    width: '50%',
-  },
-  {
-    header: 'F1 Score',
-    key: (player: PlayerDetails) => (
-      <span className='text-base font-bold text-[#00edfd]'>
-        {player.f1_score}
-      </span>
-    ),
-    align: 'center',
-    width: '25%',
-  },
-  {
-    header: 'Tot Pts',
-    key: (player: PlayerDetails) => (
-      <span className='text-base font-bold text-[#75fa95]'>
-        {player.total_points || 0}
-      </span>
-    ),
-    align: 'center',
-    width: '25%',
-  },
-];
+      ),
+      className: 'w-[50%]',
+    },
+    {
+      header: 'F1 score',
+      key: (player: PlayerDetails) => (
+        <span className='text-base font-bold text-[#00edfd]'>
+          {player.f1_score}
+        </span>
+      ),
+      align: 'center',
+      className: 'w-[25%]',
+    },
+    {
+      header: 'Points',
+      key: (player: PlayerDetails) => {
+        const pointsRank = pointsRanks.get(player.id);
+
+        return (
+          <div>
+            <span className='text-base font-bold text-[#75fa95]'>
+              {player.total_points || 0}
+            </span>
+            {pointsRank !== undefined && (
+              <div className='text-xs text-white/40'>
+                {ordinal(pointsRank)} on points
+              </div>
+            )}
+          </div>
+        );
+      },
+      align: 'center',
+      className: 'w-[25%]',
+    },
+  ];
+}
+
+/** 1 → 1st, 2 → 2nd. The league is eight managers, so this need not be clever. */
+function ordinal(rank: number): string {
+  const suffix = ['th', 'st', 'nd', 'rd'][rank] ?? 'th';
+  return `${rank}${suffix}`;
+}
 
 // Position Placed Table Configuration
 export const positionPlacedTableConfig: TableColumn<PlayerDetails>[] = [

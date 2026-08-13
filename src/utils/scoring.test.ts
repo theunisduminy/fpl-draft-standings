@@ -10,11 +10,15 @@ import {
   type LeagueEntryId,
   type LeagueStanding,
 } from '@/interfaces/fpl';
-import type { GameweekPerformance } from '@/interfaces/players';
+import {
+  emptyPositionTally,
+  type GameweekPerformance,
+} from '@/interfaces/players';
 import {
   aggregatePlayers,
   assignRanks,
   buildRumblerData,
+  rankByPoints,
   scoreGameweek,
   type EntryPicks,
 } from './scoring';
@@ -279,6 +283,46 @@ describe('aggregatePlayers', () => {
     );
 
     expect(players.find((p) => p.id === a)!.total_points).toBe(137);
+  });
+});
+
+describe('rankByPoints', () => {
+  const entries = makeEntries(3);
+  const [a, b, c] = entries.map((e) => e.id);
+
+  /** Only the fields `rankByPoints` reads; the rest is noise here. */
+  function player(id: LeagueEntryId, totalPoints: number) {
+    return {
+      id,
+      player_name: 'X',
+      player_surname: 'Y',
+      team_name: 'Z',
+      total_points: totalPoints,
+      f1_score: 0,
+      f1_ranking: 0,
+      total_wins: 0,
+      position_placed: emptyPositionTally(),
+    };
+  }
+
+  it('ranks on points regardless of the F1 order', () => {
+    const ranks = rankByPoints([
+      player(a, 900),
+      player(b, 1100),
+      player(c, 1000),
+    ]);
+
+    expect([ranks.get(a), ranks.get(b), ranks.get(c)]).toEqual([3, 1, 2]);
+  });
+
+  it('shares the higher rank on a tie, as everywhere else', () => {
+    const ranks = rankByPoints([
+      player(a, 1000),
+      player(b, 1000),
+      player(c, 900),
+    ]);
+
+    expect([ranks.get(a), ranks.get(b), ranks.get(c)]).toEqual([1, 1, 3]);
   });
 });
 

@@ -191,6 +191,27 @@ export function aggregatePlayers(
 }
 
 /**
+ * Where each manager would stand if the league ranked on total points.
+ *
+ * The league does not — it ranks on F1 score, which counts finishing positions
+ * rather than points, so a consistent third place beats one enormous week. The
+ * two orders disagree, and that disagreement is the season's most interesting
+ * fact, so the standings page shows both. Same tie rule as everywhere else.
+ */
+export function rankByPoints(
+  players: PlayerDetails[],
+): Map<LeagueEntryId, number> {
+  const ranked = assignRanks(
+    players.map((player) => ({
+      id: player.id,
+      event_total: player.total_points,
+    })),
+  );
+
+  return new Map(ranked.map((player) => [player.id, player.rank]));
+}
+
+/**
  * The rumbler for each gameweek: whoever finished last, newest gameweek first.
  *
  * Last place is the **worst rank present**, not rank 8. A gameweek where two
