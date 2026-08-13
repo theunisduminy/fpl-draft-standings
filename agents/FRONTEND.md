@@ -70,13 +70,24 @@ Columns are data, not JSX, and live in `table-configs.tsx`:
 
 ```ts
 export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
-  { header: 'Player', key: (player) => <PlayerCell player={player} /> },
-  { header: 'F1 score', key: 'f1_score', align: 'right' },
+  { header: 'Player', key: (player) => <PlayerCell player={player} />, width: 'w-[50%]' },
+  { header: 'F1 score', key: 'f1_score', align: 'right', width: 'w-[25%]' },
 ];
 ```
 
-`key` is either a field name or a render function. Use `align`, `width`, `className`,
-`cellClassName` and `rowClassName` rather than wrapping cells in extra divs.
+`key` is either a field name or a render function. Use `align`, `width`, `hideBelow`,
+`className`, `cellClassName` and `rowClassName` rather than wrapping cells in extra divs.
+
+**`width` is Tailwind classes, not a CSS length** — `'w-[45%] md:w-[34%]'`. A column that
+changes width at a breakpoint cannot be expressed as an inline style, and an inline width
+beats any class, so the two mechanisms could not be mixed on one table. **`hideBelow`**
+(`'sm' | 'md' | 'lg'`) hides a column's header and its cells together; never write
+`hidden md:table-cell` into `className` and `cellClassName` by hand, because the two halves
+have to agree.
+
+**A column config may be a function** when a cell needs something the component owns —
+`draftResultsColumns(onViewTeam)`. Columns stay data and stay in `table-configs.tsx`
+either way; do not assemble them inline in a component.
 
 **Rank badges are shared.** Use `renderRankBadge(rank)` / `getRankBadgeClasses(rank)` from
 `table-configs.tsx` — they encode the league's colour language (gold 1st, silver 2nd, bronze

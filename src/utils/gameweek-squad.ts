@@ -1,37 +1,30 @@
-import {
-  POSITION_ORDER,
-  type DraftBootstrap,
-  type DraftElement,
-  type DraftElementType,
-  type DraftTeam,
-  type ElementId,
-  type EntryId,
-  type EntryPick,
-  type EventLive,
-  type LeagueEntryId,
-  type Position,
+import type {
+  ElementId,
+  EntryId,
+  EntryPick,
+  EventLive,
+  LeagueEntryId,
+  Position,
 } from '@/interfaces/fpl';
 
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
+import { getElementLookup } from './draft-elements';
 
 /**
  * One manager's team sheet for one gameweek, with what each footballer scored.
  *
- * This is the only read in the app that is triggered by an interaction rather
- * than by a page render, so it is deliberately narrow: one manager, one
- * gameweek, four upstream calls, no cache layer of its own. Every call is a
- * `fetch` with a `revalidate`, so Next's Data Cache carries it — and three of
- * the four are already warm, because `gameweek-data.ts` and the squads page
- * read the same URLs.
+ * This is the only read in the app triggered by an interaction rather than by
+ * a page render, so it is deliberately narrow: one manager, one gameweek. The
+ * element lookup and the league both come from caches the rest of the app
+ * shares, and the two gameweek-scoped fetches are the same URLs
+ * `gameweek-data.ts` reads, so in practice all of it is warm.
  *
  * Ownership comes from the **picks**, not `element-status`, which is the
  * opposite of `squads.ts` and correct for the opposite reason: this is a
  * historical question ("who did they field in GW5?"), and element-status only
  * ever answers for today.
  */
-
-const NO_SQUAD_STATUSES = [404];
 
 /** A footballer on a team sheet, with what they scored that gameweek. */
 export interface GameweekSquadPlayer {
@@ -68,8 +61,18 @@ export async function getGameweekSquad(
   leagueEntry: LeagueEntryId,
   gameweek: number,
 ): Promise<GameweekSquad | null> {
-  const leagueId = getLeagueId();
-  const league = await fetchLeagueDetails(leagueId);
+  // Started before the league is awaited: neither depends on which manager was
+  // asked for, so waiting would put a league round trip in front of them for
+  // nothing.
+  const livePromise = fetchUpstream<EventLive>(fplApi.eventLive(gameweek), 300);
+  const lookupPromise = getElementLookup();
+
+  // Swallow a rejection that nobody awaits, in case the early return below
+  // fires. The real error still surfaces at the `await` when we do get there.
+  livePromise.catch(() => {});
+  lookupPromise.catch(() => {});
+
+  const league = await fetchLeagueDetails(getLeagueId());
 
   // The league entry is what the app calls a player; the URL below needs the
   // entry_id. This lookup is the only place the two meet here, and it is also
@@ -77,28 +80,17 @@ export async function getGameweekSquad(
   const entry = league.league_entries.find((e) => e.id === leagueEntry);
   if (!entry) return null;
 
-  const [picks, live, bootstrap] = await Promise.all([
-    fetchPicks(entry.entry_id, gameweek),
-    fetchUpstream<EventLive>(fplApi.eventLive(gameweek), 300),
-    fetchUpstream<DraftBootstrap>(fplApi.draftBootstrap(), 21600),
+  const [picks, live, lookup] = await Promise.all([
+    fetchEntryPicks(entry.entry_id, gameweek),
+    livePromise,
+    lookupPromise,
   ]);
 
   if (picks.length === 0) return null;
 
-  const elements = new Map<ElementId, DraftElement>(
-    bootstrap.elements.map((element) => [element.id, element]),
-  );
-  const clubs = new Map<number, DraftTeam>(
-    bootstrap.teams.map((team) => [team.id, team]),
-  );
-  const positions = new Map<number, DraftElementType>(
-    bootstrap.element_types.map((type) => [type.id, type]),
-  );
-
   const players = [...picks]
     .sort((a, b) => a.position - b.position)
     .map((pick): GameweekSquadPlayer => {
-      const details = elements.get(pick.element);
       // `elements` is `{}` for a gameweek that has not been scored — a real
       // possibility here, because the reader can open the current gameweek
       // mid-flight. Zero is the honest answer for a footballer who has not
@@ -107,11 +99,7 @@ export async function getGameweekSquad(
 
       return {
         element: pick.element,
-        name: details?.web_name ?? `Player ${pick.element}`,
-        position: details
-          ? toPosition(positions.get(details.element_type)?.singular_name_short)
-          : 'UNK',
-        club: details ? (clubs.get(details.team)?.short_name ?? '—') : '—',
+        ...lookup.describe(pick.element),
         points: points ?? 0,
         starting: pick.position <= 11,
       };
@@ -135,9 +123,11 @@ export async function getGameweekSquad(
  * The picks for one entry's gameweek, or `[]` if there are none.
  *
  * Upstream 404s with "No pick history" until an entry has played, so a 404 is
- * "not yet", not a failure. Anything else is a genuine error and throws.
+ * "not yet", not a failure. Anything else is a genuine error and throws — a
+ * caller scoring a whole gameweek should catch it and drop that gameweek
+ * rather than score a partial league.
  */
-async function fetchPicks(
+export async function fetchEntryPicks(
   entryId: EntryId,
   gameweek: number,
 ): Promise<EntryPick[]> {
@@ -145,7 +135,7 @@ async function fetchPicks(
     next: { revalidate: 300 },
   });
 
-  if (NO_SQUAD_STATUSES.includes(res.status)) return [];
+  if (res.status === 404) return [];
 
   if (!res.ok) {
     throw new Error(`Picks for entry ${entryId} GW${gameweek}: ${res.status}`);
@@ -153,9 +143,4 @@ async function fetchPicks(
 
   const body = (await res.json()) as { picks?: EntryPick[] };
   return body.picks ?? [];
-}
-
-/** Upstream sends the position as a bare string; keep it in the union. */
-function toPosition(raw: string | undefined): Position {
-  return POSITION_ORDER.includes(raw as Position) ? (raw as Position) : 'UNK';
 }

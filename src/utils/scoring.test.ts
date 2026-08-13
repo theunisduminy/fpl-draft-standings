@@ -300,6 +300,7 @@ describe('rankByPoints', () => {
       total_points: totalPoints,
       f1_score: 0,
       f1_ranking: 0,
+      points_ranking: 0,
       total_wins: 0,
       position_placed: emptyPositionTally(),
     };

@@ -3,7 +3,8 @@ import { TableColumn } from './base-table';
 import { PlayerDetails } from '@/interfaces/players';
 import type { LeagueEntryId } from '@/interfaces/fpl';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ArrowUp, ArrowDown, Eye, Minus } from 'lucide-react';
 
 // Truncate text helper
 const truncate = (str: string, maxLen: number) =>
@@ -33,74 +34,53 @@ export const renderRankBadge = (rank: number, size: 'sm' | 'md' = 'sm') => {
   );
 };
 
-/**
- * The standings columns, given where each manager stands on points.
- *
- * A function rather than a constant because the points rank is derived from
- * the same list the table is rendering, and it is the column that carries the
- * page's argument: the league ranks on finishes, so "2nd on points" beside a
- * first place is the interesting disagreement.
- */
-export function standingsColumns(
-  pointsRanks: Map<LeagueEntryId, number>,
-): TableColumn<PlayerDetails>[] {
-  return [
-    {
-      header: 'Player',
-      key: (player: PlayerDetails) => (
-        <div className='flex min-w-0 items-center gap-3'>
-          {renderRankBadge(player.f1_ranking)}
-          <div className='min-w-0'>
-            <div className='truncate font-medium text-white'>
-              {player.player_name}
-            </div>
-            <div className='truncate text-xs text-white/50'>
-              {player.team_name}
-            </div>
+// Standings Table Configuration
+export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
+  {
+    header: 'Player',
+    key: (player: PlayerDetails) => (
+      <div className='flex min-w-0 items-center gap-3'>
+        {renderRankBadge(player.f1_ranking)}
+        <div className='min-w-0'>
+          <div className='truncate font-medium text-white'>
+            {player.player_name}
+          </div>
+          <div className='truncate text-xs text-white/50'>
+            {player.team_name}
           </div>
         </div>
-      ),
-      className: 'w-[50%]',
-    },
-    {
-      header: 'F1 score',
-      key: (player: PlayerDetails) => (
-        <span className='text-base font-bold text-[#00edfd]'>
-          {player.f1_score}
+      </div>
+    ),
+    width: 'w-[50%]',
+  },
+  {
+    header: 'F1 score',
+    key: (player: PlayerDetails) => (
+      <span className='text-base font-bold text-[#00edfd]'>
+        {player.f1_score}
+      </span>
+    ),
+    align: 'center',
+    width: 'w-[25%]',
+  },
+  {
+    // The league ranks on finishes, so "2nd on points" beside a first place is
+    // the disagreement the standings page is built around.
+    header: 'Points',
+    key: (player: PlayerDetails) => (
+      <div>
+        <span className='text-base font-bold text-[#75fa95]'>
+          {player.total_points || 0}
         </span>
-      ),
-      align: 'center',
-      className: 'w-[25%]',
-    },
-    {
-      header: 'Points',
-      key: (player: PlayerDetails) => {
-        const pointsRank = pointsRanks.get(player.id);
-
-        return (
-          <div>
-            <span className='text-base font-bold text-[#75fa95]'>
-              {player.total_points || 0}
-            </span>
-            {pointsRank !== undefined && (
-              <div className='text-xs text-white/40'>
-                {ordinal(pointsRank)} on points
-              </div>
-            )}
-          </div>
-        );
-      },
-      align: 'center',
-      className: 'w-[25%]',
-    },
-  ];
-}
-
-/** 1 → 1st, 2 → 2nd. The league is eight managers, so this need not be clever. */
-function ordinal(rank: number): string {
-  const suffix = ['th', 'st', 'nd', 'rd'][rank] ?? 'th';
-  return `${rank}${suffix}`;
-}
+        <div className='text-xs text-white/40'>
+          {ordinal(player.points_ranking)} on points
+        </div>
+      </div>
+    ),
+    align: 'center',
+    width: 'w-[25%]',
+  },
+];
 
 // Position Placed Table Configuration
 export const positionPlacedTableConfig: TableColumn<PlayerDetails>[] = [
@@ -111,7 +91,7 @@ export const positionPlacedTableConfig: TableColumn<PlayerDetails>[] = [
         {truncate(player.player_name, 12)}
       </span>
     ),
-    width: '20%',
+    width: 'w-[20%]',
   },
   {
     header: '1st',
@@ -214,62 +194,96 @@ export const renderPositionMovement = (movement?: number) => {
 };
 
 /**
- * Team name is a column from `md` up and a sub-line under the player below it.
- * The widths are Tailwind classes rather than the `width` prop because they
- * have to change at the breakpoint, and an inline style cannot.
+ * The results columns, given what "view team" should do.
+ *
+ * A factory because the last column needs a callback the component owns — the
+ * same reason the standings columns would take a parameter if they needed one.
+ * Columns stay data and stay in this file either way.
+ *
+ * Team name is its own column from `md` up (`hideBelow`) and a sub-line under
+ * the player below it, which is why the sub-line carries the complementary
+ * `md:hidden`. Both halves name the same breakpoint on purpose.
  */
-export const draftResultsTableConfig: TableColumn<GameweekResult>[] = [
-  {
-    header: 'Player',
-    key: (result: GameweekResult) => (
-      <div className='flex min-w-0 items-center gap-3'>
-        {renderRankBadge(result.rank, 'md')}
-        <div className='min-w-0'>
-          <div className='truncate font-medium text-white'>
-            {result.player_name}
-          </div>
-          <div className='truncate text-xs text-white/50 md:hidden'>
-            {result.team_name}
+export function draftResultsColumns(
+  onViewTeam: (result: GameweekResult) => void,
+): TableColumn<GameweekResult>[] {
+  return [
+    {
+      header: 'Player',
+      key: (result: GameweekResult) => (
+        <div className='flex min-w-0 items-center gap-3'>
+          {renderRankBadge(result.rank, 'md')}
+          <div className='min-w-0'>
+            <div className='truncate font-medium text-white'>
+              {result.player_name}
+            </div>
+            <div className='truncate text-xs text-white/50 md:hidden'>
+              {result.team_name}
+            </div>
           </div>
         </div>
-      </div>
-    ),
-    className: 'w-[45%] md:w-[34%]',
-  },
-  {
-    header: 'Team',
-    key: (result: GameweekResult) => (
-      <div className='truncate text-white/70'>{result.team_name}</div>
-    ),
-    className: 'hidden w-[24%] md:table-cell',
-    cellClassName: () => 'hidden md:table-cell',
-  },
-  {
-    header: 'Move',
-    key: (result: GameweekResult) =>
-      renderPositionMovement(result.position_movement),
-    align: 'center',
-    className: 'w-[20%] md:w-[15%]',
-  },
-  {
-    header: 'Points',
-    key: (result: GameweekResult) => (
-      <span
-        className={`text-base font-bold ${
-          result.rank === 1
-            ? 'text-yellow-400'
-            : result.rank === 8
-              ? 'text-red-400'
-              : 'text-white'
-        }`}
-      >
-        {result.points}
-      </span>
-    ),
-    align: 'center',
-    className: 'w-[20%] md:w-[15%]',
-  },
-];
+      ),
+      width: 'w-[45%] md:w-[34%]',
+    },
+    {
+      header: 'Team',
+      key: (result: GameweekResult) => (
+        <div className='truncate text-white/70'>{result.team_name}</div>
+      ),
+      width: 'md:w-[24%]',
+      hideBelow: 'md',
+    },
+    {
+      header: 'Move',
+      key: (result: GameweekResult) =>
+        renderPositionMovement(result.position_movement),
+      align: 'center',
+      width: 'w-[20%] md:w-[15%]',
+    },
+    {
+      header: 'Points',
+      key: (result: GameweekResult) => (
+        <span
+          className={`text-base font-bold ${
+            result.rank === 1
+              ? 'text-yellow-400'
+              : result.rank === 8
+                ? 'text-red-400'
+                : 'text-white'
+          }`}
+        >
+          {result.points}
+        </span>
+      ),
+      align: 'center',
+      width: 'w-[20%] md:w-[15%]',
+    },
+    {
+      header: '',
+      key: (result: GameweekResult) => (
+        <Button
+          variant='outline'
+          size='sm'
+          className='h-8 gap-1.5 border-white/10 bg-white/5 px-2 text-xs text-white/70 hover:border-[#00edfd]/50 hover:text-[#00edfd]'
+          onClick={() => onViewTeam(result)}
+        >
+          <Eye className='h-3.5 w-3.5' />
+          <span className='hidden md:inline'>View team</span>
+          <span className='sr-only md:hidden'>
+            View {result.player_name}&apos;s team
+          </span>
+        </Button>
+      ),
+      align: 'right',
+      width: 'w-[15%] md:w-[12%]',
+    },
+  ];
+}
+
+/** 1 → 1st, 2 → 2nd. The league is eight managers, so this need not be clever. */
+function ordinal(rank: number): string {
+  return `${rank}${['th', 'st', 'nd', 'rd'][rank] ?? 'th'}`;
+}
 
 // Table wrapper configurations
 export interface TableConfig {

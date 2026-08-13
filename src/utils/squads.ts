@@ -1,10 +1,6 @@
 import {
   POSITION_ORDER,
-  type DraftBootstrap,
   type DraftChoice,
-  type DraftElement,
-  type DraftElementType,
-  type DraftTeam,
   type ElementId,
   type ElementStatus,
   type EntryId,
@@ -14,6 +10,7 @@ import {
 
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
+import { getElementLookup } from './draft-elements';
 import { cachedRead } from './cache';
 
 /**
@@ -87,30 +84,18 @@ async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
 async function computeSquads(): Promise<SquadsResponse> {
   const leagueId = getLeagueId();
 
-  const [league, ownership, bootstrap, choices] = await Promise.all([
+  const [league, ownership, lookup, choices] = await Promise.all([
     fetchLeagueDetails(leagueId),
     fetchUpstream<{ element_status: ElementStatus[] }>(
       fplApi.elementStatus(leagueId),
       900,
     ),
-    // The static dataset is ~850 KB and changes about as often as a transfer
-    // window, so it gets a much longer window than ownership does.
-    fetchUpstream<DraftBootstrap>(fplApi.draftBootstrap(), 21600),
+    // Names, positions and clubs come from the shared element lookup, which
+    // holds the ~850 KB static dataset parsed once — see `draft-elements.ts`.
+    getElementLookup(),
     fetchDraftChoices(leagueId),
   ]);
 
-  // Every map below is keyed by the branded ID it actually holds, so the join
-  // cannot quietly cross identities. The brands are erased at runtime, so
-  // this costs nothing and a `Number()` here would buy nothing but the bug.
-  const elements = new Map<ElementId, DraftElement>(
-    bootstrap.elements.map((element) => [element.id, element]),
-  );
-  const clubs = new Map<number, DraftTeam>(
-    bootstrap.teams.map((team) => [team.id, team]),
-  );
-  const positions = new Map<number, DraftElementType>(
-    bootstrap.element_types.map((type) => [type.id, type]),
-  );
   const choiceByElement = new Map<ElementId, DraftChoice>(
     choices.map((choice) => [choice.element, choice]),
   );
@@ -131,7 +116,6 @@ async function computeSquads(): Promise<SquadsResponse> {
   }
 
   function toSquadPlayer(element: ElementId, owner: EntryId): SquadPlayer {
-    const details = elements.get(element);
     const choice = choiceByElement.get(element);
 
     let acquisition: Acquisition;
@@ -151,11 +135,7 @@ async function computeSquads(): Promise<SquadsResponse> {
 
     return {
       element,
-      name: details?.web_name ?? `Player ${element}`,
-      position: details
-        ? toPosition(positions.get(details.element_type)?.singular_name_short)
-        : 'UNK',
-      club: details ? (clubs.get(details.team)?.short_name ?? '—') : '—',
+      ...lookup.describe(element),
       acquisition,
     };
   }
@@ -200,11 +180,6 @@ export const getSquads = cachedRead(
   CACHE_TTL_SECONDS,
   computeSquads,
 );
-
-/** Upstream sends the position as a bare string; keep it in the union. */
-function toPosition(raw: string | undefined): Position {
-  return POSITION_ORDER.includes(raw as Position) ? (raw as Position) : 'UNK';
-}
 
 function byPositionThenName(a: SquadPlayer, b: SquadPlayer): number {
   const positionDelta =

@@ -1,10 +1,9 @@
 'use client';
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { BaseTable } from './base-table';
-import { standingsColumns, tableConfigs } from './table-configs';
+import { standingsTableConfig, tableConfigs } from './table-configs';
 import { PlayerDetails } from '@/interfaces/players';
-import { rankByPoints } from '@/utils/scoring';
 
 /**
  * Presentational: the season is fetched by the page, on the server.
@@ -18,19 +17,12 @@ export default function StandingsTable({
   const router = useRouter();
   const config = tableConfigs.standings;
 
-  // The league ranks on F1 score, so a manager's points rank is a different
-  // number — and the gap between the two is the point of the column.
-  const columns = useMemo(
-    () => standingsColumns(rankByPoints(players)),
-    [players],
-  );
-
   return (
     <BaseTable
       title=''
       subtitle=''
       data={players}
-      columns={columns}
+      columns={standingsTableConfig}
       onRowClick={(player) => router.push(`/players/${player.id}`)}
       emptyMessage={config.emptyMessage}
       className={config.className}

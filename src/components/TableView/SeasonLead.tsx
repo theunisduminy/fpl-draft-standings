@@ -4,7 +4,6 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import type { PlayerDetails } from '@/interfaces/players';
-import { rankByPoints } from '@/utils/scoring';
 
 /**
  * The one thing worth saying above the standings table: who leads, and whether
@@ -23,11 +22,9 @@ export function SeasonLead({ players }: { players: PlayerDetails[] }) {
 
   if (!leader || leader.f1_score === 0) return null;
 
-  const pointsRanks = rankByPoints(players);
-  const pointsLeader = players.find(
-    (player) => pointsRanks.get(player.id) === 1,
-  );
-  const gap = runnerUp ? leader.f1_score - runnerUp.f1_score : 0;
+  // `points_ranking` is computed once in the scoring layer, so this agrees with
+  // the standings table by construction rather than by both getting it right.
+  const pointsLeader = players.find((player) => player.points_ranking === 1);
   const sameManager = pointsLeader?.id === leader.id;
 
   return (
@@ -38,11 +35,7 @@ export function SeasonLead({ players }: { players: PlayerDetails[] }) {
           label='Leading the season'
           player={leader}
           value={`${leader.f1_score} F1`}
-          note={
-            gap > 0
-              ? `${gap} clear of ${runnerUp.player_name}`
-              : `Level with ${runnerUp?.player_name ?? 'nobody'}`
-          }
+          note={leadNote(leader, runnerUp)}
         />
 
         {pointsLeader && (
@@ -61,6 +54,16 @@ export function SeasonLead({ players }: { players: PlayerDetails[] }) {
       </div>
     </Card>
   );
+}
+
+/** How the lead reads: alone, level, or clear by a margin. */
+function leadNote(leader: PlayerDetails, runnerUp?: PlayerDetails): string {
+  if (!runnerUp) return 'Alone at the top';
+
+  const gap = leader.f1_score - runnerUp.f1_score;
+  return gap > 0
+    ? `${gap} clear of ${runnerUp.player_name}`
+    : `Level with ${runnerUp.player_name}`;
 }
 
 function Lead({

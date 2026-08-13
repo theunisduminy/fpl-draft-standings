@@ -1,3 +1,4 @@
+import { TABLE_CELL_CLASS, TABLE_HEAD_CLASS } from './base-table';
 import {
   Table,
   TableBody,
@@ -16,11 +17,10 @@ import { Skeleton, SkeletonText, cellWidth } from '@/components/ui/skeleton';
  * that is a `'use client'` entry — a route's `loading.tsx` would ship the whole
  * interactive table just to draw six grey rows.
  *
- * It renders the real `<Table>` inside the real `Card`, with the same padding
- * and border classes the loaded table uses, so row height, header height and
- * cell rhythm all come from the same CSS. Nothing here is a measured guess,
- * which is why the data landing causes no layout shift. The chrome classes
- * below are the one thing that must stay in step with `BaseTable`.
+ * It renders the real `<Table>` inside the real `Card`, and imports its cell
+ * and header classes from `BaseTable` rather than restating them, so row
+ * height, header height and cell rhythm cannot drift. Nothing here is a
+ * measured guess, which is why the data landing causes no layout shift.
  */
 export function TableSkeleton({
   columns = 3,
@@ -42,7 +42,7 @@ export function TableSkeleton({
                 {Array.from({ length: columns }).map((_, col) => (
                   <TableHead
                     key={col}
-                    className='px-3 py-3 md:px-4'
+                    className={TABLE_HEAD_CLASS}
                     style={{ width: col === 0 ? '50%' : undefined }}
                   >
                     <SkeletonText size='label' width='sm' />
@@ -54,10 +54,7 @@ export function TableSkeleton({
               {Array.from({ length: rows }).map((_, row) => (
                 <TableRow key={row} className='border-white/5'>
                   {Array.from({ length: columns }).map((_, col) => (
-                    <TableCell
-                      key={col}
-                      className='px-3 py-3 md:px-4 md:py-3.5'
-                    >
+                    <TableCell key={col} className={TABLE_CELL_CLASS}>
                       {col === 0 && leadingBadge ? (
                         <div className='flex items-center gap-3'>
                           <Skeleton className='h-6 w-6 shrink-0 rounded-full' />

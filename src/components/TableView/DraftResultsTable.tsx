@@ -1,15 +1,15 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { BaseTable, type TableColumn } from './base-table';
+import { BaseTable } from './base-table';
 import {
-  draftResultsTableConfig,
+  draftResultsColumns,
   tableConfigs,
   GameweekResult,
 } from './table-configs';
 import { GameweekDataResponse } from '@/interfaces/players';
 import { GameweekSelector } from '@/components/GameweekSelector';
-import { ViewTeamDrawer } from './ViewTeamDrawer';
+import { useViewTeam, ViewTeamDrawer } from './ViewTeamDrawer';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, BarChart3, Minus } from 'lucide-react';
@@ -88,25 +88,14 @@ export default function DraftResultsTable({
 
   const config = tableConfigs.draftResults;
 
-  // The trailing column is built here rather than in `table-configs` because
-  // it needs the selected gameweek, which is state.
-  const columns: TableColumn<GameweekResult>[] = useMemo(
-    () => [
-      ...draftResultsTableConfig,
-      {
-        header: '',
-        key: (result: GameweekResult) => (
-          <ViewTeamDrawer
-            leagueEntry={result.league_entry}
-            gameweek={activeGameweek}
-            playerName={result.player_name}
-          />
-        ),
-        align: 'right',
-        className: 'w-[15%] md:w-[12%]',
-      },
-    ],
-    [activeGameweek],
+  // One drawer for the whole table; the rows only name a target.
+  const viewTeam = useViewTeam(activeGameweek);
+
+  const columns = draftResultsColumns((result: GameweekResult) =>
+    viewTeam.open({
+      leagueEntry: result.league_entry,
+      playerName: result.player_name,
+    }),
   );
 
   const summaryStats = useMemo(() => {
@@ -139,7 +128,7 @@ export default function DraftResultsTable({
         title=''
         subtitle=''
         data={formattedResults}
-        columns={draftResultsTableConfig}
+        columns={columns}
         emptyMessage={config.emptyMessage}
         getRowKey={(result) => result.league_entry}
       />
@@ -161,6 +150,8 @@ export default function DraftResultsTable({
         columns={columns}
         getRowKey={(result) => result.league_entry}
       />
+
+      <ViewTeamDrawer view={viewTeam} />
 
       {summaryStats && (
         <Card className='border-white/10 bg-[#2a0d33]'>

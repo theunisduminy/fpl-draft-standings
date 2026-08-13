@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Eye } from 'lucide-react';
 
 import {
   Drawer,
@@ -12,144 +11,163 @@ import {
 } from '@/components/ui/drawer';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { readGameweekSquad } from '@/server/actions/gameweek';
 import type { GameweekSquad } from '@/utils/gameweek-squad';
 import type { LeagueEntryId } from '@/interfaces/fpl';
 import { cn } from '@/lib/utils';
 
-/**
- * The team sheet behind a results row: who was fielded, and what each scored.
- *
- * The squad is fetched when the drawer opens, not with the page. A gameweek's
- * picks are eight upstream calls, and the reader may never ask for any of them
- * — so the cost is paid per click, and only once: `loadedGameweek` keys the
- * result on the gameweek, so re-opening the same one is free while switching
- * gameweeks refetches.
- *
- * It opens from the bottom on a phone and floats at the right on a desktop.
- * That is a vaul prop rather than a class, which is the only reason there is a
- * media query in JavaScript here.
- */
-export function ViewTeamDrawer({
-  leagueEntry,
-  gameweek,
-  playerName,
-}: {
+/** Which manager's team sheet to show, and whose name to title it with. */
+export interface ViewTeamTarget {
   leagueEntry: LeagueEntryId;
-  gameweek: number;
   playerName: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [squad, setSquad] = useState<GameweekSquad | null>(null);
-  const [loadedGameweek, setLoadedGameweek] = useState<number | null>(null);
+}
+
+export interface ViewTeam {
+  target: ViewTeamTarget | null;
+  gameweek: number;
+  squad: GameweekSquad | null;
+  loaded: boolean;
+  error: string | null;
+  open: (target: ViewTeamTarget) => void;
+  close: () => void;
+  retry: () => void;
+}
+
+/**
+ * Own one table's team-sheet drawer: which manager is showing, and the squads
+ * already read.
+ *
+ * A hook plus a single drawer, rather than a drawer per row. Each vaul root
+ * registers window listeners whether or not it is open, so a drawer per row
+ * meant eight of everything to show at most one panel — and eight private
+ * caches that could never share a result.
+ *
+ * The read happens in `open`, an event handler, so there is no effect syncing
+ * state to a fetch. Squads are cached by manager and gameweek: reopening one
+ * already seen costs nothing, and switching gameweek reads afresh.
+ */
+export function useViewTeam(gameweek: number): ViewTeam {
+  const [target, setTarget] = useState<ViewTeamTarget | null>(null);
+  const [squads, setSquads] = useState<Map<string, GameweekSquad | null>>(
+    new Map(),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Matches Tailwind's `md`, the breakpoint the rest of this table changes at.
-  const isDesktop = useMediaQuery('(min-width: 48rem)');
+  const key = target ? `${target.leagueEntry}:${gameweek}` : null;
 
-  function load() {
+  function read(next: ViewTeamTarget) {
+    const nextKey = `${next.leagueEntry}:${gameweek}`;
     setError(null);
+
     startTransition(async () => {
-      const result = await readGameweekSquad(leagueEntry, gameweek);
+      const result = await readGameweekSquad(next.leagueEntry, gameweek);
 
       if (result.ok) {
-        setSquad(result.squad);
-        setLoadedGameweek(gameweek);
+        setSquads((current) => new Map(current).set(nextKey, result.squad));
       } else {
         setError(result.error);
       }
     });
   }
 
-  function onOpenChange(next: boolean) {
-    setOpen(next);
+  return {
+    target,
+    gameweek,
+    squad: key ? (squads.get(key) ?? null) : null,
+    loaded: key !== null && squads.has(key) && !pending,
+    error,
+    open: (next) => {
+      setTarget(next);
+      if (!squads.has(`${next.leagueEntry}:${gameweek}`)) read(next);
+    },
+    close: () => setTarget(null),
+    retry: () => target && read(target),
+  };
+}
 
-    // Already holding this gameweek's squad, so opening costs nothing.
-    if (!next || loadedGameweek === gameweek) return;
-
-    load();
-  }
-
-  const starters = squad?.players.filter((player) => player.starting) ?? [];
-  const bench = squad?.players.filter((player) => !player.starting) ?? [];
-  const showSquad = loadedGameweek === gameweek && !pending;
+/**
+ * The team sheet behind a results row: who was fielded, and what each scored.
+ *
+ * Bottom sheet on a phone, floating panel at the right on a desktop. That is a
+ * vaul prop rather than a class, which is the only reason there is a media
+ * query in JavaScript here.
+ */
+export function ViewTeamDrawer({ view }: { view: ViewTeam }) {
+  // Matches Tailwind's `md`, the breakpoint the results table changes at.
+  const isDesktop = useMediaQuery('(min-width: 48rem)');
 
   return (
     <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
+      open={view.target !== null}
+      onOpenChange={(open) => !open && view.close()}
       direction={isDesktop ? 'right' : 'bottom'}
     >
-      <button
-        type='button'
-        onClick={() => onOpenChange(true)}
-        className='inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white/70 transition-colors hover:border-[#00edfd]/50 hover:text-[#00edfd]'
-      >
-        <Eye className='h-3.5 w-3.5' />
-        <span className='hidden md:inline'>View team</span>
-        <span className='sr-only md:hidden'>View {playerName}&apos;s team</span>
-      </button>
-
       <DrawerContent className='border-white/10 bg-[#1a0520] md:max-h-none'>
         <DrawerHeader className='border-b border-white/10 px-6 pt-2 pb-4 text-left md:pt-4'>
-          <DrawerTitle className='text-white'>{playerName}</DrawerTitle>
+          <DrawerTitle className='text-white'>
+            {view.target?.playerName ?? 'Team sheet'}
+          </DrawerTitle>
           <DrawerDescription className='text-white/60'>
-            Gameweek {gameweek} team sheet
+            Gameweek {view.gameweek} team sheet
           </DrawerDescription>
         </DrawerHeader>
 
         <ScrollArea className='custom-scrollbar flex-1 overflow-y-auto'>
           <div className='space-y-6 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
-            {error && (
-              <div className='space-y-3'>
-                <p className='text-sm text-red-400'>{error}</p>
-                <button
-                  type='button'
-                  onClick={load}
-                  disabled={pending}
-                  className='rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:border-[#00edfd]/50 hover:text-[#00edfd] disabled:opacity-50'
-                >
-                  {pending ? 'Trying again…' : 'Try again'}
-                </button>
-              </div>
-            )}
-
-            {!error && !showSquad && <SquadLoading />}
-
-            {!error && showSquad && !squad && (
-              <p className='text-sm text-white/50'>
-                No team sheet for this gameweek.
-              </p>
-            )}
-
-            {!error && showSquad && squad && (
-              <>
-                <div className='flex items-center justify-between rounded-lg bg-white/5 p-3'>
-                  <div>
-                    <p className='text-xs text-white/50'>Starting XI</p>
-                    <p className='text-lg font-bold text-white'>
-                      {squad.total} pts
-                    </p>
-                  </div>
-                  <div className='text-right'>
-                    <p className='text-xs text-white/50'>On the bench</p>
-                    <p className='text-lg font-bold text-white/60'>
-                      {squad.benchTotal} pts
-                    </p>
-                  </div>
-                </div>
-
-                <SquadList title='Starting XI' players={starters} />
-                <SquadList title='Bench' players={bench} muted />
-              </>
-            )}
+            <Body view={view} />
           </div>
         </ScrollArea>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+/**
+ * The four states, as an if-ladder.
+ *
+ * They are mutually exclusive and JSX `&&` has no `else`, so chaining them in
+ * the markup means restating `!error &&` at every branch.
+ */
+function Body({ view }: { view: ViewTeam }) {
+  if (view.error) {
+    return <ErrorDisplay message={view.error} onRetry={view.retry} />;
+  }
+  if (!view.loaded) return <SquadLoading />;
+  if (!view.squad) {
+    return (
+      <p className='text-sm text-white/50'>No team sheet for this gameweek.</p>
+    );
+  }
+
+  const { players, total, benchTotal } = view.squad;
+
+  return (
+    <>
+      <div className='flex items-center justify-between rounded-lg bg-white/5 p-3'>
+        <div>
+          <p className='text-xs text-white/50'>Starting XI</p>
+          <p className='text-lg font-bold text-white'>{total} pts</p>
+        </div>
+        <div className='text-right'>
+          <p className='text-xs text-white/50'>On the bench</p>
+          <p className='text-lg font-bold text-white/60'>{benchTotal} pts</p>
+        </div>
+      </div>
+
+      <SquadList
+        title='Starting XI'
+        players={players.filter((player) => player.starting)}
+      />
+      <SquadList
+        title='Bench'
+        players={players.filter((player) => !player.starting)}
+        muted
+      />
+    </>
   );
 }
 
@@ -206,23 +224,23 @@ function SquadList({
   );
 }
 
-/** Mirrors the loaded shape: the totals bar, then eleven rows. */
+/** Mirrors the loaded shape: the totals bar, then the starting eleven. */
 function SquadLoading() {
   return (
     <div className='space-y-6'>
       <Skeleton className='h-[68px] w-full rounded-lg' />
       <div className='space-y-2'>
-        <Skeleton className='h-3 w-24' />
+        <SkeletonText size='label' width='md' />
         {Array.from({ length: 11 }).map((_, i) => (
           <div key={i} className='flex items-center justify-between gap-3 py-2'>
             <div className='flex items-center gap-2'>
               <Skeleton className='h-5 w-11 shrink-0 rounded-md' />
               <div className='space-y-1.5'>
-                <Skeleton className='h-3.5 w-28' />
-                <Skeleton className='h-3 w-10' />
+                <SkeletonText size='body' width='md' />
+                <SkeletonText size='label' width='xs' />
               </div>
             </div>
-            <Skeleton className='h-3.5 w-6' />
+            <SkeletonText size='body' width='xs' />
           </div>
         ))}
       </div>

@@ -22,6 +22,12 @@ import { NextResponse } from 'next/server';
  * page render pays for the recompute. So a replayed request is a non-event,
  * which is why a bearer token is enough and there is no nonce.
  */
+/**
+ * Every cache `cachedRead` owns, tagged with its own key. Squads move on
+ * waivers rather than on results, but the same evening covers both.
+ */
+const TAGS = ['gameweek-data', 'squads', 'draft-elements'] as const;
+
 export async function GET(request: Request): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
 
@@ -42,17 +48,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Both caches are tagged with their key — see `cachedRead`. Squads move on
-  // waivers rather than on results, but the same evening covers both.
-  //
   // `'max'` is Next 16's stale-while-revalidate window: the next reader is
   // served the old season immediately while the new one computes behind them,
   // rather than waiting out a ~2s recompute. Nobody watching a table needs the
   // last hour's numbers to be atomic.
-  revalidateTag('gameweek-data', 'max');
-  revalidateTag('squads', 'max');
+  TAGS.forEach((tag) => revalidateTag(tag, 'max'));
 
-  return NextResponse.json({ revalidated: ['gameweek-data', 'squads'] });
+  return NextResponse.json({ revalidated: TAGS });
 }
 
 /**

@@ -17,7 +17,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 export function useMediaQuery(query: string): boolean {
   const subscribe = useCallback(
     (onChange: () => void) => {
-      const media = window.matchMedia(query);
+      const media = mediaQuery(query);
       media.addEventListener('change', onChange);
       return () => media.removeEventListener('change', onChange);
     },
@@ -26,7 +26,25 @@ export function useMediaQuery(query: string): boolean {
 
   return useSyncExternalStore(
     subscribe,
-    () => window.matchMedia(query).matches,
+    () => mediaQuery(query).matches,
     () => false,
   );
+}
+
+/**
+ * One `MediaQueryList` per query string, for the life of the page.
+ *
+ * React calls the snapshot on every render, and `matchMedia` allocates a fresh
+ * object each time — so without this a component that renders often builds a
+ * new one every pass, and two components asking the same question keep two.
+ */
+const cache = new Map<string, MediaQueryList>();
+
+function mediaQuery(query: string): MediaQueryList {
+  const existing = cache.get(query);
+  if (existing) return existing;
+
+  const media = window.matchMedia(query);
+  cache.set(query, media);
+  return media;
 }

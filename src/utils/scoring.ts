@@ -154,6 +154,7 @@ export function aggregatePlayers(
       total_points: 0,
       f1_score: 0,
       f1_ranking: 0,
+      points_ranking: 0,
       total_wins: 0,
       position_placed: emptyPositionTally(),
     };
@@ -187,6 +188,11 @@ export function aggregatePlayers(
     player.f1_ranking = index + 1;
   });
 
+  const pointsRanks = rankByPoints(players);
+  players.forEach((player) => {
+    player.points_ranking = pointsRanks.get(player.id) ?? 0;
+  });
+
   return players;
 }
 
@@ -197,6 +203,9 @@ export function aggregatePlayers(
  * rather than points, so a consistent third place beats one enormous week. The
  * two orders disagree, and that disagreement is the season's most interesting
  * fact, so the standings page shows both. Same tie rule as everywhere else.
+ *
+ * Exported for its test; every consumer reads `points_ranking` off the player,
+ * which {@link aggregatePlayers} sets from this once per season.
  */
 export function rankByPoints(
   players: PlayerDetails[],

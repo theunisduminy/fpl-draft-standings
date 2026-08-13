@@ -1,3 +1,4 @@
+import { GameweekSelectorSkeleton } from '@/components/GameweekSelectorSkeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
@@ -15,11 +16,7 @@ export function RumblerSkeleton() {
       <Skeleton className='h-9 w-full rounded-lg md:w-[400px]' />
 
       <div className='mt-6 w-full space-y-4'>
-        <div className='flex w-full gap-1.5 pb-2'>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className='h-9 w-[70px] shrink-0 rounded-lg' />
-          ))}
-        </div>
+        <GameweekSelectorSkeleton />
 
         <Card className='w-full overflow-hidden border-white/10 bg-[#2a0d33]'>
           <div className='flex flex-col space-y-1.5 p-6 pb-3'>

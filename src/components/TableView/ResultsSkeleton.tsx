@@ -1,3 +1,4 @@
+import { GameweekSelectorSkeleton } from '@/components/GameweekSelectorSkeleton';
 import { TableSkeleton } from '@/components/TableView/table-skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
@@ -11,11 +12,7 @@ import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 export function ResultsSkeleton() {
   return (
     <div className='w-full space-y-6'>
-      <div className='flex w-full gap-1.5 pb-2'>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className='h-9 w-[70px] shrink-0 rounded-lg' />
-        ))}
-      </div>
+      <GameweekSelectorSkeleton />
 
       <TableSkeleton columns={5} rows={8} />
 
