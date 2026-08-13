@@ -1,27 +1,27 @@
-import { fplApi } from './fpl-api';
+import { fetchUpstream, fplApi } from './fpl-api';
 import type { LeagueDetails } from '@/interfaces/fpl';
 
 /**
  * Read the league, its entries and its standings.
  *
- * The upstream JSON is untyped, so this is the sanctioned place to assert its
- * shape — and with it, that `league_entries[].id` is a league entry and
- * `entry_id` is an entry. Every consumer downstream gets that distinction for
- * free, and can no longer swap them.
+ * Typing the response here is what gives every consumer downstream the
+ * distinction between `league_entries[].id` and `entry_id` for free, so they
+ * can no longer swap them.
  */
 export async function fetchLeagueDetails(
   leagueId: number,
 ): Promise<LeagueDetails> {
-  const res = await fetch(fplApi.leagueDetails(leagueId), {
-    next: { revalidate: 300 },
-  });
-
-  if (!res.ok) {
+  try {
+    return await fetchUpstream<LeagueDetails>(
+      fplApi.leagueDetails(leagueId),
+      300,
+    );
+  } catch (cause) {
+    // League IDs are minted fresh every August, so a failure here is far more
+    // often a stale ID than an outage. Say so.
     throw new Error(
-      `League ${leagueId} details request failed with ${res.status}. ` +
-        'League IDs are season-scoped — check FPL_LEAGUE_ID is current.',
+      `Could not read league ${leagueId}. League IDs are season-scoped — check FPL_LEAGUE_ID is current.`,
+      { cause },
     );
   }
-
-  return (await res.json()) as LeagueDetails;
 }

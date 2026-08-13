@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -6,6 +7,7 @@ import { ChevronLeft, User } from 'lucide-react';
 import { parseLeagueEntryId } from '@/interfaces/fpl';
 import { getGameweekData } from '@/utils/gameweek-data';
 import { buildPlayerProfile } from '@/utils/player-profile';
+import type { PlayerProfile } from '@/interfaces/players';
 import { PlayerSummaryCard } from '@/components/PlayerView/PlayerSummaryCard';
 import { PlayerPerformanceChart } from '@/components/PlayerView/PlayerPerformanceChart';
 import { PositionStatsCard } from '@/components/PlayerView/PositionStatsCard';
@@ -18,39 +20,39 @@ export const dynamic = 'force-dynamic';
 type PageProps = { params: Promise<{ playerId: string }> };
 
 /**
- * Resolve the route param to a manager, or 404.
+ * Resolve the route param to a manager, or `null`.
  *
  * The param is untrusted, so it goes through `parseLeagueEntryId` rather than
  * `parseInt` — which would happily read "39837-nonsense" as 39837.
+ *
+ * `cache` because Next calls `generateMetadata` and the page in the same
+ * request: without it the whole profile is derived twice, and the two copies
+ * can disagree about whether the manager exists.
  */
-async function loadProfile(params: PageProps['params']) {
-  const { playerId } = await params;
-  const leagueEntry = parseLeagueEntryId(playerId);
+const resolveProfile = cache(
+  async (playerId: string): Promise<PlayerProfile | null> => {
+    const leagueEntry = parseLeagueEntryId(playerId);
 
-  if (!leagueEntry) notFound();
+    if (!leagueEntry) return null;
 
-  const profile = buildPlayerProfile(await getGameweekData(), leagueEntry);
-
-  if (!profile) notFound();
-
-  return profile;
-}
+    return buildPlayerProfile(await getGameweekData(), leagueEntry);
+  },
+);
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { playerId } = await params;
-  const leagueEntry = parseLeagueEntryId(playerId);
+  const profile = await resolveProfile(playerId);
 
-  if (!leagueEntry) return { title: 'Player' };
-
-  const profile = buildPlayerProfile(await getGameweekData(), leagueEntry);
-
-  return { title: profile ? profile.player_name : 'Player' };
+  return { title: profile?.player_name ?? 'Player' };
 }
 
 export default async function PlayerStatistics({ params }: PageProps) {
-  const profile = await loadProfile(params);
+  const { playerId } = await params;
+  const profile = await resolveProfile(playerId);
+
+  if (!profile) notFound();
 
   return (
     <div className='w-full space-y-6'>

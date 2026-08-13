@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
 
-import type { PlayerStats } from '@/utils/player-profile';
+import type { PlayerStats } from '@/interfaces/players';
 
 interface PositionStatsCardProps {
   stats: PlayerStats;

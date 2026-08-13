@@ -4,7 +4,7 @@ import { FormGuide } from '@/components/PlayerView/FormGuide';
 import { PositionTrajectory } from '@/components/PlayerView/PositionTrajectory';
 import { PodiumRace } from '@/components/PlayerView/PodiumRace';
 import { GameweekDataResponse } from '@/interfaces/players';
-import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/EmptyState';
 
 export default function PositionPlacedTable({
   data,
@@ -12,13 +12,7 @@ export default function PositionPlacedTable({
   data: GameweekDataResponse;
 }) {
   if (data.players.length === 0) {
-    return (
-      <Card className='w-full border-white/10 bg-[#2a0d33]'>
-        <CardContent className='p-6 text-center text-sm text-white/60'>
-          No position data available yet.
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState>No position data available yet.</EmptyState>;
   }
 
   const playerNames = Object.fromEntries(

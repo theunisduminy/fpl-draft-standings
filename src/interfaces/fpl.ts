@@ -173,6 +173,19 @@ export interface DraftTeam {
   short_name: string;
 }
 
+/**
+ * A playing position, in the order a team sheet is read.
+ *
+ * `UNK` is the fallback for an element the bootstrap cannot resolve, so that
+ * every consumer handles a real member of the union rather than an arbitrary
+ * string. Keeping this closed means a new position is a compile error at every
+ * `Record<Position, …>` — the ordering and the badge colours cannot silently
+ * fall through.
+ */
+export const POSITION_ORDER = ['GKP', 'DEF', 'MID', 'FWD', 'UNK'] as const;
+
+export type Position = (typeof POSITION_ORDER)[number];
+
 /** A playing position. `singular_name_short` is `GKP` / `DEF` / `MID` / `FWD`. */
 export interface DraftElementType {
   id: number;

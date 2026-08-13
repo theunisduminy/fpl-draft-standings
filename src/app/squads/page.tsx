@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { getSquads } from '@/utils/squads';
 import { SquadCard } from '@/components/SquadView/SquadCard';
 import { SkeletonCard } from '@/components/SkeletonTable';
-import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/EmptyState';
 
 export const metadata: Metadata = { title: 'Squads' };
 
@@ -32,11 +32,9 @@ async function Squads() {
 
   if (!drafted) {
     return (
-      <Card className='border-white/10 bg-[#2a0d33]'>
-        <CardContent className='p-6 text-center text-sm text-white/60'>
-          The draft has not run yet. Squads appear here once it does.
-        </CardContent>
-      </Card>
+      <EmptyState>
+        The draft has not run yet. Squads appear here once it does.
+      </EmptyState>
     );
   }
 

@@ -95,8 +95,6 @@ export default function DraftResultsTable({
         subtitle=''
         data={formattedResults}
         columns={draftResultsTableConfig}
-        loading={false}
-        error={null}
         emptyMessage={config.emptyMessage}
         getRowKey={(result) => result.league_entry}
       />
@@ -117,8 +115,6 @@ export default function DraftResultsTable({
         subtitle=''
         data={formattedResults}
         columns={draftResultsTableConfig}
-        loading={false}
-        error={null}
         getRowKey={(result) => result.league_entry}
       />
 

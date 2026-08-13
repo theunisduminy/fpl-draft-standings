@@ -1,7 +1,5 @@
 'use client';
 import React from 'react';
-import { SkeletonCard } from '@/components/SkeletonTable';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
 import {
   Table,
   TableBody,
@@ -33,9 +31,6 @@ export interface BaseTableProps<T> {
   subtitle?: string;
   data: T[];
   columns: TableColumn<T>[];
-  loading: boolean;
-  error: string | null;
-  onRetry?: () => void;
   emptyMessage?: string;
   className?: string;
   tableClassName?: string;
@@ -50,9 +45,6 @@ export function BaseTable<T extends Record<string, any>>({
   subtitle,
   data,
   columns,
-  loading,
-  error,
-  onRetry,
   emptyMessage,
   className = '',
   tableClassName,
@@ -61,12 +53,8 @@ export function BaseTable<T extends Record<string, any>>({
   children,
   getRowKey,
 }: BaseTableProps<T>) {
-  if (loading) return <SkeletonCard />;
-
-  if (error && onRetry) {
-    return <ErrorDisplay message={error} onRetry={onRetry} />;
-  }
-
+  // No loading or error branch: the page owns those now, through its Suspense
+  // boundary and src/app/error.tsx. See agents/FRONTEND.md.
   if (data.length === 0) {
     return (
       <Card className='w-full border-white/10 bg-[#2a0d33]'>

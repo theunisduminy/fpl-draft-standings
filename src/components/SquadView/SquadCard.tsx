@@ -3,14 +3,21 @@ import { Zap } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { Position } from '@/interfaces/fpl';
 import type { Acquisition, Squad, SquadPlayer } from '@/utils/squads';
 
-/** The colour a position gets, everywhere it appears. */
-const POSITION_CLASSES: Record<string, string> = {
+/**
+ * The colour a position gets, everywhere it appears.
+ *
+ * Exhaustive over `Position`, so adding one is a compile error here rather
+ * than an unstyled badge in the UI.
+ */
+const POSITION_CLASSES: Record<Position, string> = {
   GKP: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
   DEF: 'border-[#00edfd]/30 bg-[#00edfd]/10 text-[#00edfd]',
   MID: 'border-[#75fa95]/30 bg-[#75fa95]/10 text-[#75fa95]',
   FWD: 'border-rose-400/30 bg-rose-400/10 text-rose-300',
+  UNK: 'border-white/20 bg-white/5 text-white/60',
 };
 
 export function SquadCard({ squad }: { squad: Squad }) {
@@ -64,10 +71,7 @@ function PlayerRow({ player }: { player: SquadPlayer }) {
     <li className='flex items-center gap-3 py-2'>
       <Badge
         variant='outline'
-        className={`w-11 shrink-0 justify-center border px-0 text-[10px] font-bold ${
-          POSITION_CLASSES[player.position] ??
-          'border-white/20 bg-white/5 text-white/60'
-        }`}
+        className={`w-11 shrink-0 justify-center border px-0 text-[10px] font-bold ${POSITION_CLASSES[player.position]}`}
       >
         {player.position}
       </Badge>

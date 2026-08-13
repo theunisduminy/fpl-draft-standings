@@ -23,8 +23,6 @@ export default function StandingsTable({
       subtitle=''
       data={players}
       columns={standingsTableConfig}
-      loading={false}
-      error={null}
       onRowClick={(player) => router.push(`/players/${player.id}`)}
       emptyMessage={config.emptyMessage}
       className={config.className}
