@@ -54,15 +54,12 @@ right version.
 ## The core boundary: upstream API access is server-only, always
 
 **Rule: the browser never calls `draft.premierleague.com` or `fantasy.premierleague.com`
-directly.** All upstream access flows through server-only modules, and the browser talks
-only to our own `/api/*` routes.
+directly.** All upstream access flows through server-only modules.
 
 ```
-  browser (client components)
-     │  fetch('/api/standings')  ← via apiHelper() / useTableData()
-     ▼
-  src/app/api/**/route.ts        ── shapes the response, owns error contract
-     │
+  app/**/page.tsx                ── async Server Component: reads its own data
+     │                              renders to HTML, passes plain props down
+     │                              client components are leaves, for interaction only
      ▼
   src/utils/gameweek-data.ts     ── the data layer: fetch, score, rank, aggregate
      │                              (in-memory TTL cache + promise dedup)
@@ -73,6 +70,11 @@ only to our own `/api/*` routes.
   draft.premierleague.com  /  fantasy.premierleague.com
 ```
 
+**Pages read their own data.** There is no client-fetch layer any more: no `apiHelper`, no
+`useTableData`, and no `/api/*` route that exists only to feed a component. A page that
+needs the season calls `getGameweekData()` directly and hands the result down as props. An
+`/api/*` route is now only justified by an _external_ consumer.
+
 - **`src/utils/fpl-api.ts` is the single gateway.** It is the only file allowed to contain
   an upstream URL, and the only file that reads `FPL_LEAGUE_ID`. It starts with
   `import 'server-only'`, so it fails the build if pulled into a client bundle.
@@ -82,12 +84,13 @@ only to our own `/api/*` routes.
 
 ### Allowed vs forbidden
 
-| Allowed                                                   | Forbidden                                                                 |
-| --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| A route handler importing `getGameweekData()` or `fplApi` | A client component fetching `draft.premierleague.com` directly            |
-| A client component calling `apiHelper('standings')`       | A client component importing `@/utils/fpl-api` or `@/utils/gameweek-data` |
-| Adding a new endpoint builder to `fplApi`                 | Writing an upstream URL anywhere other than `fpl-api.ts`                  |
-| Reading `process.env.FPL_LEAGUE_ID` inside `fpl-api.ts`   | `NEXT_PUBLIC_FPL_LEAGUE_ID`, or reading the env var anywhere else         |
+| Allowed                                                    | Forbidden                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------- |
+| A route handler importing `getGameweekData()` or `fplApi`  | A client component fetching `draft.premierleague.com` directly            |
+| A Server Component page calling `getGameweekData()`        | A client component importing `@/utils/fpl-api` or `@/utils/gameweek-data` |
+| Passing server-fetched data to a client component as props | Adding an `/api/*` route so a client component can fetch its own data     |
+| Adding a new endpoint builder to `fplApi`                  | Writing an upstream URL anywhere other than `fpl-api.ts`                  |
+| Reading `process.env.FPL_LEAGUE_ID` inside `fpl-api.ts`    | `NEXT_PUBLIC_FPL_LEAGUE_ID`, or reading the env var anywhere else         |
 
 ### The database half of the boundary
 
@@ -137,6 +140,29 @@ specific behaviours have already caused real bugs in this repo:
 All of it, with observed payloads, is in [API.md](./API.md). When you add an endpoint,
 document it there in the same change.
 
+### Never type an FPL identifier as `number`
+
+Three different integers flow through this app, and two of them are in the same range:
+
+| Type            | Upstream field              | Addresses                                                  |
+| --------------- | --------------------------- | ---------------------------------------------------------- |
+| `LeagueEntryId` | `league_entries[].id`       | a manager in this league — **our player ID**               |
+| `EntryId`       | `league_entries[].entry_id` | a team — `/api/entry/{id}/…`, and `element_status[].owner` |
+| `ElementId`     | `elements[].id`             | a footballer                                               |
+
+They are branded types in [`src/interfaces/fpl.ts`](../src/interfaces/fpl.ts), erased at
+runtime. **Use them; never widen one back to `number`.** Every way of confusing these fails
+_silently_ — the wrong ID finds no match and renders "Unknown", or 404s and makes a whole
+gameweek vanish from the season. The brands turn all of that into a compile error.
+
+Numbers entering from outside the type system get branded exactly once, at the boundary:
+`asLeagueEntryId()` for a database column or an upstream payload, `parseLeagueEntryId()` for
+anything a user supplied (a route param, a query string) — it rejects `"39837-nonsense"`,
+which `parseInt` reads as `39837`.
+
+**`ElementId` is only valid against the API it came from.** The draft and classic bootstraps
+disagree on about 21 of their 581 elements.
+
 ### Never trust a truthy check on an upstream collection
 
 Upstream returns `{}` and `[]` for "nothing yet" and 404s for "not applicable", often in the
@@ -148,20 +174,26 @@ awards points.
 
 ## File conventions
 
-- **Everything lives under `src/`.** `src/app` (routes), `src/components`, `src/hooks`,
+- **Everything lives under `src/`.** `src/app` (routes), `src/components`,
   `src/interfaces`, `src/lib`, `src/utils`. `public/` and config files stay at the repo root.
 - **The `@/` alias points at `src/`** (`tsconfig.json` → `"@/*": ["./src/*"]`). Use it for
   every cross-directory import; relative imports are for siblings only.
 - **API routes** live at `src/app/api/<name>/route.ts`, export `GET`, and return
-  `{ error, message }` with a 500 on failure — `apiHelper()` detects the `error` key.
+  `{ error, message }` with a 500 on failure. Add one only for an _external_ consumer — a
+  page must never fetch its own data over HTTP.
 - **Shared types** live in `src/interfaces/`. **Pure helpers and the FPL scoring layer** live
   in `src/utils/`. **`cn`** lives in `src/lib/utils.ts`.
 - **Server-only code lives under `src/server/`** — `db/` (client + Drizzle schema), `data/`
   (the DAL, one module per domain), `actions/` (Server Actions), `auth/` (session and the
   allowlist). Every file there starts with `import 'server-only'`.
-- **New pages should read their own data** as `async` Server Components calling the DAL or
-  `getGameweekData()` directly. `src/app/profile/page.tsx` is the pattern; the older pages
-  still client-fetch and are being converted.
+- **Pages read their own data** as `async` Server Components calling the DAL or
+  `getGameweekData()` directly. Every page now follows this; `src/app/page.tsx` is the
+  pattern, including where to put the Suspense boundary.
+- **Put the Suspense boundary inside the page, not in a `loading.tsx`.** A `loading.tsx`
+  creates a boundary for its segment _and every route beneath it_; flushing that shell
+  commits the HTTP status before the page has decided whether it is a 404, so `notFound()`
+  renders the right page with a **200**. An in-page `<Suspense>` around the data-dependent
+  subtree streams just the same and leaves routes that can 404 alone.
 - **UI primitives** from shadcn/ui live in `src/components/ui/` — use these before building
   anything custom (see [FRONTEND.md](./FRONTEND.md)).
 - **Feature components** are grouped by view: `TableView/`, `PlayerView/`, `RumblerView/`,
@@ -258,7 +290,7 @@ Port 3000 is frequently taken by another project on this machine — a `307 → 
 **`rm -rf .next` before trusting any data-shape debugging.** Next persists its fetch cache
 across builds and will happily serve you last season's payload.
 
-`pnpm lint` currently reports **0 errors and ~29 warnings**. The warnings are a known,
+`pnpm lint` currently reports **0 errors and 4 warnings**. The warnings are a known,
 pre-existing backlog — see below. Do not add to them.
 
 ---
@@ -281,11 +313,15 @@ pre-existing backlog — see below. Do not add to them.
 the Next 16 / React 19 upgrade that surfaced them. They are a backlog to work off. Fix the
 violations, then promote the rule back to `error` in `eslint.config.mjs`.
 
-| Rule                                 | Count | What it means here                                                                                |
-| ------------------------------------ | ----- | ------------------------------------------------------------------------------------------------- |
-| `@typescript-eslint/no-explicit-any` | ~26   | Untyped upstream payloads. Fix by typing the shapes in [API.md](./API.md) into `src/interfaces/`. |
-| `react-hooks/set-state-in-effect`    | 2     | Client-side data fetching in `useEffect`. Dissolves with the Server Components refactor.          |
-| `react-hooks/exhaustive-deps`        | 1     | The deliberate dependency escape hatch in `use-table-data.ts`.                                    |
+| Rule                                 | Count | What it means here                                                             |
+| ------------------------------------ | ----- | ------------------------------------------------------------------------------ |
+| `@typescript-eslint/no-explicit-any` | 3     | Recharts tooltip/label payloads, and the generic row type in `base-table.tsx`. |
+| `import/no-anonymous-default-export` | 1     | `eslint.config.mjs` exporting its config array inline.                         |
+
+The `react-hooks` warnings are gone: `set-state-in-effect` and `exhaustive-deps` both came
+from client-side data fetching, which the Server Components refactor removed outright. The
+`no-explicit-any` count fell from ~26 to 3 when the upstream payloads were typed into
+[`src/interfaces/fpl.ts`](../src/interfaces/fpl.ts).
 
 Two further known defects, both pre-existing and neither yet fixed:
 
@@ -293,8 +329,14 @@ Two further known defects, both pre-existing and neither yet fixed:
   on `<html>`, but no theme entry maps `font-inter` to it, so the app renders in the default
   sans stack. Deliberately left alone during the Tailwind 4 migration to avoid changing
   typography; fold it into the design refresh.
-- **Four routes are unused** by any component: `/api/current-event`, `/api/pl-teams`,
-  `/api/pl-fixtures`, `/api/matches`. Keep or delete deliberately.
+- **Four routes have no consumer**: `/api/current-event`, `/api/pl-teams`,
+  `/api/pl-fixtures`, `/api/matches`. Now that pages read their own data, an `/api/*` route
+  is only justified by an external consumer — decide whether these have one, or delete them.
+  (`/api/standings`, `/api/gameweek-data`, `/api/rumbler` and `/api/player/[id]` were
+  deleted with the Server Components refactor; `/api/auth/[...path]` is Neon Auth's and
+  stays.)
+- **Four components are defined but never imported**: `MatchOddsCard`, `GameweekScoreChart`,
+  `GameweekSummaryCard`, `StreaksTracker`. Same decision, deliberately deferred.
 
 And one piece of production configuration still outstanding:
 

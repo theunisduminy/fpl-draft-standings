@@ -11,13 +11,18 @@ patterns. Where the two conflict, `AGENTS.md` wins.
 
 ## The one boundary rule for frontend
 
-**A client component never imports `@/utils/fpl-api` or `@/utils/gameweek-data`.** Data
-comes from our own `/api/*` routes via `useTableData()`. `fpl-api.ts` is marked
-`server-only`, so violating this fails the build rather than leaking into the bundle.
+**A client component never imports `@/utils/fpl-api` or `@/utils/gameweek-data`.**
+`fpl-api.ts` is marked `server-only`, so violating this fails the build rather than leaking
+into the bundle.
 
-When the Server Components refactor lands, reads move into `async` page components calling
-`getGameweekData()` directly — that will be the sanctioned server-side import, and client
-components will receive data as props.
+**Reads happen in the page.** An `async` Server Component calls `getGameweekData()` or the
+DAL and passes plain, serialisable data down. Client components are **leaves**: they own
+interaction — tab state, the gameweek selector, chart rendering — and nothing else. If you
+find yourself wanting a fetch inside a component, the data belongs one level up, as a prop.
+
+`'use client'` is a cost, so push it down. `StandingsTabs` is client (tab state) while
+`PositionPlacedTable` beneath it is not; the marker goes on the smallest subtree that
+genuinely needs the browser.
 
 ---
 
@@ -80,11 +85,17 @@ one-file change.
 
 ## Loading and error states
 
-- **Loading → `SkeletonCard` / `SkeletonStats`** from `src/components/SkeletonTable.tsx`.
-  Never a bare spinner, never a layout-shifting `null`.
-- **Error → `ErrorDisplay`** with `message` and, wherever a refetch exists, `onRetry`.
-  `useTableData` returns `refetch` for exactly this. An error the user cannot retry is a
-  dead end.
+These are **route-level** concerns now, not component state. A component that receives its
+data as a prop has no loading state and no error state to render.
+
+- **Loading → an in-page `<Suspense>`** with `SkeletonCard` / `SkeletonStats` from
+  `src/components/SkeletonTable.tsx` as the fallback. Never a bare spinner, never a
+  layout-shifting `null`. Put the boundary **in the page, not in a `loading.tsx`** — see
+  [`AGENTS.md`](./AGENTS.md#file-conventions) for why that breaks 404 status codes.
+- **Error → `src/app/error.tsx`**, which renders `ErrorDisplay` and wires `onRetry` to
+  Next's `reset()`, re-rendering the segment on the server. A page throws; it does not
+  catch.
+- **Missing → `notFound()`**, which renders `src/app/not-found.tsx` with a real 404.
 - **Empty is not an error.** Pre-season the API legitimately returns zero gameweeks. Empty
   states say what is happening ("No gameweeks played yet"), not "Something went wrong".
 
@@ -134,8 +145,7 @@ one-file change.
 - **Domain words are fixed**: _rumbler_ (last place in a gameweek), _F1 score_, _entry_,
   _gameweek_. Don't invent synonyms.
 - **Files:** components are `PascalCase.tsx`; shared primitives and configs are
-  `kebab-case.tsx` (`base-table.tsx`, `table-configs.tsx`, `use-table-data.ts`). Match the
-  folder you are in.
+  `kebab-case.tsx` (`base-table.tsx`, `table-configs.tsx`). Match the folder you are in.
 
 ---
 

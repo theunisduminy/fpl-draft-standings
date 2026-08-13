@@ -1,6 +1,6 @@
 ---
 name: Better Draft
-last_updated: 2026-08-12
+last_updated: 2026-08-13
 ---
 
 # Better Draft Strategy
@@ -74,23 +74,23 @@ signals that actually indicate the app is working.
 
 ## Tracks
 
-### Server Components refactor
+### Server Components refactor — **done**
 
-Every page currently fetches on the client inside a `useEffect`, so every visit starts with
-a spinner and no page server-renders real content. Move reads into `async` Server
-Components calling `getGameweekData()` directly, retiring `use-table-data.ts` and
-`apiHelper.ts`.
+Every page now reads its own data in an `async` Server Component calling
+`getGameweekData()` directly. `use-table-data.ts`, `apiHelper.ts`, `fetchWithDelay.ts` and
+four `/api/*` routes are gone; the HTML ships with the content in it, `/` makes one read
+instead of two overlapping browser fetches, and the `react-hooks` warnings cleared with it.
 
-_Why it serves the approach:_ cold-load time is a key metric, and this is the largest single
-lever on it. It also clears the `set-state-in-effect` warnings noted in
-[`AGENTS.md`](./AGENTS.md#known-issues-the-warning-backlog).
+### Type the FPL API properly — **done**
 
-### Type the FPL API properly
+League details, event status, live elements and picks now have real interfaces in
+`src/interfaces/fpl.ts`, built from the shapes captured in [`API.md`](./API.md). The `any`
+count fell from ~26 to 3.
 
-Replace the ~27 `any`s with real interfaces for league details, event status, live elements
-and picks, built from the observed shapes captured in [`API.md`](./API.md).
+The part worth keeping in mind: the three FPL identifiers (`LeagueEntryId`, `EntryId`,
+`ElementId`) are **branded**, so the compiler rejects mixing them.
 
-_Why it serves the approach:_ the two worst bugs this codebase has had — a fabricated
+_Why it served the approach:_ the two worst bugs this codebase has had — a fabricated
 700-point standings table and a crash on a bare-string 404 — were both shape bugs at the
 upstream boundary. Types are the cheapest insurance available.
 

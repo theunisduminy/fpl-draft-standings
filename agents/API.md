@@ -1,12 +1,12 @@
 ---
 name: Better Draft — API reference
-last_updated: 2026-08-12
+last_updated: 2026-08-13
 ---
 
 # API.md — Every API We Call, and What Comes Back
 
 Supporting reference doc, read on demand. This is the contract sheet for the two
-Premier League APIs this app reads and the eight routes it exposes. If you are about
+Premier League APIs this app reads and the few routes it still exposes. If you are about
 to `fetch()` anything, read the relevant section first — several of these endpoints
 behave in ways the field names do not suggest.
 
@@ -49,8 +49,12 @@ the request that needs it, not `next build`.
 
 Most of the surprises below come from one fact: **these APIs change shape between
 seasons, and several of them 404 rather than returning an empty result.** At the time
-of writing (2026-08-12) the 2026/27 season has not kicked off — GW1 deadline is
-`2026-08-21T17:30:00Z`.
+of writing (2026-08-13) the draft is done but the 2026/27 season has not kicked off —
+GW1 deadline is `2026-08-21T17:30:00Z`.
+
+**The draft completing does not change any of this.** Squads exist, but `event-status`
+still 404s, `entry/{id}/event/1` still 404s, and `standings` is still `[]`. The only thing
+that flipped is ownership, which lives on a different endpoint (`element-status`).
 
 | Endpoint                     | In season | Pre-season                                            |
 | ---------------------------- | --------- | ----------------------------------------------------- |
@@ -149,10 +153,10 @@ leagues** — `matches`.
 ```json
 {
   "admin_entry": 39780,
-  "closed": false,
-  "draft_dt": "2026-08-12T18:30:00Z",
+  "closed": true,
+  "draft_dt": "2026-08-12T19:00:00Z",
   "draft_pick_time_limit": 90,
-  "draft_status": "pre",
+  "draft_status": "post",
   "draft_tz_show": "Europe/Berlin",
   "id": 8337,
   "ko_rounds": 0,
@@ -164,17 +168,26 @@ leagues** — `matches`.
   "start_event": 1,
   "stop_event": 38,
   "trades": "y",
-  "transaction_mode": "not-drafted",
+  "transaction_mode": "waivers",
   "variety": "x",
   "drafts": [
     {
       "id": 8911,
-      "draft_started": false,
-      "draft_completed": null,
-      "draft_dt": "2026-08-12T18:30:00Z",
+      "draft_started": true,
+      "draft_completed": "2026-08-12T19:56:25.910800Z",
+      "draft_dt": "2026-08-12T19:00:00Z",
       "event": 1,
       "league": 8337,
-      "order_method": "rank"
+      "order_method": "random"
+    },
+    {
+      "id": 32922,
+      "draft_started": false,
+      "draft_completed": null,
+      "draft_dt": "2027-02-03T20:00:00Z",
+      "event": 24,
+      "league": 8337,
+      "order_method": "random"
     }
   ],
   "is_renewed": true
@@ -182,20 +195,24 @@ leagues** — `matches`.
 ```
 
 - `scoring`: `"c"` classic (total points) or `"h"` head-to-head. Ours is classic.
-- `draft_status`: `"pre"` before the draft, so an empty `standings` here is normal.
+- `draft_status`: `"pre"` → `"post"` once the draft completes. **An empty `standings` is
+  still normal afterwards** — that tracks the season, not the draft.
+- `transaction_mode` flips `"not-drafted"` → `"waivers"` at the same moment.
+- **`drafts` is a list.** There is a mid-season draft too (GW24, 2027-02-03). Do not assume
+  one element, and do not assume `drafts[0]` is the one you want.
 
 **`league_entries`** — one row per manager. **This is the identity table for the app.**
 
 ```json
 {
   "entry_id": 39781,
-  "entry_name": "Frankly Speaking",
+  "entry_name": "DeZerbi To Win",
   "id": 39837,
-  "joined_time": "2026-08-04T12:01:47.067995Z",
+  "joined_time": "2026-08-05T10:23:19.708629Z",
   "player_first_name": "Theunis",
   "player_last_name": "Duminy",
   "short_name": "TD",
-  "waiver_pick": null
+  "waiver_pick": 7
 }
 ```
 
@@ -203,12 +220,16 @@ leagues** — `matches`.
 > **`id` and `entry_id` are different numbers and are not interchangeable.**
 >
 > - `id` is the **league entry** ID (39837). It is what `standings[].league_entry`
->   references and what this app uses as its player ID throughout — including in the
->   `/api/player/[id]` route and every `PlayerDetails.id`.
+>   references and what this app uses as its player ID throughout — the
+>   `/players/[playerId]` URL, every `PlayerDetails.id`, the `league_entry` column.
 > - `entry_id` is the **team** ID (39781). It is what you put in `/api/entry/{...}/...`
->   URLs.
+>   URLs, and what `element_status[].owner` gives you back.
 >
 > Passing one where the other belongs returns a 404 or, worse, another league's data.
+>
+> In code they are the branded types `LeagueEntryId` and `EntryId`
+> ([`src/interfaces/fpl.ts`](../src/interfaces/fpl.ts)), so the compiler rejects the swap.
+> Never widen them back to `number`.
 
 **`standings`** — the league table. `[]` before the season starts.
 
@@ -251,24 +272,68 @@ The app reads `picks[]`, using `pick.position` (1–11 are starters, 12–15 ben
   `fetchGameweekBatch` catches this and substitutes `{ picks: [] }` — which is why the
   empty-`elements` guard matters so much.
 
-> _Unverified pre-season_ — 404 today. Confirm the full pick shape after GW1.
+> _Still 404 as of 2026-08-13_, the day after the draft — the endpoint stays unavailable
+> until GW1 is actually played, not merely until squads exist. **To read a squad before the
+> season starts, use `element-status` instead.** Confirm the full pick shape after GW1.
+
+### `GET /api/league/{leagueId}/element-status`
+
+**Current ownership** — the reliable way to ask "whose squad is this player in?", both
+before GW1 and all season, because it reflects trades and waivers rather than just the
+draft.
+
+Verified 2026-08-13: 581 elements, 120 owned (15 each across 8 entries), 461 free agents.
+
+```json
+{ "element": 414, "owner": null, "status": "a", "in_accepted_trade": false }
+```
+
+- `status` is `"a"` (available) or `"o"` (owned).
+- **`owner` is an `entry_id`** (39781), **not** a `league_entries[].id` (39837). This is the
+  third place in the API where the two collide, and the one most likely to be got wrong,
+  because `owner` reads like a person. It is typed `EntryId`.
+
+### `GET /api/draft/{leagueId}/choices`
+
+The draft itself: 120 rows over 15 rounds, in pick order. Each carries `element`, `entry`
+(an **`entry_id`**), `round`, `pick`, `index`, `seconds_to_pick` and `was_auto`.
+
+A historical record — it does **not** track later trades or waivers, so it is the wrong
+source for "who owns X now". Good for a draft-recap view.
+
+### `GET /api/bootstrap-static` (draft)
+
+The draft game's own static dataset: `elements`, `teams`, `element_types`, `events`,
+`fixtures`, `settings`, `element_stats`.
+
+> [!IMPORTANT]
+> **No trailing slash** — `/api/bootstrap-static/` 404s here. This is the exact inverse of
+> the classic API, which 301s without one.
+
+> [!WARNING]
+> **Element IDs are not portable between the two APIs.** Both return 581 elements over the
+> same ID range and 560 agree — but the rest do not. Element 554 is Tzolis on the draft API
+> and Van Oevelen on the classic one; 555, 556, 557 and 558 likewise disagree. The
+> divergence is in the tail, where late additions were numbered independently.
+>
+> Anything holding a draft element (`picks[].element`, `element_status[].element`,
+> `choices[].element`, the keys of `event/{gw}/live`) **must** be resolved against this
+> endpoint, never against `fantasy.premierleague.com/api/bootstrap-static/`. Getting it
+> wrong mislabels roughly 4% of players and nothing errors.
+>
+> `ElementId` is branded, but a brand cannot tell you which API a number came from — this
+> one is on you.
 
 ### Endpoints we do not currently call
 
 Probed and working, listed here so nobody has to rediscover them:
 
-| Endpoint                                | Returns                                                                          |
-| --------------------------------------- | -------------------------------------------------------------------------------- |
-| `/api/entry/{entryId}/public`           | `{ entry: { name, player_first_name, favourite_team, league_set, … } }`          |
-| `/api/entry/{entryId}/history`          | `{ history: [], entry: {…} }` — per-gameweek history                             |
-| `/api/league/{leagueId}/element-status` | Ownership per element: `{ element, owner, status, in_accepted_trade }`           |
-| `/api/draft/{leagueId}/choices`         | Draft picks: `{ choices, idle, element_status }`                                 |
-| `/api/draft/league/{leagueId}/trades`   | `{ trades: [] }`                                                                 |
-| `/api/bootstrap-static`                 | Draft-flavoured static data — `elements` carry **last season's** aggregate stats |
-| `/api/watchlist/{leagueId}`             | **403** — needs authentication, unusable                                         |
-
-`element-status` and `choices` are the natural sources for a draft-results or
-ownership view.
+| Endpoint                              | Returns                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| `/api/entry/{entryId}/public`         | `{ entry: { name, player_first_name, favourite_team, league_set, … } }` |
+| `/api/entry/{entryId}/history`        | `{ history: [], entry: {…} }` — per-gameweek history                    |
+| `/api/draft/league/{leagueId}/trades` | `{ trades: [] }`                                                        |
+| `/api/watchlist/{leagueId}`           | **403** — needs authentication, unusable                                |
 
 ---
 
@@ -334,29 +399,24 @@ All 380 fixtures. Served by `/api/pl-fixtures`.
 
 ## Our own routes (`src/app/api/**`)
 
-All eight are `GET`-only and dynamic. Client components reach them through
-`apiHelper()` → `fetchWithDelay()` → `useTableData()`.
+**Pages do not use these.** Every page is an `async` Server Component calling
+`getGameweekData()` or the DAL directly, so an `/api/*` route now exists only for an
+external consumer. `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and
+`/api/player/[id]` were deleted when the pages stopped needing them.
 
-| Route                | Returns                                   | Backed by                   |
-| -------------------- | ----------------------------------------- | --------------------------- |
-| `/api/standings`     | `PlayerDetails[]`, F1-ranked              | `getGameweekData().players` |
-| `/api/gameweek-data` | The whole `GameweekDataResponse`          | `getGameweekData()`         |
-| `/api/matches`       | `GameweekPerformance[]`                   | `.gameweekPerformances`     |
-| `/api/rumbler`       | `RumblerGameweekData[]`, newest first     | `.rumblerData`              |
-| `/api/player/[id]`   | One player + computed stats + performance | `getGameweekData()`         |
-| `/api/current-event` | `GameWeekStatus \| null`                  | Draft `event-status`        |
-| `/api/pl-teams`      | The 20 `teams`                            | Classic `bootstrap-static`  |
-| `/api/pl-fixtures`   | All 380 fixtures                          | Classic `fixtures`          |
+| Route                 | Returns                  | Backed by                  |
+| --------------------- | ------------------------ | -------------------------- |
+| `/api/auth/[...path]` | Neon Auth's own handler  | `auth.handler()`           |
+| `/api/matches`        | `GameweekPerformance[]`  | `.gameweekPerformances`    |
+| `/api/current-event`  | `GameWeekStatus \| null` | Draft `event-status`       |
+| `/api/pl-teams`       | The 20 `teams`           | Classic `bootstrap-static` |
+| `/api/pl-fixtures`    | All 380 fixtures         | Classic `fixtures`         |
 
-`/api/player/[id]` takes a **league entry `id`** (e.g. 39837), not an `entry_id`.
+Errors are uniform — `{ error, message }` with a 500.
 
-Errors are uniform — `{ error, message }` with a 500 — and `apiHelper()` detects the
-`error` key and throws, so a failed upstream call surfaces in the UI rather than
-rendering as empty data.
-
-> **Currently unused by any component:** `/api/current-event`, `/api/pl-teams`,
-> `/api/pl-fixtures`, `/api/matches`. They are exercised only by the Bruno collection.
-> Keep or delete deliberately — do not assume they are load-bearing.
+> **No consumer:** `/api/matches`, `/api/current-event`, `/api/pl-teams`,
+> `/api/pl-fixtures`. They are exercised only by the Bruno collection. Keep or delete
+> deliberately — do not assume they are load-bearing.
 
 ### Pre-season responses
 
@@ -364,6 +424,9 @@ With no gameweeks played, the pipeline returns a valid empty season rather than
 failing: all 8 entries present with `f1_score: 0`, `total_points: 0` and zeroed
 `position_placed`; `gameweekPerformances: []`; `rumblerData: []`;
 `completedGameweeks: []`; `currentGameweek: 0`; and `/api/current-event` → `null`.
+
+The pages render that state as content, not as an error: standings list all eight managers
+on zero, and results and rumblers show their empty-state copy.
 
 ---
 

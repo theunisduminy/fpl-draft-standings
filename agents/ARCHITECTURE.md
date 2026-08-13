@@ -1,6 +1,6 @@
 ---
 name: Better Draft — Architecture
-last_updated: 2026-08-12
+last_updated: 2026-08-13
 ---
 
 # Architecture
@@ -38,6 +38,7 @@ The product surface:
 - `/` — the standings table (F1 scoring) and position distribution
 - `/results` — per-gameweek results, charts and detail views
 - `/rumblers` — the last-place hall of shame
+- `/squads` — who owns whom, with the draft round each player went in
 - `/players/[playerId]` — one manager's season: performance, positions, form
 - `/profile` — claim which manager you are (members only)
 
@@ -58,7 +59,7 @@ connection string is a real credential, and it must never reach the browser.
 ```
 ┌──────────────────────────── browser ─────────────────────────────┐
 │  React client components ('use client')                          │
-│     • useTableData() → fetchWithDelay() → apiHelper()            │
+│     • leaves only: receive data as props, never fetch it         │
 │     • @/lib/auth/client  → sign in/out only, never data          │
 │     • NEVER imports @/server/** or @/utils/{fpl-api,gameweek-data}│
 │       → enforced by `import 'server-only'`                       │
@@ -96,23 +97,32 @@ Full rules, and the allowed/forbidden table:
 
 ## 3. Request lifecycle
 
-Every data-bearing page follows the same path today:
+Every data-bearing page follows the same path:
 
-1. **A page renders** as a client component and mounts a table or chart.
-2. **`useTableData({ endpoints })`** (`src/hooks/use-table-data.ts`) fires in a `useEffect`,
-   calling `fetchWithDelay()` → `apiHelper()` → `fetch('/api/<endpoint>')`.
-3. **The route handler** (`src/app/api/<name>/route.ts`) calls `getGameweekData()` and
-   returns a slice of it. On failure it returns `{ error, message }` with a 500.
-4. **`getGameweekData()`** checks the in-memory TTL cache, then the in-flight promise, then
-   does the work: league details + event status, then per-gameweek live data and picks,
-   then scoring, ranking and aggregation.
-5. **`apiHelper()`** inspects the parsed body for an `error` key and throws, so upstream
-   failures surface as an error state rather than an empty table.
+1. **The page shell renders immediately** — heading and layout, no data needed. The
+   data-dependent subtree sits behind an in-page `<Suspense>`, so the response starts
+   streaming at once.
+2. **An `async` child Server Component calls `getGameweekData()`** (or the DAL) directly.
+   No HTTP hop, no serialisation of a request we are already inside.
+3. **`getGameweekData()`** checks the in-memory TTL cache, then the in-flight promise, then
+   does the work: league details + event status, then whichever finished gameweeks are not
+   already in Postgres, then scoring, ranking and aggregation.
+4. **The result is passed down as plain props.** Client components are leaves that own
+   interaction only — tab state, the gameweek selector, chart rendering.
+5. **Failures land on the boundaries**, not in component state: a throw hits
+   `src/app/error.tsx`, and `notFound()` hits `src/app/not-found.tsx` with a real 404.
 
-> **This is the shape we are moving away from.** Every read is a client fetch in an effect,
-> which means a spinner on every page load and no server rendering of real content. The
-> Server Components refactor in [`STRATEGY.md`](./STRATEGY.md#tracks) replaces steps 1–3
-> with an `async` page calling `getGameweekData()` directly.
+Two consequences worth stating outright:
+
+- **The HTML contains the content.** View source on `/` and the eight managers are there.
+- **One read per page.** `/` previously issued two overlapping browser fetches
+  (`/api/standings` and `/api/gameweek-data`); both trees now render from a single object.
+
+> **Where the Suspense boundary goes matters.** It belongs _inside the page_, not in a
+> `loading.tsx`. A `loading.tsx` creates a boundary for its segment and everything beneath
+> it, and flushing that shell commits the HTTP status before the page has decided whether
+> it is a 404 — so `/players/99999` renders the not-found page with a **200**. Verified
+> against Next 16.3.0.
 
 ---
 
@@ -139,12 +149,15 @@ Every data-bearing page follows the same path today:
     │   ├── results/           /results
     │   ├── rumblers/          /rumblers
     │   ├── players/[playerId]/  /players/:id
-    │   └── api/               8 GET route handlers (see API.md)
+    │   ├── error.tsx          route-level error boundary (retry re-renders on the server)
+    │   ├── not-found.tsx      404 page — reached via notFound()
+    │   └── api/               Neon Auth + 4 consumer-less GET handlers (see API.md)
     ├── components/
     │   ├── ui/                shadcn primitives — chart.tsx is the recharts wrapper
     │   ├── TableView/         standings, draft results, position tables, base-table
     │   ├── PlayerView/        per-player charts, summary, form guide
     │   ├── RumblerView/       rumbler cards, dashboard, frequency chart
+    │   ├── SquadView/         squad card (pure server, no client JS)
     │   ├── Layout/            HeaderNav, MobileNav, Footer
     │   └── DetailView/        gameweek summary, score chart, match odds
     ├── server/                ★ server-only. Never imported by a client component.
@@ -159,18 +172,19 @@ Every data-bearing page follows the same path today:
     │   │   └── profile.ts
     │   └── auth/
     │       └── server.ts      ★ session + league_members gate
-    ├── hooks/
-    │   └── use-table-data.ts  ★ the client-fetch hook every view uses
-    ├── interfaces/            players.ts, match.ts, standings.ts
+    ├── interfaces/
+    │   ├── fpl.ts             ★ branded IDs + upstream payload shapes
+    │   └── players.ts, match.ts, standings.ts
     ├── lib/
     │   ├── utils.ts           cn()
     │   └── auth/client.ts     browser auth client (sign in/out only)
     └── utils/
         ├── fpl-api.ts         ★ server-only. Upstream URLs + FPL_LEAGUE_ID. The gateway.
         ├── gameweek-data.ts   ★ the data layer: fetch, score, rank, aggregate, cache
+        ├── league.ts          fetchLeagueDetails — the typed league read
+        ├── squads.ts          ownership + draft provenance, joined
+        ├── player-profile.ts  one manager's season, derived (pure)
         ├── cache.ts           in-memory TTL Map
-        ├── apiHelper.ts       client-side fetch wrapper + error detection
-        ├── fetchWithDelay.ts  parallel multi-endpoint fetch
         ├── formatMatches.ts   (head-to-head only — currently unused)
         ├── lossBlurb.ts       rumbler banter strings
         └── tailwindVars.ts    colour constants for charts
@@ -264,9 +278,13 @@ table above are the tables in `public`; every other row still reads live.
 ### Everything persisted is scoped by league
 
 A league id **is** a season id. A renewed league gets a new id, and its
-`league_entries[].id` and `entry_id` values are minted fresh alongside it — ours were all
-created in one sequential block the day the league formed, and both previous league ids now
+`league_entries[].id` and `entry_id` values are minted fresh alongside it — most of ours
+were issued in one block the day the league formed, and both previous league ids now
 return 404.
+
+Note the ids are not even contiguous _within_ a season: a late joiner has league entry
+`40460` against everyone else's `39836`–`39842`. Never infer anything from an id's value —
+not order, not membership, not adjacency.
 
 So `league_id` is part of the key on every persisted table:
 
@@ -339,13 +357,9 @@ integrity cost of leaving it off is nil.
 
 Tracked in [`STRATEGY.md`](./STRATEGY.md#tracks).
 
-- **Server Components for the public pages.** `/profile` is the only page reading its own
-  data today; the standings, results and rumbler pages still client-fetch through
-  `use-table-data.ts`. Converting them retires that hook, `apiHelper.ts`, most of the
-  `/api/*` routes, and the remaining `set-state-in-effect` warnings. **`/profile` is the
-  pattern to copy.**
-- **Typed upstream payloads.** `src/interfaces/` grows real types for league details,
-  event status, live elements and picks, retiring ~26 `any`s.
+- ~~**Server Components for the public pages.**~~ Done — every page reads its own data.
+- ~~**Typed upstream payloads.**~~ Done — `src/interfaces/fpl.ts`.
+- ~~**Squads.**~~ Done — `/squads`, from `element-status` joined to the draft choices.
 - **Weekly bets.** The reason profiles exist. Needs a `bets` table (proposer, opponent,
   gameweek, stake/wager text, outcome) and a resolution flow. Profiles and the
   server-action write path are the foundation; the UX is still loosely specified.
