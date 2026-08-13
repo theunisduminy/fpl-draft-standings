@@ -41,6 +41,20 @@ export function cachedRead<T>(
   ttlSeconds: number,
   compute: () => Promise<T>,
 ): () => Promise<T> {
+  // Both caches are keyed on `key` alone, not on anything derived from
+  // `compute`, so editing the computation does **not** invalidate them. In
+  // production that is exactly right — the same code runs for the whole TTL.
+  // In development it means an edit to the data layer is invisible until the
+  // window expires or `.next` is deleted, which cost real debugging time here:
+  // a fix to `total_points` looked like it had not worked, because the cache
+  // was replaying a value computed before it.
+  //
+  // So development recomputes every time. A cold read is ~2s locally, which is
+  // a fair price for "the code I just wrote is the code that runs".
+  if (process.env.NODE_ENV !== 'production') {
+    return compute;
+  }
+
   const readShared = unstable_cache(compute, [key], {
     revalidate: ttlSeconds,
     tags: [key],
