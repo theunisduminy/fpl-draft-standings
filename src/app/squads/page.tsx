@@ -3,7 +3,9 @@ import type { Metadata } from 'next';
 
 import { getSquads } from '@/utils/squads';
 import { SquadCard } from '@/components/SquadView/SquadCard';
-import { SkeletonCard } from '@/components/SkeletonTable';
+import { SquadsSkeleton } from '@/components/SquadView/SquadsSkeleton';
+import { SkeletonRegion } from '@/components/SkeletonRegion';
+import { PageShell } from '@/components/Layout/PageShell';
 import { EmptyState } from '@/components/EmptyState';
 
 export const metadata: Metadata = { title: 'Squads' };
@@ -11,19 +13,20 @@ export const metadata: Metadata = { title: 'Squads' };
 // Reads live upstream data, so it is never prerendered.
 export const dynamic = 'force-dynamic';
 
-// The boundary is in the page, not a `loading.tsx` — see `src/app/page.tsx`.
+// Heading above the boundary, skeleton below — see `src/app/(home)/page.tsx`.
 export default function SquadsPage() {
   return (
-    <div className='w-full space-y-6'>
-      <div className='space-y-1'>
-        <h1 className='text-2xl font-bold text-white md:text-3xl'>Squads</h1>
-        <p className='text-sm text-white/60'>Who drafted whom</p>
-      </div>
-
-      <Suspense fallback={<SkeletonCard />}>
+    <PageShell title='Squads' subtitle='Who drafted whom'>
+      <Suspense
+        fallback={
+          <SkeletonRegion>
+            <SquadsSkeleton />
+          </SkeletonRegion>
+        }
+      >
         <Squads />
       </Suspense>
-    </div>
+    </PageShell>
   );
 }
 

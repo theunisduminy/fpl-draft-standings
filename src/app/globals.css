@@ -167,3 +167,27 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* The 200ms hold is the point: a read that resolves inside it shows no skeleton
+   at all, so a fast page never flashes grey. Only a route `loading.tsx` gets
+   this — see SkeletonRegion for why an in-page fallback must not. */
+@keyframes skeleton-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.skeleton-reveal {
+  animation: skeleton-reveal 150ms ease-out 200ms both;
+}
+
+/* The delay suppresses the flash, so it survives; only the fade itself is
+   motion, and that collapses to effectively instant. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-reveal {
+    animation-duration: 1ms;
+  }
+}
