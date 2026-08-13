@@ -272,6 +272,13 @@ The app reads `picks[]`, using `pick.position` (1–11 are starters, 12–15 ben
   `fetchGameweekBatch` catches this and substitutes `{ picks: [] }` — which is why the
   empty-`elements` guard matters so much.
 
+Two callers, for opposite purposes. `fetchGameweekBatch` reads all eight entries for a
+gameweek to score it. `getGameweekSquad` (`src/utils/gameweek-squad.ts`) reads one entry
+for one gameweek, joined against the live feed and the draft bootstrap, to show a team
+sheet in the results drawer — a historical question, which is why it uses picks rather
+than `element-status` the way the squads page does. It treats the 404 as "no team sheet",
+which is an empty state, not an error.
+
 > _Still 404 as of 2026-08-13_, the day after the draft — the endpoint stays unavailable
 > until GW1 is actually played, not merely until squads exist. **To read a squad before the
 > season starts, use `element-status` instead.** Confirm the full pick shape after GW1.

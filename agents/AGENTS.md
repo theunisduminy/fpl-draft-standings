@@ -167,7 +167,18 @@ The same rule, with a real credential behind it:
   `src/server/auth/server.ts` returns `null` for any session whose email is not in
   `league_members`, so there is one answer to "who is this?" and it already accounts for
   both authentication and membership. Never accept a user id — or a league entry — as an
-  action argument.
+  action argument **to say who is acting**. A league entry naming _whose public data to
+  display_ is a subject, not an identity, and is fine: `readGameweekSquad` takes one. The
+  test is whether the argument could grant the caller someone else's authority. If it
+  could, it comes from the session.
+- **An action may serve a read, but only one a page genuinely cannot do.** The default
+  stands: pages read their own data. The exception is data chosen by an interaction long
+  after the render, where pre-fetching every possible answer is absurd —
+  `readGameweekSquad` in `src/server/actions/gameweek.ts` is the only one, and it exists
+  because eight managers × 38 gameweeks of picks is hundreds of upstream calls to answer a
+  question the reader may never ask. An `/api/*` route is not the alternative: the proxy
+  307s it, and past that it has no membership check. Such an action re-checks
+  `getCurrentUser()` itself and validates every argument.
 - **`neon_auth` is Neon's schema, not ours.** We read from it; we never define it.
   `drizzle.config.ts` sets `schemaFilter: ['public']` to keep drizzle-kit out of it, and
   `profiles.user_id` deliberately carries no foreign key into it.
@@ -235,7 +246,8 @@ awards points.
 ## File conventions
 
 - **Everything lives under `src/`.** `src/app` (routes), `src/components`,
-  `src/interfaces`, `src/lib`, `src/utils`. `public/` and config files stay at the repo root.
+  `src/interfaces`, `src/lib`, `src/utils`, `src/hooks` (client hooks only, and only for
+  what CSS cannot do). `public/` and config files stay at the repo root.
 - **The `@/` alias points at `src/`** (`tsconfig.json` → `"@/*": ["./src/*"]`). Use it for
   every cross-directory import; relative imports are for siblings only.
 - **API routes** live at `src/app/api/<name>/route.ts`, export `GET`, and return

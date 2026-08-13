@@ -163,6 +163,18 @@ html {
   border-radius: 3px;
 }
 
+/* vaul paints a 200%-wide block of the drawer's own background just past its
+   edge, so a drawer dragged beyond its stop still looks attached to the side of
+   the window. Our side drawer floats — inset, fully rounded — so that block is
+   a purple slab beside it instead. Kill it for the side directions only; the
+   bottom sheet is flush with the bottom edge, where the filler is both
+   invisible and doing its job. Three attribute selectors, because vaul injects
+   its own rule at runtime and a tie would go to whichever landed last. */
+[data-slot='drawer-content'][data-vaul-drawer][data-vaul-drawer-direction='right']::after,
+[data-slot='drawer-content'][data-vaul-drawer][data-vaul-drawer-direction='left']::after {
+  content: none;
+}
+
 /* Glassmorphism utility */
 .glass {
   background: rgba(26, 5, 32, 0.85);
