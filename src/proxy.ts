@@ -36,8 +36,17 @@ export const config = {
    * `/api/auth/**` is deliberately *not* excluded: the library already skips it
    * (`DEFAULT_AUTH_SKIP_ROUTES`), and the sign-in POST has to reach it while the
    * caller is still signed out.
+   *
+   * `/api/cron/**` **is** excluded, because its caller is Vercel Cron and has no
+   * session to redirect. It is not thereby public: the route checks a bearer
+   * `CRON_SECRET` itself. Nothing else may be excluded on those grounds without
+   * its own authentication written first.
+   *
+   * The OAuth callback lands on a page route (`/`), which the pattern above
+   * still matches — check that remains true before touching this, or sign-in
+   * fails silently. See the note at the top of this file.
    */
   matcher: [
-    '/((?!_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|txt|xml|webmanifest)$).*)',
+    '/((?!api/cron|_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|txt|xml|webmanifest)$).*)',
   ],
 };

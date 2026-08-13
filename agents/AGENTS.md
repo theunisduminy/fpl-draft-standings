@@ -47,7 +47,8 @@ right version.
 
 **Node.js 22** (developed against v22.18.0; Next 16 requires `>=20.9.0`).
 
-> _TODO (owner)_ — there is no `.nvmrc` and no CI. Add both so local, CI, and Vercel agree.
+`.nvmrc` pins the patch version and CI reads it with `node-version-file`, so local, CI and
+Vercel agree on the runtime. Change one and change the other.
 
 ---
 
@@ -367,8 +368,13 @@ here has already been broken once in production:
 Adding a rule to the scoring layer means adding the test that pins it. Component tests are a
 separate decision; there is no jsdom environment configured and no need for one yet.
 
-> _TODO (owner)_ — no CI workflow yet. Add one running `pnpm lint`, `pnpm typecheck` and
-> `pnpm test`.
+CI is `.github/workflows/ci.yml`: `pnpm lint`, `typecheck`, `test` and `format:check` on
+every pull request and every push to `main`. Each step carries `if: '!cancelled()'` so one
+push reports every failure rather than one per round trip.
+
+**`pnpm build` is deliberately not in CI.** It needs `FPL_LEAGUE_ID` and the database
+credentials, and Vercel already builds every branch with them. Adding it here would mean
+putting production secrets in GitHub to learn something Vercel tells us for free.
 
 ---
 
@@ -424,22 +430,25 @@ from client-side data fetching, which the Server Components refactor removed out
 
 Two further known defects, both pre-existing and neither yet fixed:
 
-- **`font-inter` is a dead class.** `src/app/layout.tsx` loads Inter and sets `--font-inter`
-  on `<html>`, but no theme entry maps `font-inter` to it, so the app renders in the default
-  sans stack. Deliberately left alone during the Tailwind 4 migration to avoid changing
-  typography; fold it into the design refresh.
-- **Four components are defined but never imported**: `MatchOddsCard`, `GameweekScoreChart`,
-  `GameweekSummaryCard`, `StreaksTracker`. Deliberately deferred.
+Both of the defects that used to be listed here are fixed. Inter is now mapped into the
+theme as `--font-sans`, so it is the sans face everywhere and no element needs a font
+class — the `font-inter` class it replaced never generated anything. And the four
+never-imported components (`MatchOddsCard`, `GameweekScoreChart`, `GameweekSummaryCard`,
+`StreaksTracker`) are deleted; git remembers them if they are ever wanted back.
 
-**`/api/auth/[...path]` is now the only route handler**, and it is Neon Auth's. Every other
-one has been deleted: `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and
-`/api/player/[id]` went with the Server Components refactor, and `/api/current-event`,
-`/api/pl-teams`, `/api/pl-fixtures` and `/api/matches` followed once nothing imported them.
+**There are two route handlers.** `/api/auth/[...path]` is Neon Auth's, and
+`/api/cron/revalidate` drops the cached season on a schedule. Everything else has been
+deleted: `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and `/api/player/[id]` went
+with the Server Components refactor, and `/api/current-event`, `/api/pl-teams`,
+`/api/pl-fixtures` and `/api/matches` followed once nothing imported them.
 
 The deciding argument is worth keeping, because it applies to the next one somebody wants to
 add: **`src/proxy.ts` matches `/api/*` too**, so an unauthenticated caller gets a 307 to the
-sign-in page. A route "for an external consumer" cannot have one until that changes. Adding
-an `/api/*` route means designing its authentication first, not afterwards.
+sign-in page. Adding an `/api/*` route means designing its authentication first, not
+afterwards. The cron route is what that looks like in practice: its caller has no session,
+so the matcher excludes `/api/cron`, and the route itself checks a bearer `CRON_SECRET` in
+constant time. The exclusion buys authentication written by hand — it does not make the
+path public, and nothing else may be excluded without the same work.
 
 Production auth configuration is now done: `trusted_origins` on the Neon project contains
 `https://draftrank.vercel.app`, and `allow_localhost` is on for development.

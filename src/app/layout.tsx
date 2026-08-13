@@ -57,7 +57,7 @@ export default function RootLayout({
       lang='en'
       className={`${inter.variable} h-full scroll-smooth antialiased`}
     >
-      <body className='font-inter flex min-h-screen flex-col bg-[#1a0520] text-white antialiased'>
+      <body className='flex min-h-screen flex-col bg-[#1a0520] text-white antialiased'>
         {/* Navigation is deliberately NOT here — it lives in `AppChrome`, which
             `(app)/layout.tsx` wraps every real page in. `/auth/sign-in` renders
             against this layout alone, so a signed-out visitor gets the fonts,

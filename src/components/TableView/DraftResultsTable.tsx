@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { BaseTable, type TableColumn } from './base-table';
 import {
   draftResultsTableConfig,
@@ -18,15 +19,36 @@ export default function DraftResultsTable({
 }: {
   data: GameweekDataResponse;
 }) {
-  // `null` means "the reader hasn't chosen yet", so we fall back to the most
-  // recent gameweek. Deriving the default beats storing it: setting state from
-  // inside useMemo triggers a cascading render, which React 19 flags.
+  // `null` means "the reader hasn't chosen yet", so we fall back to `?gw=` and
+  // then to the most recent gameweek. Deriving the default beats storing it:
+  // setting state from inside useMemo triggers a cascading render, which React
+  // 19 flags.
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
   const gameweeks = data.completedGameweeks;
+  const requestedGameweek = Number(useSearchParams().get('gw'));
 
   // `completedGameweeks` arrives newest-first.
-  const activeGameweek = selectedGameweek ?? gameweeks[0] ?? 0;
+  const activeGameweek =
+    selectedGameweek ??
+    (gameweeks.includes(requestedGameweek)
+      ? requestedGameweek
+      : gameweeks[0]) ??
+    0;
+
+  /**
+   * Select a gameweek and mirror it into the URL.
+   *
+   * `history.replaceState`, deliberately, **not** `router.replace`: the table
+   * already holds every gameweek, so a navigation would re-render the route on
+   * the server — a couple of seconds of force-dynamic work — to arrive at
+   * markup the client could produce instantly. This way `/results?gw=5` is
+   * shareable and the pills stay free.
+   */
+  function selectGameweek(gameweek: number) {
+    setSelectedGameweek(gameweek);
+    window.history.replaceState(null, '', `?gw=${gameweek}`);
+  }
 
   const formattedResults: GameweekResult[] = useMemo(() => {
     if (!activeGameweek) return [];
@@ -129,7 +151,7 @@ export default function DraftResultsTable({
       <GameweekSelector
         gameweeks={gameweeks}
         selectedGameweek={activeGameweek}
-        onSelectGameweek={setSelectedGameweek}
+        onSelectGameweek={selectGameweek}
       />
 
       <BaseTable

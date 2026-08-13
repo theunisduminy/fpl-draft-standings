@@ -90,6 +90,12 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  /* `layout.tsx` loads Inter and puts it on `--font-inter`, but nothing mapped
+     it into the theme, so the app quietly rendered in the default stack. This
+     entry is what connects them: it makes Inter the sans face everywhere,
+     including Tailwind's own preflight, so no element needs a font class. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

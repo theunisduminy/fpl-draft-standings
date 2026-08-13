@@ -232,7 +232,8 @@ async function computeSeason(): Promise<GameweekDataResponse> {
  *
  * Both cache layers live in `cachedRead`; see there for why a per-process map
  * still earns its place in front of the shared one. Revalidate early with
- * `revalidateTag('gameweek-data')`.
+ * `revalidateTag('gameweek-data', 'max')` — which is what the cron route does
+ * every evening.
  */
 export const getGameweekData = cachedRead(
   CACHE_KEY,
