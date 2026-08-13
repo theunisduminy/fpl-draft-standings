@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: 'Squads' };
 // Reads live upstream data, so it is never prerendered.
 export const dynamic = 'force-dynamic';
 
-// Heading above the boundary, skeleton below — see `src/app/(home)/page.tsx`.
+// Heading above the boundary, skeleton below — see `src/app/(app)/(onboarded)/(home)/page.tsx`.
 export default function SquadsPage() {
   return (
     <PageShell title='Squads' subtitle='Who drafted whom'>

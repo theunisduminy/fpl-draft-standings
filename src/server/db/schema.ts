@@ -132,6 +132,18 @@ export const profiles = pgTable('profiles', {
   userId: uuid('user_id').primaryKey(),
   displayName: text('display_name'),
   bio: text('bio'),
+  /**
+   * `teams[].code` from the classic bootstrap — **not** `teams[].id`.
+   *
+   * The one FPL identifier that survives a season rollover. `id` is 1–20 handed
+   * out alphabetically each August, so storing it would repoint every row the
+   * first time a promoted club sorted differently. See `TeamCode` in
+   * `src/interfaces/fpl.ts`.
+   *
+   * Nullable: unlike a display name and a bio, this is not part of compulsory
+   * onboarding.
+   */
+  favouriteTeam: integer('favourite_team'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

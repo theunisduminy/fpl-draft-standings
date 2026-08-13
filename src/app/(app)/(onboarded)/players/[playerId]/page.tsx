@@ -8,6 +8,7 @@ import { parseLeagueEntryId } from '@/interfaces/fpl';
 import { getGameweekData } from '@/utils/gameweek-data';
 import { buildPlayerProfile } from '@/utils/player-profile';
 import type { PlayerProfile } from '@/interfaces/players';
+import { PageShell } from '@/components/Layout/PageShell';
 import { PlayerSummaryCard } from '@/components/PlayerView/PlayerSummaryCard';
 import { PlayerPerformanceChart } from '@/components/PlayerView/PlayerPerformanceChart';
 import { PositionStatsCard } from '@/components/PlayerView/PositionStatsCard';
@@ -55,25 +56,22 @@ export default async function PlayerStatistics({ params }: PageProps) {
   if (!profile) notFound();
 
   return (
-    <div className='w-full space-y-6'>
-      <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-        <div className='flex items-center gap-3'>
-          <Link href='/'>
-            <Button
-              variant='ghost'
-              size='icon'
-              className='text-white hover:bg-white/10'
-            >
-              <ChevronLeft className='h-5 w-5' />
-            </Button>
-          </Link>
-          <div>
-            <h1 className='text-xl font-bold text-white md:text-2xl'>
-              {profile.player_name}
-            </h1>
-            <p className='text-sm text-white/50'>Season performance</p>
-          </div>
-        </div>
+    <PageShell
+      title={profile.player_name}
+      subtitle='Season performance'
+      back={
+        <Link href='/'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='text-white hover:bg-white/10'
+          >
+            <ChevronLeft className='h-5 w-5' />
+            <span className='sr-only'>Back to standings</span>
+          </Button>
+        </Link>
+      }
+      action={
         <Badge
           variant='outline'
           className='w-fit border-[#00edfd]/30 bg-[#00edfd]/10 text-[#00edfd]'
@@ -81,8 +79,8 @@ export default async function PlayerStatistics({ params }: PageProps) {
           <User className='mr-1 h-3 w-3' />
           {profile.team_name}
         </Badge>
-      </div>
-
+      }
+    >
       <PlayerPerformanceChart
         data={profile.performance}
         playerName={profile.player_name}
@@ -92,6 +90,6 @@ export default async function PlayerStatistics({ params }: PageProps) {
         <PlayerSummaryCard player={profile} />
         <PositionStatsCard stats={profile.stats} />
       </div>
-    </div>
+    </PageShell>
   );
 }

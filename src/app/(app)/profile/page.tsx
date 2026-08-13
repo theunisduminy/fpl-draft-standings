@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { getCurrentUser } from '@/server/auth/server';
 import { getProfileByUserId } from '@/server/data/profiles';
 import { getGameweekData } from '@/utils/gameweek-data';
+import { getPremierLeagueTeams } from '@/utils/pl-teams';
+import { buildPlayerProfile } from '@/utils/player-profile';
+import { asTeamCode } from '@/interfaces/fpl';
+import { cn } from '@/lib/utils';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
 import { ProfileForm } from '@/components/Profile/ProfileForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,69 +19,195 @@ export const metadata: Metadata = { title: 'Profile' };
 export const dynamic = 'force-dynamic';
 
 /**
- * The first Server Component in the app — it reads its own data rather than
- * going through `/api/*` and a client fetch. New pages should follow this
- * shape; see agents/ARCHITECTURE.md.
+ * The profile page, and the onboarding step.
+ *
+ * It sits in `(app)` but outside `(onboarded)`, so it is the one gated page
+ * reachable without a finished profile — which is what makes it a viable
+ * redirect target for the onboarding gate. See `(onboarded)/layout.tsx`.
+ *
+ * The layout matches every other page: `PageShell` heading on the left, content
+ * below it, the width owned by `AppChrome`.
  */
 export default async function ProfilePage() {
   const user = await getCurrentUser();
 
+  // Not "signed out" — `src/proxy.ts` redirects those to /auth/sign-in before
+  // this renders. This is a valid Google session with no `league_members` row:
+  // authenticated, but not one of us.
   if (!user) {
     return (
       <PageShell
-        title='Sign in'
+        title='Not on the league list'
         subtitle='Profiles are for the managers in this league'
-        width='narrow'
       >
-        <Card className='border-white/10 bg-[#2a0d33]'>
+        <Card className='max-w-4xl border-white/10 bg-[#2a0d33]'>
           <CardContent className='space-y-4 pt-6'>
             <p className='text-sm text-white/60'>
-              Sign in with the Google account that is on the league list.
+              You are signed in, but your address is not mapped to a manager
+              yet. Ask the league admin to add you, or sign out and try another
+              Google account.
             </p>
-            <AuthPanel signedIn={false} />
-            <p className='text-xs text-white/40'>
-              Signed in and still seeing this? Your address is not mapped to a
-              manager yet — ask the league admin to add you.
-            </p>
+            <AuthPanel signedIn />
           </CardContent>
         </Card>
       </PageShell>
     );
   }
 
-  const [{ players }, profile] = await Promise.all([
+  const [season, profile, teams] = await Promise.all([
     getGameweekData(),
     getProfileByUserId(user.id),
+    getPremierLeagueTeams(),
   ]);
 
-  const manager = players.find((player) => player.id === user.leagueEntry);
+  const manager = season.players.find(
+    (player) => player.id === user.leagueEntry,
+  );
+
+  // Pure, and over data this page already has — the season summary costs a
+  // reduce, not a round trip. Same function the `/players/[playerId]` page uses,
+  // so the two can never disagree about what a rumbler count is.
+  const stats = buildPlayerProfile(season, user.leagueEntry)?.stats;
+  const played = stats && stats.totalGameweeks > 0;
+  const onboarding = !user.profileComplete;
+  const favouriteTeam = profile?.favouriteTeam
+    ? asTeamCode(profile.favouriteTeam)
+    : null;
+  const club = teams.find((team) => team.code === favouriteTeam);
 
   return (
-    <PageShell title='Your profile' subtitle={user.email} width='narrow'>
-      <Card className='border-white/10 bg-[#2a0d33]'>
-        <CardHeader className='flex-row items-center justify-between space-y-0'>
-          <CardTitle className='text-white'>Details</CardTitle>
-          <AuthPanel signedIn />
-        </CardHeader>
-        <CardContent className='space-y-6'>
-          <div className='rounded-lg bg-[#1a0520] p-3'>
-            <p className='text-xs text-white/40'>You are</p>
-            <p className='text-base font-bold text-white'>
-              {manager
-                ? `${manager.player_name} ${manager.player_surname}`
-                : `League entry ${user.leagueEntry}`}
-            </p>
-            {manager && (
-              <p className='text-sm text-white/50'>{manager.team_name}</p>
-            )}
-          </div>
+    <PageShell
+      title={onboarding ? 'Finish your profile' : 'Your profile'}
+      subtitle={
+        onboarding
+          ? 'A display name and a bio, and the league is yours'
+          : user.email
+      }
+    >
+      {/* Four facts across the top, then the form beside the season summary.
+          The page fills the container rather than stopping short of it: the
+          cure for a lot of empty space to the right of a form is more to read,
+          not a narrower column. */}
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+        <IdentityCard label='You are'>
+          {manager
+            ? `${manager.player_name} ${manager.player_surname}`
+            : `League entry ${user.leagueEntry}`}
+        </IdentityCard>
+        <IdentityCard label='Your team'>
+          {manager?.team_name ?? 'Not in this season yet'}
+        </IdentityCard>
+        <IdentityCard label='Signed in as'>{user.email}</IdentityCard>
+        <IdentityCard label='Favourite club'>
+          {club?.name ?? 'No allegiance'}
+        </IdentityCard>
+      </div>
 
-          <ProfileForm
-            displayName={profile?.displayName ?? null}
-            bio={profile?.bio ?? null}
-          />
-        </CardContent>
-      </Card>
+      <div className='grid gap-4 lg:grid-cols-3'>
+        <Card className='border-white/10 bg-[#2a0d33] lg:col-span-2'>
+          <CardHeader className='flex-row items-center justify-between space-y-0'>
+            <CardTitle className='text-white'>Details</CardTitle>
+            <AuthPanel signedIn />
+          </CardHeader>
+          <CardContent>
+            <ProfileForm
+              displayName={profile?.displayName ?? null}
+              bio={profile?.bio ?? null}
+              favouriteTeam={favouriteTeam}
+              teams={teams}
+              onboarding={onboarding}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className='border-white/10 bg-[#2a0d33]'>
+          <CardHeader>
+            <CardTitle className='text-white'>Your season</CardTitle>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {manager && played ? (
+              <>
+                <Stat label='F1 score' value={manager.f1_score} />
+                <Stat label='F1 ranking' value={`#${manager.f1_ranking}`} />
+                <Stat label='Gameweeks played' value={stats.totalGameweeks} />
+                <Stat label='Gameweeks won' value={stats.totalWins} />
+                <Stat
+                  label='Rumblers'
+                  value={stats.rumblerCount}
+                  // The one stat here nobody wants a high number on, so it is
+                  // the one that reads differently at a glance.
+                  accent={stats.rumblerCount > 0}
+                />
+                <Stat
+                  label='Best gameweek'
+                  value={`${stats.bestGameweek.points} · GW${stats.bestGameweek.gameweek}`}
+                />
+                <Stat label='Average points' value={stats.averagePoints} />
+
+                <Link
+                  href={`/players/${user.leagueEntry}`}
+                  className='block pt-1 text-sm text-[#75fa95] hover:underline'
+                >
+                  See your full season
+                </Link>
+              </>
+            ) : (
+              <p className='text-sm text-white/50'>
+                Nothing to show until this season has a finished gameweek in it.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </PageShell>
+  );
+}
+
+/**
+ * One fact about who you are, read-only.
+ *
+ * Three of the four are not yours to change — the manager and team come from
+ * upstream via `league_members`, the email from the session — which is why they
+ * sit beside the form rather than in it. The fourth mirrors what the form set.
+ */
+function IdentityCard({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className='border-white/10 bg-[#2a0d33]'>
+      <CardContent className='pt-6'>
+        <p className='text-xs text-white/40'>{label}</p>
+        <p className='truncate text-base font-bold text-white'>{children}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** A labelled number in the season summary. */
+function Stat({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+}) {
+  return (
+    <div className='flex items-baseline justify-between gap-3'>
+      <span className='text-sm text-white/50'>{label}</span>
+      <span
+        className={cn(
+          'text-lg font-bold',
+          accent ? 'text-[#ff8fa3]' : 'text-white',
+        )}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

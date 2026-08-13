@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'Rumblers' };
 // Reads live upstream data, so it is never prerendered.
 export const dynamic = 'force-dynamic';
 
-// Heading above the boundary, skeleton below — see `src/app/(home)/page.tsx`.
+// Heading above the boundary, skeleton below — see `src/app/(app)/(onboarded)/(home)/page.tsx`.
 export default function Rumblers() {
   return (
     <PageShell title='Rumblers' subtitle="Who's buying the next round?">

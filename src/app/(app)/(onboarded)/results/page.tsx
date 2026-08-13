@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'Results' };
 // Reads live upstream data, so it is never prerendered.
 export const dynamic = 'force-dynamic';
 
-// Heading above the boundary, skeleton below — see `src/app/(home)/page.tsx`.
+// Heading above the boundary, skeleton below — see `src/app/(app)/(onboarded)/(home)/page.tsx`.
 export default function ResultsView() {
   return (
     <PageShell title='Results' subtitle='Gameweek by gameweek breakdown'>

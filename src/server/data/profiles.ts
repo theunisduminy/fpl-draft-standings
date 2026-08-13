@@ -6,6 +6,9 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/server/db/client';
 import { profiles, type ProfileRow } from '@/server/db/schema';
 
+/** Re-exported so callers never reach into `@/server/db/**` for the row type. */
+export type { ProfileRow };
+
 /**
  * The parts of a profile its owner controls — display name and bio.
  *
@@ -41,6 +44,8 @@ export async function upsertProfile(input: {
   userId: string;
   displayName?: string | null;
   bio?: string | null;
+  /** A `TeamCode`, already checked against the codes upstream returned. */
+  favouriteTeam?: number | null;
 }): Promise<ProfileRow> {
   const rows = await getDb()
     .insert(profiles)
@@ -48,12 +53,14 @@ export async function upsertProfile(input: {
       userId: input.userId,
       displayName: input.displayName ?? null,
       bio: input.bio ?? null,
+      favouriteTeam: input.favouriteTeam ?? null,
     })
     .onConflictDoUpdate({
       target: profiles.userId,
       set: {
         displayName: input.displayName ?? null,
         bio: input.bio ?? null,
+        favouriteTeam: input.favouriteTeam ?? null,
         updatedAt: new Date(),
       },
     })

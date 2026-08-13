@@ -1,21 +1,11 @@
 import { NextResponse } from 'next/server';
-import { fplApi } from '@/utils/fpl-api';
+
+import { getPremierLeagueTeams } from '@/utils/pl-teams';
 
 /** The 20 Premier League clubs, lifted out of the classic-FPL static dataset. */
 export const GET = async () => {
   try {
-    const res = await fetch(fplApi.bootstrapStatic(), {
-      next: {
-        revalidate: 3600, // 1 hour
-      },
-    });
-
-    if (!res.ok) {
-      throw new Error(`Bootstrap-static request failed with ${res.status}`);
-    }
-
-    const { teams } = await res.json();
-    return NextResponse.json(teams);
+    return NextResponse.json(await getPremierLeagueTeams());
   } catch (error) {
     console.error('Error in pl-teams API:', error);
     return NextResponse.json(
