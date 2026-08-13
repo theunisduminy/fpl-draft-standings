@@ -3,6 +3,7 @@ import 'server-only';
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 
 import { getLeagueMemberByEmail } from '@/server/data/league-members';
+import { asLeagueEntryId, type LeagueEntryId } from '@/interfaces/fpl';
 
 /**
  * Neon Auth (managed Better Auth). Identity lives in this project's own
@@ -36,7 +37,7 @@ export type SignedInUser = {
   name: string | null;
   image: string | null;
   /** Which manager they are, from the curated `league_members` mapping. */
-  leagueEntry: number;
+  leagueEntry: LeagueEntryId;
 };
 
 /**
@@ -66,6 +67,6 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
     email: user.email,
     name: user.name ?? null,
     image: user.image ?? null,
-    leagueEntry: member.leagueEntry,
+    leagueEntry: asLeagueEntryId(member.leagueEntry),
   };
 }

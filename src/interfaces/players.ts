@@ -1,14 +1,17 @@
+import type { LeagueEntryId } from './fpl';
+
 // Legacy Player interface - kept for backwards compatibility
 export interface Player {
   player_first_name: string;
   player_last_name: string;
-  id: number;
+  id: LeagueEntryId;
   entry_name: string;
 }
 
 // Main PlayerDetails interface - standardized structure
 export interface PlayerDetails {
-  id: number;
+  /** The league entry — see `LeagueEntryId`, not the `entry_id`. */
+  id: LeagueEntryId;
   player_name: string;
   player_surname: string;
   team_name: string;
@@ -31,7 +34,7 @@ export interface PlayerDetails {
 // Gameweek performance data
 export interface GameweekPerformance {
   event: number;
-  league_entry: number;
+  league_entry: LeagueEntryId;
   event_total: number;
   rank: number;
   finished: boolean;

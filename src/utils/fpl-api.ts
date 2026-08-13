@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type { EntryId } from '@/interfaces/fpl';
+
 /**
  * The single source of truth for every upstream Premier League API this app
  * reads, plus the environment-derived league ID they are addressed with.
@@ -68,10 +70,37 @@ export const fplApi = {
   eventLive: (gameweek: number) => `${DRAFT_API}/event/${gameweek}/live`,
 
   /**
+   * Who currently owns each element: `{ element, owner, status }`.
+   *
+   * The right source for squads — it reflects trades and waivers, and it works
+   * before GW1, unlike `entryEvent`. **`owner` is an `entry_id`**, not the
+   * league entry.
+   */
+  elementStatus: (leagueId: number) =>
+    `${DRAFT_API}/league/${leagueId}/element-status`,
+
+  /** Every pick made in the draft, in order. A historical record only. */
+  draftChoices: (leagueId: number) => `${DRAFT_API}/draft/${leagueId}/choices`,
+
+  /**
+   * The draft game's static dataset: elements, teams, element types.
+   *
+   * **No trailing slash** — adding one 404s here, the exact inverse of the
+   * classic API below. Draft element IDs must be resolved against this, never
+   * against the classic bootstrap: the two disagree on ~21 of 581 elements.
+   */
+  draftBootstrap: () => `${DRAFT_API}/bootstrap-static`,
+
+  /**
    * One entry's picks for one gameweek.
    * 404s with `"No pick history"` until that entry has played a gameweek.
+   *
+   * Takes the `entry_id`, **not** the `league_entries[].id` we use as the
+   * player ID everywhere else. Passing the wrong one 404s, which this app
+   * swallows as "no picks" — so the gameweek would vanish rather than fail
+   * loudly. Hence the branded parameter type.
    */
-  entryEvent: (entryId: number, gameweek: number) =>
+  entryEvent: (entryId: EntryId, gameweek: number) =>
     `${DRAFT_API}/entry/${entryId}/event/${gameweek}`,
 
   /**

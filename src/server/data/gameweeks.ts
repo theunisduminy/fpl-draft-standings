@@ -5,6 +5,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '@/server/db/client';
 import { gameweekScores, gameweeks } from '@/server/db/schema';
 import { getLeagueId } from '@/utils/fpl-api';
+import { asLeagueEntryId } from '@/interfaces/fpl';
 import type { GameweekPerformance } from '@/interfaces/players';
 
 /**
@@ -41,9 +42,11 @@ export async function getStoredPerformances(): Promise<GameweekPerformance[]> {
     .where(eq(gameweekScores.leagueId, leagueId))
     .orderBy(asc(gameweekScores.gameweek), asc(gameweekScores.rank));
 
+  // The column holds a league entry; the driver can only tell us it is an
+  // integer, so this is where it gets its identity back.
   return rows.map((row) => ({
     event: row.gameweek,
-    league_entry: row.leagueEntry,
+    league_entry: asLeagueEntryId(row.leagueEntry),
     event_total: row.points,
     rank: row.rank,
     finished: true,

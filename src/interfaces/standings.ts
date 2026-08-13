@@ -1,5 +1,7 @@
+import type { LeagueEntryId } from './fpl';
+
 export interface StandingsData {
-  league_entry: number;
+  league_entry: LeagueEntryId;
   total: number;
   rank: number;
   rank_sort: number;
@@ -10,7 +12,7 @@ export interface StandingsData {
 export interface F1PlayerDetails {
   player_name: string;
   player_surname: string;
-  id: number;
+  id: LeagueEntryId;
   team_name: string;
   f1_score: number;
   f1_ranking: number;

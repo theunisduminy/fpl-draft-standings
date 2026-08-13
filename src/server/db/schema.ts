@@ -92,7 +92,9 @@ export const leagueMembers = pgTable(
      * The season, identified by its league. **Both FPL identifiers are
      * season-scoped:** a renewed league gets a new id, and its
      * `league_entries[].id` and `entry_id` values are minted fresh with it —
-     * ours were all created in one sequential block the day the league formed.
+     * most of ours were issued in one block the day the league formed, and a
+     * late joiner's sit well outside it (40460, against 39836–39842). So the
+     * ids are not even contiguous within a season, let alone stable across one.
      *
      * Without this column a mapping would survive into next season pointing at
      * a number that either no longer exists or, worse, now belongs to somebody

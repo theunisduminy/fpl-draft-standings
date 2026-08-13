@@ -4,12 +4,19 @@ import {
   GameweekDataResponse,
 } from '@/interfaces/players';
 import { GameWeekStatus } from '@/interfaces/match';
+import type {
+  EntryPick,
+  EventLive,
+  LeagueEntry,
+  LeagueEntryId,
+} from '@/interfaces/fpl';
 import {
   getFinalisedGameweeks,
   getStoredPerformances,
   storeFinalisedGameweeks,
 } from '@/server/data/gameweeks';
 import { fplApi, getLeagueId } from './fpl-api';
+import { fetchLeagueDetails } from './league';
 import { getCache, setCache } from './cache';
 
 const F1_POINTS = [20, 15, 12, 10, 8, 6, 4, 2];
@@ -42,8 +49,8 @@ async function fetchEventStatus(): Promise<GameWeekStatus[]> {
 }
 
 function assignRanks(
-  data: Array<{ event_total: number; league_entry: number }>,
-): Array<{ rank: number; league_entry: number; event_total: number }> {
+  data: Array<{ event_total: number; league_entry: LeagueEntryId }>,
+): Array<{ rank: number; league_entry: LeagueEntryId; event_total: number }> {
   const sorted = [...data].sort((a, b) => b.event_total - a.event_total);
   const rankedData = [];
   let currentRank = 1;
@@ -57,10 +64,16 @@ function assignRanks(
   return rankedData;
 }
 
+/** One entry's starting XI for a gameweek, tagged with both its identities. */
+interface EntryPicks {
+  league_entry: LeagueEntryId;
+  picks: EntryPick[];
+}
+
 async function fetchGameweekBatch(
   startGw: number,
   endGw: number,
-  leagueEntries: any[],
+  leagueEntries: LeagueEntry[],
 ): Promise<GameweekPerformance[]> {
   const batchPromises = [];
 
@@ -69,19 +82,20 @@ async function fetchGameweekBatch(
       Promise.all([
         fetch(fplApi.eventLive(gw), {
           next: { revalidate: 300 },
-        }).then((res) => res.json()),
-        ...leagueEntries.map((entry) =>
+        }).then((res) => res.json() as Promise<EventLive>),
+        // `entry_id` addresses the URL, `id` identifies the manager. They are
+        // different numbers for the same person; the branded types are what
+        // stop them being swapped here.
+        ...leagueEntries.map((entry): Promise<EntryPicks> =>
           fetch(fplApi.entryEvent(entry.entry_id, gw), {
             next: { revalidate: 300 },
           })
             .then((res) => res.json())
             .then((data) => ({
-              entry_id: entry.entry_id,
               league_entry: entry.id,
-              picks: data.picks,
+              picks: (data.picks ?? []) as EntryPick[],
             }))
             .catch(() => ({
-              entry_id: entry.entry_id,
               league_entry: entry.id,
               picks: [],
             })),
@@ -92,7 +106,11 @@ async function fetchGameweekBatch(
           liveData,
           playerPicks,
         }))
-        .catch(() => ({ gameweek: gw, liveData: null, playerPicks: [] })),
+        .catch(() => ({
+          gameweek: gw,
+          liveData: null as EventLive | null,
+          playerPicks: [] as EntryPicks[],
+        })),
     );
   }
 
@@ -110,19 +128,20 @@ async function fetchGameweekBatch(
     // Likewise, entries whose picks failed to load must not be scored as zeros
     // — an unplayed gameweek has to be absent, not a joint-first finish.
     const scoredEntries = playerPicks.filter(
-      (playerData: any) => playerData?.picks?.length,
+      (playerData) => playerData?.picks?.length,
     );
 
     if (scoredEntries.length === 0) return;
 
-    const gameweekScores = scoredEntries.map((playerData: any) => {
-      const startingPlayers = (playerData.picks || []).filter(
-        (pick: any) => pick.position <= 11,
+    const gameweekScores = scoredEntries.map((playerData) => {
+      const startingPlayers = playerData.picks.filter(
+        (pick) => pick.position <= 11,
       );
 
-      const totalPoints = startingPlayers.reduce((sum: number, pick: any) => {
-        const elementId = pick.element.toString();
-        const liveElement = liveData.elements[elementId];
+      const totalPoints = startingPlayers.reduce((sum, pick) => {
+        // Draft element IDs, resolved against the draft API's own live feed —
+        // the classic bootstrap numbers a handful of elements differently.
+        const liveElement = liveData.elements[pick.element.toString()];
         return sum + (liveElement?.stats?.total_points || 0);
       }, 0);
 
@@ -162,7 +181,7 @@ async function fetchGameweekBatch(
  */
 async function fetchMissingGameweeks(
   missing: number[],
-  leagueEntries: any[],
+  leagueEntries: LeagueEntry[],
 ): Promise<GameweekPerformance[]> {
   const fetched: GameweekPerformance[] = [];
 
@@ -195,23 +214,10 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
   pendingPromise = (async () => {
     const leagueId = getLeagueId();
 
-    const [leagueRes, status] = await Promise.all([
-      fetch(fplApi.leagueDetails(leagueId), {
-        next: { revalidate: 300 },
-      }),
+    const [{ league_entries, standings }, status] = await Promise.all([
+      fetchLeagueDetails(leagueId),
       fetchEventStatus(),
     ]);
-
-    if (!leagueRes.ok) {
-      throw new Error(
-        `League ${leagueId} details request failed with ${leagueRes.status}. ` +
-          'League IDs are season-scoped — check FPL_LEAGUE_ID is current.',
-      );
-    }
-
-    const leagueData = await leagueRes.json();
-
-    const { league_entries, standings } = leagueData;
 
     // Derive max gameweek from status array — instant, no extra HTTP calls
     const maxGameweek = Math.max(...status.map((s) => s.event), 0);
@@ -261,7 +267,7 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
       );
 
       if (!hasCurrentGameweekData) {
-        const currentGameweekData = standings.map((standing: any) => ({
+        const currentGameweekData = standings.map((standing) => ({
           league_entry: standing.league_entry,
           event_total: standing.event_total,
         }));
@@ -282,7 +288,7 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
 
     const playerMetrics: Record<number, PlayerDetails> = {};
 
-    league_entries.forEach((entry: any) => {
+    league_entries.forEach((entry) => {
       playerMetrics[entry.id] = {
         id: entry.id,
         player_name: entry.player_first_name || 'Unknown',
@@ -328,7 +334,7 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
       }
     });
 
-    standings?.forEach((standing: any) => {
+    standings?.forEach((standing) => {
       const player = playerMetrics[standing.league_entry];
       if (player) {
         player.total_points = standing.total;
@@ -357,7 +363,7 @@ export async function getGameweekData(): Promise<GameweekDataResponse> {
 
         const rumblerDetails = rumblers.map((rumbler) => {
           const player = league_entries.find(
-            (entry: any) => entry.id === rumbler.league_entry,
+            (entry) => entry.id === rumbler.league_entry,
           );
           return {
             points: rumbler.event_total,

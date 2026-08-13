@@ -1,9 +1,11 @@
+import type { LeagueEntryId } from './fpl';
+
 export interface Match {
   event: number;
   finished: boolean;
-  league_entry_1: number;
+  league_entry_1: LeagueEntryId;
   league_entry_1_points: number;
-  league_entry_2: number;
+  league_entry_2: LeagueEntryId;
   league_entry_2_points: number;
   started: boolean;
 }
