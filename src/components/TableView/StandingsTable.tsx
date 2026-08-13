@@ -1,35 +1,31 @@
 'use client';
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useTableData } from '@/hooks/use-table-data';
 import { BaseTable } from './base-table';
 import { standingsTableConfig, tableConfigs } from './table-configs';
 import { PlayerDetails } from '@/interfaces/players';
 
-export default function StandingsTable() {
+/**
+ * Presentational: the season is fetched by the page, on the server.
+ * This stays a client component only for the row-click navigation.
+ */
+export default function StandingsTable({
+  players,
+}: {
+  players: PlayerDetails[];
+}) {
   const router = useRouter();
-  const { data, loading, error, refetch } = useTableData<PlayerDetails[]>({
-    endpoints: ['standings'],
-    transform: (response) => response[0], // Extract first element from response array
-  });
-
   const config = tableConfigs.standings;
-
-  const handleRowClick = (player: PlayerDetails) => {
-    // Navigate to player detail page
-    router.push(`/players/${player.id}`);
-  };
 
   return (
     <BaseTable
       title=''
       subtitle=''
-      data={data || []}
+      data={players}
       columns={standingsTableConfig}
-      loading={loading}
-      error={error}
-      onRetry={refetch}
-      onRowClick={handleRowClick}
+      loading={false}
+      error={null}
+      onRowClick={(player) => router.push(`/players/${player.id}`)}
       emptyMessage={config.emptyMessage}
       className={config.className}
       tableClassName={config.tableClassName}

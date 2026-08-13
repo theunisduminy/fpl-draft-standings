@@ -1,9 +1,26 @@
-'use client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trophy, Medal } from 'lucide-react';
-import FormulaOneTable from '@/components/TableView/StandingsTable';
-import PositionPlacedTable from '@/components/TableView/PositionPlacedTable';
+import { Suspense } from 'react';
+import type { Metadata } from 'next';
 
+import { getGameweekData } from '@/utils/gameweek-data';
+import { StandingsTabs } from '@/components/TableView/StandingsTabs';
+import { SkeletonCard } from '@/components/SkeletonTable';
+
+export const metadata: Metadata = { title: 'Standings' };
+
+// Reads live upstream data, so it is never prerendered.
+export const dynamic = 'force-dynamic';
+
+/**
+ * The season is read here, once, on the server. Both the standings table and
+ * the position charts render from the same object — previously they were two
+ * separate browser fetches of overlapping data.
+ *
+ * The Suspense boundary lives inside the page rather than in a `loading.tsx`
+ * on purpose. A `loading.tsx` at the app root would wrap every route below it,
+ * including `/players/[playerId]`, and flushing that shell early commits the
+ * response status before the page has decided whether it is a 404 — so
+ * `notFound()` would render the right page with a 200.
+ */
 export default function Home() {
   return (
     <div className='w-full space-y-6'>
@@ -12,39 +29,15 @@ export default function Home() {
         <p className='text-sm text-white/60'>FPL Draft league rankings</p>
       </div>
 
-      {/* Mobile: Tabs */}
-      <div className='md:hidden'>
-        <Tabs defaultValue='standings' className='w-full'>
-          <TabsList className='grid w-full grid-cols-2 border border-white/10 bg-[#2a0d33]'>
-            <TabsTrigger
-              value='standings'
-              className='gap-2 text-white/70 data-[state=active]:bg-[#3d1a4d] data-[state=active]:text-white'
-            >
-              <Trophy className='h-4 w-4' />
-              Standings
-            </TabsTrigger>
-            <TabsTrigger
-              value='positions'
-              className='gap-2 text-white/70 data-[state=active]:bg-[#3d1a4d] data-[state=active]:text-white'
-            >
-              <Medal className='h-4 w-4' />
-              Positions
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value='standings' className='mt-4'>
-            <FormulaOneTable />
-          </TabsContent>
-          <TabsContent value='positions' className='mt-4'>
-            <PositionPlacedTable />
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Desktop: Stacked */}
-      <div className='hidden space-y-8 md:block'>
-        <FormulaOneTable />
-        <PositionPlacedTable />
-      </div>
+      <Suspense fallback={<SkeletonCard />}>
+        <Standings />
+      </Suspense>
     </div>
   );
+}
+
+async function Standings() {
+  const data = await getGameweekData();
+
+  return <StandingsTabs data={data} />;
 }

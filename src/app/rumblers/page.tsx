@@ -1,9 +1,16 @@
-'use client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Beer, BarChart3 } from 'lucide-react';
-import RumblerDataCards from '@/components/RumblerView/RumblerCards';
-import RumblerDashboard from '@/components/RumblerView/RumblerDashboard';
+import { Suspense } from 'react';
+import type { Metadata } from 'next';
 
+import { getGameweekData } from '@/utils/gameweek-data';
+import { RumblerTabs } from '@/components/RumblerView/RumblerTabs';
+import { SkeletonCard } from '@/components/SkeletonTable';
+
+export const metadata: Metadata = { title: 'Rumblers' };
+
+// Reads live upstream data, so it is never prerendered.
+export const dynamic = 'force-dynamic';
+
+// The boundary is in the page, not a `loading.tsx` — see `src/app/page.tsx`.
 export default function Rumblers() {
   return (
     <div className='w-full space-y-6'>
@@ -14,30 +21,15 @@ export default function Rumblers() {
         </p>
       </div>
 
-      <Tabs defaultValue='rumblers' className='w-full'>
-        <TabsList className='grid w-full grid-cols-2 border border-white/10 bg-[#2a0d33] md:w-[400px]'>
-          <TabsTrigger
-            value='rumblers'
-            className='gap-2 text-white/70 data-[state=active]:bg-[#3d1a4d] data-[state=active]:text-white'
-          >
-            <Beer className='h-4 w-4' />
-            Victims
-          </TabsTrigger>
-          <TabsTrigger
-            value='frequency'
-            className='gap-2 text-white/70 data-[state=active]:bg-[#3d1a4d] data-[state=active]:text-white'
-          >
-            <BarChart3 className='h-4 w-4' />
-            Frequency
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value='rumblers' className='mt-6'>
-          <RumblerDataCards />
-        </TabsContent>
-        <TabsContent value='frequency' className='mt-6'>
-          <RumblerDashboard />
-        </TabsContent>
-      </Tabs>
+      <Suspense fallback={<SkeletonCard />}>
+        <Rumbler />
+      </Suspense>
     </div>
   );
+}
+
+async function Rumbler() {
+  const { rumblerData } = await getGameweekData();
+
+  return <RumblerTabs data={rumblerData} />;
 }

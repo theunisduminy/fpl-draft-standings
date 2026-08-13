@@ -3,37 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
 
-interface PositionStats {
-  first: number;
-  second: number;
-  third: number;
-  fourth: number;
-  fifth: number;
-  sixth: number;
-  seventh: number;
-  eighth: number;
-}
-
-interface PlayerStats {
-  totalGameweeks: number;
-  totalWins: number;
-  totalPoints: number;
-  averagePoints: number;
-  averageRank: number;
-  bestGameweek: {
-    gameweek: number;
-    points: number;
-    rank: number;
-  };
-  worstGameweek: {
-    gameweek: number;
-    points: number;
-    rank: number;
-  };
-  rumblerCount: number;
-  consistency: number;
-  positionStats: PositionStats;
-}
+import type { PlayerStats } from '@/utils/player-profile';
 
 interface PositionStatsCardProps {
   stats: PlayerStats;

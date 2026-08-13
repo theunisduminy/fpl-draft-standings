@@ -1,8 +1,5 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { useTableData } from '@/hooks/use-table-data';
-import { SkeletonCard } from '@/components/SkeletonTable';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { GameweekSelector } from '@/components/GameweekSelector';
 import { getBlurbForGameweek } from '@/utils/lossBlurb';
 import {
@@ -19,26 +16,20 @@ import { Separator } from '@/components/ui/separator';
 import { RumblerGameweekData } from '@/interfaces/players';
 import { Beer, TrendingDown, Calendar, Quote } from 'lucide-react';
 
-export default function RumblerDataCards(): React.JSX.Element {
+export default function RumblerDataCards({
+  gameweekData,
+}: {
+  gameweekData: RumblerGameweekData[];
+}): React.JSX.Element {
   // `null` means "the reader hasn't chosen yet", so we fall back to the most
   // recent gameweek. Deriving the default beats storing it: setting state from
   // inside useMemo triggers a cascading render, which React 19 flags.
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
-  const {
-    data: gameweekData,
-    loading,
-    error,
-    refetch,
-  } = useTableData<RumblerGameweekData[]>({
-    endpoints: ['rumbler'],
-    transform: (response) => response[0],
-  });
-
-  const gameweeks = useMemo(() => {
-    if (!gameweekData || gameweekData.length === 0) return [];
-    return gameweekData.map((item) => item.gameweek).sort((a, b) => b - a);
-  }, [gameweekData]);
+  const gameweeks = useMemo(
+    () => gameweekData.map((item) => item.gameweek).sort((a, b) => b - a),
+    [gameweekData],
+  );
 
   const activeGameweek = selectedGameweek ?? gameweeks[0] ?? 0;
 
@@ -46,9 +37,7 @@ export default function RumblerDataCards(): React.JSX.Element {
   // carries the same jab — clicking away and back no longer reshuffles it.
   const currentBlurb = getBlurbForGameweek(activeGameweek);
 
-  if (loading) return <SkeletonCard />;
-  if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
-  if (!gameweekData || gameweekData.length === 0) {
+  if (gameweekData.length === 0) {
     return (
       <Card className='w-full border-white/10 bg-[#2a0d33]'>
         <CardHeader>

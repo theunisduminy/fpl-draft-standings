@@ -1,6 +1,5 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { useTableData } from '@/hooks/use-table-data';
 import { BaseTable } from './base-table';
 import {
   draftResultsTableConfig,
@@ -12,27 +11,23 @@ import { GameweekSelector } from '@/components/GameweekSelector';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, BarChart3, Minus } from 'lucide-react';
 
-export default function DraftResultsTable() {
+export default function DraftResultsTable({
+  data,
+}: {
+  data: GameweekDataResponse;
+}) {
   // `null` means "the reader hasn't chosen yet", so we fall back to the most
   // recent gameweek. Deriving the default beats storing it: setting state from
   // inside useMemo triggers a cascading render, which React 19 flags.
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
-  const { data, loading, error, refetch } = useTableData<GameweekDataResponse>({
-    endpoints: ['gameweek-data'],
-    transform: (response) => response[0],
-  });
-
-  const gameweeks = useMemo(
-    () => data?.completedGameweeks ?? [],
-    [data?.completedGameweeks],
-  );
+  const gameweeks = data.completedGameweeks;
 
   // `completedGameweeks` arrives newest-first.
   const activeGameweek = selectedGameweek ?? gameweeks[0] ?? 0;
 
   const formattedResults: GameweekResult[] = useMemo(() => {
-    if (!data || !activeGameweek) return [];
+    if (!activeGameweek) return [];
 
     const gameweekResults = data.gameweekPerformances
       .filter((gw) => gw.event === activeGameweek && gw.finished)
@@ -93,16 +88,15 @@ export default function DraftResultsTable() {
     };
   }, [formattedResults]);
 
-  if (loading || error || gameweeks.length === 0) {
+  if (gameweeks.length === 0) {
     return (
       <BaseTable
         title=''
         subtitle=''
         data={formattedResults}
         columns={draftResultsTableConfig}
-        loading={loading}
-        error={error}
-        onRetry={refetch}
+        loading={false}
+        error={null}
         emptyMessage={config.emptyMessage}
         getRowKey={(result) => result.league_entry}
       />

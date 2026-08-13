@@ -1,33 +1,28 @@
-'use client';
 import React from 'react';
-import { useTableData } from '@/hooks/use-table-data';
 import { PositionDistributionChart } from '@/components/PlayerView/PositionDistributionChart';
 import { FormGuide } from '@/components/PlayerView/FormGuide';
 import { PositionTrajectory } from '@/components/PlayerView/PositionTrajectory';
 import { PodiumRace } from '@/components/PlayerView/PodiumRace';
 import { GameweekDataResponse } from '@/interfaces/players';
-import { SkeletonCard } from '@/components/SkeletonTable';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { Card, CardContent } from '@/components/ui/card';
 
-export default function PositionPlacedTable() {
-  const { data, loading, error, refetch } = useTableData<GameweekDataResponse>({
-    endpoints: ['gameweek-data'],
-    transform: (response) => response[0],
-  });
-
-  if (loading) return <SkeletonCard />;
-  if (error) return <ErrorDisplay message={error} onRetry={refetch} />;
-  if (!data || !data.players || data.players.length === 0) {
+export default function PositionPlacedTable({
+  data,
+}: {
+  data: GameweekDataResponse;
+}) {
+  if (data.players.length === 0) {
     return (
-      <ErrorDisplay
-        message='No position data available yet.'
-        onRetry={refetch}
-      />
+      <Card className='w-full border-white/10 bg-[#2a0d33]'>
+        <CardContent className='p-6 text-center text-sm text-white/60'>
+          No position data available yet.
+        </CardContent>
+      </Card>
     );
   }
 
   const playerNames = Object.fromEntries(
-    data.players.map((p) => [p.id, p.player_name]),
+    data.players.map((player) => [player.id, player.player_name]),
   );
 
   return (

@@ -10,8 +10,10 @@ import {
   Target,
 } from 'lucide-react';
 
+import type { PlayerProfile } from '@/utils/player-profile';
+
 interface PlayerSummaryCardProps {
-  player: any;
+  player: PlayerProfile;
 }
 
 export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
