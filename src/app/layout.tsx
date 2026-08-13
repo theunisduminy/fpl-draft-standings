@@ -8,6 +8,7 @@ import './globals.css';
 import Footer from '@/components/Layout/Footer';
 import HeaderNav from '@/components/Layout/HeaderNav';
 import MobileNav from '@/components/Layout/MobileNav';
+import { SideNav } from '@/components/Layout/SideNav';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import { config } from '@fortawesome/fontawesome-svg-core';
 config.autoAddCss = false;
@@ -61,9 +62,13 @@ export default function RootLayout({
       className={`${inter.variable} h-full scroll-smooth antialiased`}
     >
       <body className='font-inter flex min-h-screen flex-col bg-[#1a0520] text-white antialiased'>
+        {/* Three navigation surfaces, each owning one breakpoint band:
+            HeaderNav is the brand bar below `lg`, MobileNav the bottom bar
+            below `md`, and SideNav the floating panel from `lg` up. */}
         <HeaderNav />
+        <SideNav />
 
-        <main className='flex-1 pt-4 pb-20 md:pt-8 md:pb-8'>
+        <main className='flex-1 pt-4 pb-20 md:pt-8 md:pb-8 lg:pt-4 lg:pl-64'>
           <div className='mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'>
             {children}
           </div>

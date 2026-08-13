@@ -26,7 +26,7 @@ export default function HeaderNav() {
   const pathname = usePathname();
 
   return (
-    <header className='sticky top-0 z-40 rounded-b-xl bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg'>
+    <header className='sticky top-0 z-40 rounded-b-xl bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg lg:hidden'>
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         <div className='flex h-16 items-center justify-between'>
           <Link href='/' className='flex items-center gap-2.5'>
@@ -40,7 +40,7 @@ export default function HeaderNav() {
             </span>
           </Link>
 
-          <nav className='hidden md:flex md:gap-1'>
+          <nav className='hidden md:flex md:gap-1 lg:hidden'>
             {navigation.map((link) => {
               const isActive = pathname === link.href;
               return (
