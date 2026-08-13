@@ -1,27 +1,25 @@
-import {
-  emptyPositionTally,
-  POSITION_KEYS,
-  type PlayerDetails,
-  type GameweekPerformance,
-  type GameweekDataResponse,
+import type {
+  GameweekPerformance,
+  GameweekDataResponse,
 } from '@/interfaces/players';
 import { GameWeekStatus } from '@/interfaces/match';
-import type {
-  EntryPick,
-  EventLive,
-  LeagueEntry,
-  LeagueEntryId,
-} from '@/interfaces/fpl';
+import type { EntryPick, EventLive, LeagueEntry } from '@/interfaces/fpl';
 import {
   getFinalisedGameweeks,
   getStoredPerformances,
   storeFinalisedGameweeks,
 } from '@/server/data/gameweeks';
+import {
+  aggregatePlayers,
+  assignRanks,
+  buildRumblerData,
+  scoreGameweek,
+  type EntryPicks,
+} from './scoring';
 import { fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
 import { cachedRead } from './cache';
 
-const F1_POINTS = [20, 15, 12, 10, 8, 6, 4, 2];
 const CACHE_KEY = 'gameweek-data';
 const CACHE_TTL_SECONDS = 3600; // 1 hour — FPL data only changes once per gameweek
 const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
@@ -45,28 +43,6 @@ async function fetchEventStatus(): Promise<GameWeekStatus[]> {
 
   const body = await res.json();
   return Array.isArray(body?.status) ? body.status : [];
-}
-
-function assignRanks(
-  data: Array<{ event_total: number; league_entry: LeagueEntryId }>,
-): Array<{ rank: number; league_entry: LeagueEntryId; event_total: number }> {
-  const sorted = [...data].sort((a, b) => b.event_total - a.event_total);
-  const rankedData = [];
-  let currentRank = 1;
-
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i].event_total !== sorted[i - 1].event_total) {
-      currentRank = i + 1;
-    }
-    rankedData.push({ ...sorted[i], rank: currentRank });
-  }
-  return rankedData;
-}
-
-/** One entry's starting XI for a gameweek, tagged with both its identities. */
-interface EntryPicks {
-  league_entry: LeagueEntryId;
-  picks: EntryPick[];
 }
 
 async function fetchGameweekBatch(
@@ -114,56 +90,12 @@ async function fetchGameweekBatch(
   }
 
   const results = await Promise.all(batchPromises);
-  const performances: GameweekPerformance[] = [];
 
-  results.forEach(({ gameweek, liveData, playerPicks }) => {
-    // `elements` is an object, so a bare truthiness check passes on the empty
-    // `{}` the API returns for a gameweek that has not been scored yet. Without
-    // the key count, every entry scores 0, ties on rank 1, and banks a win.
-    if (!liveData?.elements || Object.keys(liveData.elements).length === 0) {
-      return;
-    }
-
-    // Likewise, entries whose picks failed to load must not be scored as zeros
-    // — an unplayed gameweek has to be absent, not a joint-first finish.
-    const scoredEntries = playerPicks.filter(
-      (playerData) => playerData?.picks?.length,
-    );
-
-    if (scoredEntries.length === 0) return;
-
-    const gameweekScores = scoredEntries.map((playerData) => {
-      const startingPlayers = playerData.picks.filter(
-        (pick) => pick.position <= 11,
-      );
-
-      const totalPoints = startingPlayers.reduce((sum, pick) => {
-        // Draft element IDs, resolved against the draft API's own live feed —
-        // the classic bootstrap numbers a handful of elements differently.
-        const liveElement = liveData.elements[pick.element.toString()];
-        return sum + (liveElement?.stats?.total_points || 0);
-      }, 0);
-
-      return {
-        league_entry: playerData.league_entry,
-        event_total: totalPoints,
-      };
-    });
-
-    const rankedData = assignRanks(gameweekScores);
-
-    rankedData.forEach((player) => {
-      performances.push({
-        event: gameweek,
-        league_entry: player.league_entry,
-        event_total: player.event_total,
-        rank: player.rank,
-        finished: true,
-      });
-    });
-  });
-
-  return performances;
+  // `scoreGameweek` returns nothing for a gameweek that cannot be scored, so an
+  // unplayed week falls out of the results rather than being stored as zeros.
+  return results.flatMap(({ gameweek, liveData, playerPicks }) =>
+    scoreGameweek(gameweek, liveData, playerPicks),
+  );
 }
 
 /**
@@ -282,107 +214,16 @@ async function computeSeason(): Promise<GameweekDataResponse> {
     }
   }
 
-  const playerMetrics: Record<number, PlayerDetails> = {};
-
-  league_entries.forEach((entry) => {
-    playerMetrics[entry.id] = {
-      id: entry.id,
-      player_name: entry.player_first_name || 'Unknown',
-      player_surname: entry.player_last_name || 'Unknown',
-      team_name: entry.entry_name || 'Unknown',
-      total_points: 0,
-      f1_score: 0,
-      f1_ranking: 0,
-      total_wins: 0,
-      position_placed: emptyPositionTally(),
-    };
-  });
-
-  historicalData.forEach((gameweek) => {
-    const player = playerMetrics[gameweek.league_entry];
-    if (player) {
-      const f1Points = F1_POINTS[gameweek.rank - 1] || 0;
-      player.f1_score += f1Points;
-      if (gameweek.rank === 1) player.total_wins++;
-      // Summed here as the fallback below; overwritten by the official total
-      // whenever upstream has one.
-      player.total_points += gameweek.event_total;
-
-      const position = POSITION_KEYS[gameweek.rank - 1];
-      if (position) player.position_placed[position]++;
-    }
-  });
-
-  // The official cumulative total, which is the same measure as the sum above
-  // but authoritative — it accounts for anything upstream scores differently
-  // from a starting-XI sum.
-  //
-  // Only applied once upstream has a season to report. `standings` is **not**
-  // empty before then: once the draft completes it returns a row per manager
-  // with `total: 0` and every other field null. Overwriting with those zeros
-  // wiped the derived sum and left the table showing real F1 scores beside
-  // 0 points, which reads as a bug rather than as pre-season.
-  const upstreamHasPlayed = standings?.some((standing) => standing.total > 0);
-
-  if (upstreamHasPlayed) {
-    standings.forEach((standing) => {
-      const player = playerMetrics[standing.league_entry];
-      if (player) {
-        player.total_points = standing.total;
-      }
-    });
-  }
-
-  const players = Object.values(playerMetrics);
-  players.sort((a, b) => b.f1_score - a.f1_score);
-  players.forEach((player, index) => {
-    player.f1_ranking = index + 1;
-  });
-
-  const gameweeksByEvent: Record<number, GameweekPerformance[]> = {};
-  historicalData.forEach((gw) => {
-    if (!gameweeksByEvent[gw.event]) {
-      gameweeksByEvent[gw.event] = [];
-    }
-    gameweeksByEvent[gw.event].push(gw);
-  });
-
-  const rumblerData = Object.entries(gameweeksByEvent).map(
-    ([eventStr, performances]) => {
-      const event = parseInt(eventStr, 10);
-      const worstRank = Math.max(...performances.map((p) => p.rank));
-      const rumblers = performances.filter((p) => p.rank === worstRank);
-
-      const rumblerDetails = rumblers.map((rumbler) => {
-        const player = league_entries.find(
-          (entry) => entry.id === rumbler.league_entry,
-        );
-        return {
-          points: rumbler.event_total,
-          entry_name: player?.entry_name || 'Unknown',
-          player_name: player?.player_first_name || 'Unknown',
-        };
-      });
-
-      return {
-        gameweek: event,
-        points: rumblerDetails[0]?.points || 0,
-        entry_names: rumblerDetails.map((r) => r.entry_name),
-        player_names: rumblerDetails.map((r) => r.player_name),
-      };
-    },
-  );
-
   const completedGameweeks = Array.from(
     new Set(historicalData.map((gw) => gw.event)),
   ).sort((a, b) => b - a);
 
   return {
-    players,
+    players: aggregatePlayers(league_entries, historicalData, standings),
     gameweekPerformances: historicalData,
     currentGameweek: currentEvent,
     completedGameweeks,
-    rumblerData: rumblerData.sort((a, b) => b.gameweek - a.gameweek),
+    rumblerData: buildRumblerData(historicalData, league_entries),
   };
 }
 
