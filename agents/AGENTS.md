@@ -338,16 +338,25 @@ awards points.
 
 ## Testing
 
-**There is no test framework in this repo yet.** That is a gap, not a policy.
+**Vitest, colocated `*.test.ts`, run with `pnpm test`.** Config is `vitest.config.mts` — the
+`@/` alias has to be repeated there, because Vitest does not read `tsconfig.json` paths.
 
-> _TODO (owner)_ — add Vitest with colocated `*.test.ts`, and a CI workflow running
-> `pnpm lint`, `pnpm typecheck` and `pnpm test`. The scoring logic in
-> `src/utils/gameweek-data.ts` (`assignRanks`, the F1 award, the empty-gameweek guards) is
-> pure, high-risk, and the obvious first target — the 700-point bug described in
-> [API.md](./API.md) would have been caught by one test.
+**Test the scoring layer, not the fetching.** Everything worth testing here is pure, and it
+lives in [`src/utils/scoring.ts`](../src/utils/scoring.ts): `assignRanks`, `scoreGameweek`,
+`aggregatePlayers`, `buildRumblerData`. `gameweek-data.ts` keeps the fetch, the database and
+the cache, and calls into that module. **Keep that split.** A rule that only exists inside
+an `async` function wrapped around 344 upstream calls cannot be tested, and every rule in
+here has already been broken once in production:
 
-Until then, verify changes with `pnpm lint && pnpm typecheck && pnpm build`, then run the
-app and hit the affected routes.
+- an unscored gameweek must be **absent**, not zeros — `{}` is truthy, and zeros rank
+- ties share the higher rank and consume the lower ones (`1, 1, 3`)
+- `standings` with `total: 0` is post-draft, not a season — the derived sum stands
+
+Adding a rule to the scoring layer means adding the test that pins it. Component tests are a
+separate decision; there is no jsdom environment configured and no need for one yet.
+
+> _TODO (owner)_ — no CI workflow yet. Add one running `pnpm lint`, `pnpm typecheck` and
+> `pnpm test`.
 
 ---
 
@@ -356,6 +365,7 @@ app and hit the affected routes.
 ```bash
 pnpm lint          # eslint, flat config
 pnpm typecheck     # tsc --noEmit
+pnpm test          # vitest run
 pnpm format:check  # prettier
 pnpm build         # next build (Turbopack)
 PORT=3100 pnpm start
@@ -406,14 +416,18 @@ Two further known defects, both pre-existing and neither yet fixed:
   on `<html>`, but no theme entry maps `font-inter` to it, so the app renders in the default
   sans stack. Deliberately left alone during the Tailwind 4 migration to avoid changing
   typography; fold it into the design refresh.
-- **Four routes have no consumer**: `/api/current-event`, `/api/pl-teams`,
-  `/api/pl-fixtures`, `/api/matches`. Now that pages read their own data, an `/api/*` route
-  is only justified by an external consumer — decide whether these have one, or delete them.
-  (`/api/standings`, `/api/gameweek-data`, `/api/rumbler` and `/api/player/[id]` were
-  deleted with the Server Components refactor; `/api/auth/[...path]` is Neon Auth's and
-  stays.)
 - **Four components are defined but never imported**: `MatchOddsCard`, `GameweekScoreChart`,
-  `GameweekSummaryCard`, `StreaksTracker`. Same decision, deliberately deferred.
+  `GameweekSummaryCard`, `StreaksTracker`. Deliberately deferred.
+
+**`/api/auth/[...path]` is now the only route handler**, and it is Neon Auth's. Every other
+one has been deleted: `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and
+`/api/player/[id]` went with the Server Components refactor, and `/api/current-event`,
+`/api/pl-teams`, `/api/pl-fixtures` and `/api/matches` followed once nothing imported them.
+
+The deciding argument is worth keeping, because it applies to the next one somebody wants to
+add: **`src/proxy.ts` matches `/api/*` too**, so an unauthenticated caller gets a 307 to the
+sign-in page. A route "for an external consumer" cannot have one until that changes. Adding
+an `/api/*` route means designing its authentication first, not afterwards.
 
 Production auth configuration is now done: `trusted_origins` on the Neon project contains
 `https://draftrank.vercel.app`, and `allow_localhost` is on for development.

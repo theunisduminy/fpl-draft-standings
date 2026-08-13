@@ -133,7 +133,7 @@ Per-gameweek processing status. Drives which gameweeks are considered complete.
   field `getGameweekData()` uses to decide `maxCompletedGameweek`.
 - **404s pre-season** with the bare string `"Game not started"` — see the warning above.
 
-Consumed by: `fetchEventStatus()` in `gameweek-data.ts`, and `/api/current-event`.
+Consumed by: `fetchEventStatus()` in `gameweek-data.ts`.
 
 ### `GET /api/league/{leagueId}/details`
 
@@ -351,8 +351,7 @@ The full static dataset — ~1.3 MB. Top-level keys: `chips`, `events`, `game_se
 `game_config`, `phases`, `teams`, `total_players`, `element_stats`, `element_types`,
 `elements`.
 
-**`teams`** (20) — read through `getPremierLeagueTeams()` in `src/utils/pl-teams.ts`, which
-also backs `/api/pl-teams`:
+**`teams`** (20) — read through `getPremierLeagueTeams()` in `src/utils/pl-teams.ts`:
 
 `code`, `draw`, `form`, `id`, `loss`, `name`, `played`, `points`, `position`,
 `short_name`, `strength`, `team_division`, `unavailable`, `win`, `link_url`,
@@ -384,7 +383,7 @@ pre-season.
 
 ### `GET /api/fixtures/`
 
-All 380 fixtures. Served by `/api/pl-fixtures`.
+All 380 fixtures. No consumer in the app; `fplApi.fixtures()` builds the URL.
 
 ```json
 {
@@ -414,34 +413,33 @@ All 380 fixtures. Served by `/api/pl-fixtures`.
 
 ## Our own routes (`src/app/api/**`)
 
-**Pages do not use these.** Every page is an `async` Server Component calling
-`getGameweekData()` or the DAL directly, so an `/api/*` route now exists only for an
-external consumer. `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and
-`/api/player/[id]` were deleted when the pages stopped needing them.
+**There is one route handler left, and it is not ours.**
 
-| Route                 | Returns                  | Backed by                  |
-| --------------------- | ------------------------ | -------------------------- |
-| `/api/auth/[...path]` | Neon Auth's own handler  | `auth.handler()`           |
-| `/api/matches`        | `GameweekPerformance[]`  | `.gameweekPerformances`    |
-| `/api/current-event`  | `GameWeekStatus \| null` | Draft `event-status`       |
-| `/api/pl-teams`       | The 20 `teams`           | Classic `bootstrap-static` |
-| `/api/pl-fixtures`    | All 380 fixtures         | Classic `fixtures`         |
+| Route                 | Returns                 | Backed by        |
+| --------------------- | ----------------------- | ---------------- |
+| `/api/auth/[...path]` | Neon Auth's own handler | `auth.handler()` |
 
-Errors are uniform — `{ error, message }` with a 500.
+Every page is an `async` Server Component calling `getGameweekData()` or the DAL directly,
+so an `/api/*` route only ever existed to feed a component. `/api/standings`,
+`/api/gameweek-data`, `/api/rumbler` and `/api/player/[id]` went when the pages stopped
+needing them; `/api/matches`, `/api/current-event`, `/api/pl-teams` and `/api/pl-fixtures`
+followed once nothing in the repo imported them either. Each was a few lines wrapping a
+call the server can make directly — `/api/pl-teams`, for instance, wrapped
+`getPremierLeagueTeams()`, which the profile page already calls itself.
 
-> **No consumer:** `/api/matches`, `/api/current-event`, `/api/pl-teams`,
-> `/api/pl-fixtures`. They are exercised only by the Bruno collection, and all four now sit
-> behind the auth gate, so they answer `307 → /auth/sign-in` without a session. Keep or
-> delete deliberately — do not assume they are load-bearing. Note `/api/pl-teams` is now a
-> thin wrapper over `getPremierLeagueTeams()`, which the profile page uses directly; the
-> route itself is still consumer-less.
+**Before adding one back, note that `src/proxy.ts` matches `/api/*`.** An unauthenticated
+caller gets `307 → /auth/sign-in`, so "an external consumer needs it" is not yet a reason
+that works — there is no way for an external consumer to authenticate. Design that first.
+
+If you do add one: `src/app/api/<name>/route.ts`, export `GET`, and fail with
+`{ error, message }` and a 500.
 
 ### Pre-season responses
 
 With no gameweeks played, the pipeline returns a valid empty season rather than
 failing: all 8 entries present with `f1_score: 0`, `total_points: 0` and zeroed
 `position_placed`; `gameweekPerformances: []`; `rumblerData: []`;
-`completedGameweeks: []`; `currentGameweek: 0`; and `/api/current-event` → `null`.
+`completedGameweeks: []`; and `currentGameweek: 0`.
 
 The pages render that state as content, not as an error: standings list all eight managers
 on zero, and results and rumblers show their empty-state copy.
