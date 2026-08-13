@@ -26,12 +26,19 @@ Better Draft is a **Next.js 16 App Router application** backed by **Neon Postgre
 (accessed with Drizzle) and **Neon Auth**. It is deployed to Vercel at
 [draftrank.vercel.app](https://draftrank.vercel.app).
 
-Two audience-bounded zones:
+**The whole app is behind sign-in.** `src/proxy.ts` redirects every signed-out request to
+`/auth/sign-in`; there is no public view and no anonymous zone. Three levels of access sit
+behind that gate, each enforced somewhere different:
 
-- **Public** — the standings, results, rumbler and player pages. No sign-in, same view for
-  everyone.
-- **Members** (`/profile`, and the bets work to come) — signed in via Neon Auth and on the
-  `league_members` mapping table.
+- **Signed in** — a valid Neon Auth session. This is all the proxy checks, so any Google
+  account clears it.
+- **A member** — that session's email also has a row in `league_members`. `getCurrentUser()`
+  returns `null` for anyone else.
+- **Onboarded** — a display name and a bio are on record. `(app)/(onboarded)/layout.tsx`
+  sends anyone missing either to `/profile` and keeps them there.
+
+`/profile` is the funnel for the two failure cases, which is why it sits outside
+`(onboarded)`: a stranger sees why they are not in, a member sees the form.
 
 The product surface:
 
@@ -41,6 +48,7 @@ The product surface:
 - `/squads` — who owns whom, with the draft round each player went in
 - `/players/[playerId]` — one manager's season: performance, positions, form
 - `/profile` — claim which manager you are (members only)
+- `/auth/sign-in` — the only route a signed-out visitor can reach
 
 **The split of ownership matters.** The league roster, scores and fixtures are upstream's
 and are read from the FPL API. What the database holds is exactly two things: **a cache of
@@ -67,6 +75,7 @@ connection string is a real credential, and it must never reach the browser.
                                   │  HTTP (cookies carry the session)
 ┌─────────────────────────────────▼─────────────────────────────────┐
 │  Next.js server (App Router)                                     │
+│   src/proxy.ts               ── the gate: OAuth exchange + redirect│
 │   src/app/**/page.tsx        ── Server Components read directly   │
 │   src/app/api/**/route.ts    ── shapes responses, owns { error }  │
 │   src/server/actions/**      ── 'use server'; validates, writes   │
@@ -146,15 +155,23 @@ Two consequences worth stating outright:
 ├── drizzle.config.ts          migrations; schemaFilter: ['public'] only
 ├── drizzle/                   generated SQL migrations — never edit an applied one
 └── src/
+    ├── proxy.ts               ★ the auth gate — Next 16's name for middleware.ts
     ├── app/
-    │   ├── layout.tsx         root shell: fonts, nav, footer, analytics
+    │   ├── layout.tsx         root: html/body, fonts, analytics — NO navigation
     │   ├── globals.css        ★ Tailwind v4 config lives here (@theme inline)
-    │   ├── page.tsx           / — standings
-    │   ├── results/           /results
-    │   ├── rumblers/          /rumblers
-    │   ├── players/[playerId]/  /players/:id
-    │   ├── error.tsx          route-level error boundary (retry re-renders on the server)
-    │   ├── not-found.tsx      404 page — reached via notFound()
+    │   ├── not-found.tsx      404 — root-level, so it wraps itself in AppChrome
+    │   ├── auth/sign-in/      the only route reachable signed out; no chrome
+    │   ├── (app)/             ★ everything behind the gate, wrapped in AppChrome
+    │   │   ├── layout.tsx     the navigation shell
+    │   │   ├── error.tsx      route-level error boundary (retry re-renders server-side)
+    │   │   ├── profile/       /profile — the onboarding funnel; outside (onboarded)
+    │   │   └── (onboarded)/   ★ requires a member with a finished profile
+    │   │       ├── layout.tsx the membership + onboarding redirect
+    │   │       ├── (home)/    / — standings (its own group, for loading.tsx)
+    │   │       ├── results/   /results
+    │   │       ├── rumblers/  /rumblers
+    │   │       ├── squads/    /squads
+    │   │       └── players/[playerId]/  /players/:id
     │   └── api/               Neon Auth + 4 consumer-less GET handlers (see API.md)
     ├── components/
     │   ├── ui/                shadcn primitives — chart.tsx is the recharts wrapper
@@ -162,7 +179,7 @@ Two consequences worth stating outright:
     │   ├── PlayerView/        per-player charts, summary, form guide
     │   ├── RumblerView/       rumbler cards, dashboard, frequency chart
     │   ├── SquadView/         squad card (pure server, no client JS)
-    │   ├── Layout/            HeaderNav, MobileNav, Footer
+    │   ├── Layout/            AppChrome, HeaderNav, SideNav, MobileNav, Footer
     │   └── DetailView/        gameweek summary, score chart, match odds
     ├── server/                ★ server-only. Never imported by a client component.
     │   ├── db/
@@ -352,7 +369,7 @@ integrity cost of leaving it off is nil.
 | Add a table or change the schema        | `src/server/db/schema.ts`                 | `pnpm db:generate` then `pnpm db:migrate`                     |
 | Add a database read                     | `src/server/data/<domain>.ts`             | Never `@/server/db/**` from a page or route                   |
 | Add a write                             | `src/server/actions/<domain>.ts`          | Validate, call the DAL, `revalidatePath`                      |
-| Gate something behind sign-in           | `src/server/auth/server.ts`               | `getCurrentUser()` is `null` if not allowlisted               |
+| Gate something behind sign-in           | already gated — `src/proxy.ts`            | For members-only, check `getCurrentUser()` in the page too    |
 | Add someone to the league               | `league-members.json`                     | `pnpm db:seed:members`                                        |
 
 ---
@@ -370,9 +387,13 @@ Tracked in [`STRATEGY.md`](./STRATEGY.md#tracks).
 - **Weekly results email.** A scheduled job reading the finished gameweek and sending a
   summary. WhatsApp delivery is unresolved — the Business API needs a template and a
   number, so a shareable web summary may be the pragmatic first step.
-- **Production auth config.** `trusted_origins` on the Neon Auth project is currently empty
-  and `allow_localhost` is on. The Vercel origin must be added before sign-in works in
-  production.
+- **The onboarding gate costs a read per page.** `(onboarded)/layout.tsx` awaits
+  `getCurrentUser()` above every route, and there is no Suspense boundary between it and
+  `AppChrome`, so the navigation cannot flush until that read returns. The two queries run
+  concurrently and Neon Auth caches the session in a signed cookie for 300s, so the usual
+  cost is one round trip — but it is one round trip in front of the streaming that
+  [§3](#3-request-lifecycle) is careful to set up. Worth measuring before adding a second
+  such check.
 - **Tests and CI.** See [`AGENTS.md` — Testing](./AGENTS.md#testing). The DAL and the
   scoring logic are both pure enough to test cheaply.
 

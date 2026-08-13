@@ -351,12 +351,27 @@ The full static dataset — ~1.3 MB. Top-level keys: `chips`, `events`, `game_se
 `game_config`, `phases`, `teams`, `total_players`, `element_stats`, `element_types`,
 `elements`.
 
-**`teams`** (20) — the only part the app currently uses, via `/api/pl-teams`:
+**`teams`** (20) — read through `getPremierLeagueTeams()` in `src/utils/pl-teams.ts`, which
+also backs `/api/pl-teams`:
 
 `code`, `draw`, `form`, `id`, `loss`, `name`, `played`, `points`, `position`,
 `short_name`, `strength`, `team_division`, `unavailable`, `win`, `link_url`,
 `strength_overall_home`, `strength_overall_away`, `strength_attack_home`,
 `strength_attack_away`, `strength_defence_home`, `strength_defence_away`, `pulse_id`.
+
+> **`code` is stable across seasons. `id` is not — never persist `id`.**
+> `id` is 1–20 assigned in alphabetical order and re-minted every August, so a promoted club
+> that sorts early shifts every id after it. `code` is the club's permanent number: Arsenal
+> is `code` 3 and `id` 1 this season, Aston Villa `code` 7 / `id` 2, Bournemouth `code` 91 /
+> `id` 3 — the codes are visibly not sequential because they were issued once, historically.
+>
+> This is the same season-scoping trap as `league_entries[].id`, with one difference: it
+> would not fail at read time. A stored `id` keeps resolving, to the wrong club, a year
+> later. `profiles.favourite_team` therefore stores the **code**, typed as `TeamCode` in
+> [`src/interfaces/fpl.ts`](../src/interfaces/fpl.ts).
+>
+> `teams[].id` is still the right key for fixtures — `team_h` / `team_a` below are ids — but
+> only within one season's payload, never in the database.
 
 **`events`** (38) — gameweek metadata. `is_current` / `is_next` / `is_previous` and
 `deadline_time` are the useful ones, and unlike `event-status` they are available
@@ -415,8 +430,11 @@ external consumer. `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and
 Errors are uniform — `{ error, message }` with a 500.
 
 > **No consumer:** `/api/matches`, `/api/current-event`, `/api/pl-teams`,
-> `/api/pl-fixtures`. They are exercised only by the Bruno collection. Keep or delete
-> deliberately — do not assume they are load-bearing.
+> `/api/pl-fixtures`. They are exercised only by the Bruno collection, and all four now sit
+> behind the auth gate, so they answer `307 → /auth/sign-in` without a session. Keep or
+> delete deliberately — do not assume they are load-bearing. Note `/api/pl-teams` is now a
+> thin wrapper over `getPremierLeagueTeams()`, which the profile page uses directly; the
+> route itself is still consumer-less.
 
 ### Pre-season responses
 

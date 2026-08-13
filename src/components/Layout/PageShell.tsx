@@ -59,7 +59,7 @@ export function PageShell({
     // *title*, so it belongs with the title. Every page and every `loading.tsx`
     // renders through this, so the heading sits at one height across the site
     // and the skeleton shells line up with the real thing.
-    <div className='w-full space-y-6 pt-3 md:pt-6'>
+    <div className='w-full space-y-6 pt-2 md:pt-4'>
       <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
         <div className='flex items-center gap-3'>
           {back}

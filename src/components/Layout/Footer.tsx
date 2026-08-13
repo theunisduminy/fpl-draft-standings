@@ -38,30 +38,42 @@ const navigation = [
   },
 ];
 
+/**
+ * The footer bar.
+ *
+ * The landmark spans the page; the coloured bar inside it does not. The bar
+ * sits in the **same container as the page content** — `lg:pl-64` for the fixed
+ * sidebar, then `max-w-7xl` and the same padding scale as `AppChrome` — so its
+ * left and right edges land exactly on the card edges above it. Change the
+ * container in one and this stops lining up.
+ *
+ * That containment is also why the sidebar offset is padding here rather than
+ * the margin it used to be: the gradient now starts inside the padding, so
+ * there is nothing left to run underneath the sidebar panel.
+ */
 export default function Footer() {
   return (
-    // Margin, not padding, from `lg` up. The sidebar is fixed, so padding
-    // would clear the text but still run this bright gradient underneath the
-    // dark panel. A margin starts the footer where the sidebar ends.
-    <footer className='hidden border-t border-white/10 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] py-6 md:block lg:ml-64 lg:rounded-tl-xl'>
-      <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
-        <div className='flex flex-col items-center gap-4 md:flex-row md:justify-between'>
-          <p className='text-center text-xs font-semibold text-[#310639]'>
-            &copy; {year} Theunis Duminy. For the lads. All rights reserved.
-          </p>
-          <div className='flex items-center gap-4'>
-            {navigation.map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='text-[#310639]/70 transition-colors hover:text-[#310639]'
-              >
-                <span className='sr-only'>{item.name}</span>
-                <item.icon aria-hidden='true' className='h-5 w-5' />
-              </a>
-            ))}
+    <footer className='hidden md:block lg:pl-64'>
+      <div className='mx-auto w-full max-w-7xl px-4 pb-4 sm:px-6 lg:px-8'>
+        <div className='rounded-xl border border-white/10 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] px-6 py-5'>
+          <div className='flex flex-col items-center gap-4 md:flex-row md:justify-between'>
+            <p className='text-center text-xs font-semibold text-[#310639]'>
+              &copy; {year} Theunis Duminy. For the lads. All rights reserved.
+            </p>
+            <div className='flex items-center gap-4'>
+              {navigation.map((item) => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='text-[#310639]/70 transition-colors hover:text-[#310639]'
+                >
+                  <span className='sr-only'>{item.name}</span>
+                  <item.icon aria-hidden='true' className='h-5 w-5' />
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       </div>
