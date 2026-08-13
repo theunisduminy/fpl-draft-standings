@@ -38,11 +38,9 @@ export const metadata: Metadata = {
     url: 'https://draftrank.vercel.app',
     siteName: 'Better Draft',
   },
-  icons: {
-    icon: '/better-favicon.ico',
-    shortcut: '/better-favicon.ico',
-    apple: '/better-favicon.ico',
-  },
+  // No `icons` block on purpose: `src/app/favicon.ico` is picked up by Next's
+  // file convention. An explicit override here would win over it, which is how
+  // three links to the since-deleted `/public/better-favicon.ico` survived.
 };
 
 export const viewport: Viewport = {
