@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Standings', href: '/', target: '_self' },
   { name: 'Results', href: '/results', target: '_self' },
   { name: 'Rumblers', href: '/rumblers', target: '_self' },
+  { name: 'Squads', href: '/squads', target: '_self' },
   { name: 'Profile', href: '/profile', target: '_self' },
 ];
 
