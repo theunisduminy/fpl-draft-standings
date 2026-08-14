@@ -24,9 +24,11 @@ const navigation = [
  * newer generation of `button`/`sheet`/`tooltip`, which would have restyled
  * every button on the site. Five links did not justify that.
  *
- * Below `lg` this is hidden entirely — `MobileNav` already puts the same five
- * destinations in a bottom bar, and two mechanisms for one set of links is one
- * too many.
+ * Below `lg` this is hidden entirely — `MobileNav` and the `HeaderNav` avatar
+ * already reach the same five destinations between them, and two mechanisms for
+ * one set of links is one too many. This rail keeps Profile in the list that
+ * `MobileNav` drops, because from `lg` up the header is hidden and this is the
+ * only navigation on the page.
  *
  * **The gradient is the signature, moved.** It used to run across the full
  * width of the top bar, which made the loudest thing on every page a piece of
