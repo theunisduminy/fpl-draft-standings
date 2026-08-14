@@ -19,8 +19,9 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
   return (
     <>
       {/* Three navigation surfaces, each owning one breakpoint band:
-          HeaderNav is the brand bar below `lg`, MobileNav the bottom bar
-          below `md`, and SideNav the floating panel from `lg` up. */}
+          HeaderNav is the brand bar below `lg` and carries Profile at every
+          width it is on screen, MobileNav the bottom bar below `md`, and
+          SideNav the floating panel from `lg` up. */}
       <HeaderNav />
       <SideNav />
 

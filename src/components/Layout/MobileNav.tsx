@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, BarChart3, Beer, Users, User } from 'lucide-react';
+import { Trophy, BarChart3, Beer, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -10,7 +10,6 @@ const navigation = [
   { name: 'Results', href: '/results', icon: BarChart3 },
   { name: 'Rumblers', href: '/rumblers', icon: Beer },
   { name: 'Squads', href: '/squads', icon: Users },
-  { name: 'Profile', href: '/profile', icon: User },
 ];
 
 /**
@@ -19,7 +18,14 @@ const navigation = [
  * Same `glass` treatment and hairline border, and the gradient appears only on
  * the active item — a 3px rail and a cyan icon — so the loudest thing on a
  * phone screen is the standings rather than the chrome. The two navigations are
- * one design at two orientations; change one and change the other.
+ * one design at two orientations; change the styling of one and change the
+ * other.
+ *
+ * **Their contents deliberately differ by one item.** Profile is not here: a
+ * bottom bar holds about five items before the labels start to crowd, and this
+ * one has to keep room for the weekly pages. It moved to the avatar button in
+ * `HeaderNav`, which is on screen at every width this bar is. `SideNav` still
+ * lists it, because from `lg` up that rail is the only navigation there is.
  *
  * It floats at the sides like `SideNav` does, with a 0.25rem gap beneath it —
  * enough to read as floating, too little to show a strip of page. There is
