@@ -36,6 +36,26 @@ const CACHE_TTL_SECONDS = 21600; // 6 hours — the static set moves with transf
 
 export type { ElementDetails };
 
+/**
+ * The cacheable half: **plain data, and it has to stay that way.**
+ *
+ * `cachedRead` puts this through `unstable_cache`, which serialises to Next's
+ * Data Cache — so anything that does not survive `JSON.stringify` is silently
+ * dropped on the way in and simply absent on the way out. A `Map`, a `Set` or a
+ * method would look perfect on the process that computed it and arrive as `{}`
+ * at every process that later reads the cache.
+ *
+ * That failure is invisible in development, because `cachedRead` deliberately
+ * returns `compute` unwrapped outside production, so nothing is ever
+ * round-tripped. It would surface only as a crash on a warm lambda in
+ * production. Keep this a `Record`, not a `Map`.
+ */
+interface ElementLookupData {
+  source: 'table' | 'bootstrap';
+  /** Keyed by element id. JSON turns the keys into strings; lookup coerces. */
+  details: Record<number, ElementDetails>;
+}
+
 export interface ElementLookup {
   describe: (element: ElementId) => ElementDetails;
   /**
@@ -53,24 +73,40 @@ export interface ElementLookup {
 }
 
 /**
- * The lookup, built once per process per TTL.
+ * The data, cached; the functions, built fresh around it on every call.
  *
- * Next's Data Cache stores the *response*, not the parsed object — so without
- * this every drawer open re-parsed 850 KB and rebuilt three maps to read
- * fifteen elements. `cachedRead` keeps the derived maps in memory instead,
- * which is the difference it was written for. That still holds on the table
- * path: the rows are smaller, but the maps are the same maps.
+ * The split is the whole point — see {@link ElementLookupData}. Only the record
+ * crosses the cache boundary, so a Data Cache hit on a cold lambda revives
+ * something complete rather than an object whose methods vanished in transit.
+ *
+ * Caching is still worth it for the same reason it always was: Next's Data
+ * Cache stores the *response*, not the parsed object, so without this every
+ * drawer open re-parsed 850 KB to read fifteen elements. Wrapping a record in
+ * three closures costs nothing next to that.
  */
-export const getElementLookup = cachedRead(
+const readLookupData = cachedRead(
   CACHE_KEY,
   CACHE_TTL_SECONDS,
-  buildElementLookup,
+  buildLookupData,
 );
 
-async function buildElementLookup(): Promise<ElementLookup> {
+export async function getElementLookup(): Promise<ElementLookup> {
+  return toLookup(await readLookupData());
+}
+
+/** Wrap a plain record in the lookup interface. Cheap, and done per call. */
+function toLookup(data: ElementLookupData): ElementLookup {
+  return {
+    source: data.source,
+    has: (element) => Object.hasOwn(data.details, element),
+    describe: (element) => data.details[element] ?? unknownElement(element),
+  };
+}
+
+async function buildLookupData(): Promise<ElementLookupData> {
   const fromTable = await buildFromTable();
 
-  return fromTable ?? buildFromBootstrap();
+  return fromTable ?? buildBootstrapData();
 }
 
 /**
@@ -82,7 +118,7 @@ async function buildElementLookup(): Promise<ElementLookup> {
  * built on them would render every club column as `'—'` while reporting
  * success. Checking `pl_teams` here is what stops that shipping.
  */
-async function buildFromTable(): Promise<ElementLookup | null> {
+async function buildFromTable(): Promise<ElementLookupData | null> {
   const now = new Date();
 
   // Both reads are keyed on the league alone, so they run together and neither
@@ -120,65 +156,60 @@ async function buildFromTable(): Promise<ElementLookup | null> {
   const clubsByCode = new Map<number, PlTeam>(
     teams.rows.map((row) => [row.code, toPlTeam(row)]),
   );
-  const detailsById = new Map<ElementId, ElementDetails>(
-    elements.rows.map((row) => [
-      row.elementId as ElementId,
-      toElementDetails(row, clubsByCode),
-    ]),
-  );
 
-  return {
-    source: 'table',
-    has: (element) => detailsById.has(element),
-    describe: (element) => detailsById.get(element) ?? unknownElement(element),
-  };
+  const details: Record<number, ElementDetails> = {};
+
+  for (const row of elements.rows) {
+    details[row.elementId] = toElementDetails(row, clubsByCode);
+  }
+
+  return { source: 'table', details };
 }
 
 /**
  * The lookup from the draft bootstrap — the path that was here all along, and
  * which every fallback lands on.
  *
- * Exported so a caller that discovers the table was incomplete can rebuild
- * from the source rather than serving a hole. The 850 KB response is still held
- * by Next's Data Cache for the same six hours, so a fallback re-parses; it does
- * not re-download.
+ * Exported (as {@link buildFromBootstrap}) so a caller that discovers the table
+ * was incomplete can rebuild from the source rather than serving a hole. The
+ * 850 KB response is still held by Next's Data Cache for the same six hours, so
+ * a fallback re-parses; it does not re-download.
  */
-export async function buildFromBootstrap(): Promise<ElementLookup> {
+async function buildBootstrapData(): Promise<ElementLookupData> {
   const bootstrap = await fetchUpstream<DraftBootstrap>(
     fplApi.draftBootstrap(),
     CACHE_TTL_SECONDS,
   );
 
-  // Keyed by the branded ID each map actually holds, so the join cannot
-  // quietly cross identities. The brands are erased at runtime, so this costs
-  // nothing and a `Number()` here would buy nothing but the bug.
-  const elements = new Map(
-    bootstrap.elements.map((element) => [element.id, element]),
-  );
+  // Both of these are addressed by the bootstrap's own season-scoped `id`,
+  // which is why they are local scaffolding and never leave this function:
+  // what comes out the other side is keyed by element id and carries the
+  // season-stable `code`, matching exactly what the table path produces.
   const clubs = new Map(bootstrap.teams.map((team) => [team.id, team]));
   const positions = new Map(
     bootstrap.element_types.map((type) => [type.id, type]),
   );
 
-  return {
-    source: 'bootstrap',
-    has: (element) => elements.has(element),
-    describe: (element) => {
-      const details = elements.get(element);
+  const details: Record<number, ElementDetails> = {};
 
-      if (!details) return unknownElement(element);
+  for (const element of bootstrap.elements) {
+    details[element.id] = {
+      name: element.web_name,
+      position: toPosition(
+        positions.get(element.element_type)?.singular_name_short,
+      ),
+      club: clubs.get(element.team)?.short_name ?? '—',
+      code: asElementCode(element.code),
+      points: element.total_points,
+    };
+  }
 
-      return {
-        name: details.web_name,
-        position: toPosition(
-          positions.get(details.element_type)?.singular_name_short,
-        ),
-        club: clubs.get(details.team)?.short_name ?? '—',
-        code: asElementCode(details.code),
-        points: details.total_points,
-      };
-    },
-  };
+  return { source: 'bootstrap', details };
+}
+
+/** The bootstrap lookup, ready to use. The fallback every caller lands on. */
+export async function buildFromBootstrap(): Promise<ElementLookup> {
+  return toLookup(await buildBootstrapData());
 }
 
 /** What an unresolvable element looks like, identically on both paths. */
