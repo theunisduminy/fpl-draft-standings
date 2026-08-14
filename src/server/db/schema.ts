@@ -152,7 +152,104 @@ export const profiles = pgTable('profiles', {
     .defaultNow(),
 });
 
+/**
+ * The footballers, flattened out of the draft bootstrap.
+ *
+ * An **accelerator, never a source of truth.** Every reader that consults this
+ * table can answer without it — see `getElementLookup`, which falls back to the
+ * bootstrap whenever the table is empty, stale, incomplete or unreachable. A
+ * failed sync makes a page slower; it must never make one wrong.
+ *
+ * The point is proportion. Resolving ~120 owned element ids into names,
+ * positions and clubs costs an 850 KB download of all 581 elements plus their
+ * full statistical payload, because there is no way to ask upstream for a
+ * subset. This holds the handful of fields anyone actually reads.
+ *
+ * **Populated from the draft bootstrap and resolvable only against draft
+ * element ids.** The draft and classic APIs disagree on about 21 of their 581
+ * elements, and mixing them is silent — see `ElementId` in
+ * `src/interfaces/fpl.ts`.
+ */
+export const draftElements = pgTable(
+  'draft_elements',
+  {
+    /**
+     * The season, identified by its league. `element_id` below is re-minted
+     * every August, so without this column last season's rows would not merely
+     * be stale — they would answer, with another footballer entirely.
+     */
+    leagueId: integer('league_id').notNull(),
+    /**
+     * `elements[].id` from the **draft** bootstrap. Season-scoped, which is
+     * exactly why it is only ever a key alongside `league_id`.
+     *
+     * It is the key rather than `code` because ownership hands the reader
+     * element ids: `element_status[].element` is an id, so keying by code
+     * would force every lookup through a second translation.
+     */
+    elementId: integer('element_id').notNull(),
+    /**
+     * `elements[].code` — the season-stable identity, and what a headshot URL
+     * is built from (`resources.premierleague.com/.../p{code}.png`). Stored as
+     * an attribute rather than a key: it is what outlives the season, while
+     * `element_id` is what addresses the row within one.
+     */
+    code: integer('code').notNull(),
+    /** `web_name` — the only name rendered today. */
+    webName: text('web_name').notNull(),
+    /** `GKP` | `DEF` | `MID` | `FWD` | `UNK`, resolved from `element_type`. */
+    position: text('position').notNull(),
+    /**
+     * `teams[].code` for the club, **not** `teams[].id`. Joins to
+     * `pl_teams.code`, which is the one identifier both bootstraps agree on
+     * and the only one that survives August.
+     */
+    teamCode: integer('team_code').notNull(),
+    /** Season total. Stale between syncs by design — see KTD4 in the plan. */
+    totalPoints: integer('total_points').notNull(),
+    /**
+     * When this row was last written. Read rather than assumed: the staleness
+     * predicate compares it against one budget, and a reader that trusted the
+     * table blindly would serve a transferred player's old club forever.
+     */
+    syncedAt: timestamp('synced_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.leagueId, table.elementId] })],
+);
+
+/**
+ * The 20 Premier League clubs.
+ *
+ * Keyed by `code` rather than `id` because, unlike a footballer, a club is only
+ * ever looked up by code: `profiles.favourite_team` stores one, and a crest URL
+ * is built from one. There is no id-shaped question to answer.
+ *
+ * Still scoped by league, even though `TeamCode` is season-stable, so the
+ * season's club *set* stays recoverable. One global club table could not answer
+ * "which 20 were in the league that year" after promotion and relegation.
+ */
+export const plTeams = pgTable(
+  'pl_teams',
+  {
+    leagueId: integer('league_id').notNull(),
+    /** `teams[].code` — stable across seasons. See `TeamCode`. */
+    code: integer('code').notNull(),
+    name: text('name').notNull(),
+    shortName: text('short_name').notNull(),
+    syncedAt: timestamp('synced_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.leagueId, table.code] })],
+);
+
 export type GameweekScoreRow = typeof gameweekScores.$inferSelect;
 export type NewGameweekScoreRow = typeof gameweekScores.$inferInsert;
 export type LeagueMemberRow = typeof leagueMembers.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;
+export type DraftElementRow = typeof draftElements.$inferSelect;
+export type NewDraftElementRow = typeof draftElements.$inferInsert;
+export type PlTeamRow = typeof plTeams.$inferSelect;
+export type NewPlTeamRow = typeof plTeams.$inferInsert;

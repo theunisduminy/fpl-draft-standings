@@ -240,11 +240,12 @@ The app's whole reason to exist. In `src/utils/gameweek-data.ts`:
 
 Three layers now sit in front of the upstream APIs:
 
-| Layer                  | Where                      | TTL     | Survives a cold start?  |
-| ---------------------- | -------------------------- | ------- | ----------------------- |
-| Next.js `fetch` cache  | `.next/cache`              | 300 s   | Yes (and across builds) |
-| In-memory result cache | `src/utils/cache.ts` Map   | 3 600 s | **No**                  |
-| **Finished gameweeks** | **Neon `gameweek_scores`** | forever | **Yes**                 |
+| Layer                  | Where                                 | TTL     | Survives a cold start?  |
+| ---------------------- | ------------------------------------- | ------- | ----------------------- |
+| Next.js `fetch` cache  | `.next/cache`                         | 300 s   | Yes (and across builds) |
+| In-memory result cache | `src/utils/cache.ts` Map              | 3 600 s | **No**                  |
+| **Finished gameweeks** | **Neon `gameweek_scores`**            | forever | **Yes**                 |
+| **Reference data**     | **Neon `draft_elements`, `pl_teams`** | 6 h     | **Yes**                 |
 
 Plus promise deduplication in `getGameweekData()`, so concurrent requests on one instance
 share a single computation.
@@ -258,6 +259,17 @@ the gap, and stores what it fetched. Steady state is therefore **9 calls a week*
 gameweek), not 344 — and a cold start costs one query rather than a full rebuild. The
 batching still applies to whatever is genuinely missing, so a first run, or a rebuilt
 database, behaves exactly as it always did.
+
+**Reference data works the same way, with one difference that matters.** A finished
+gameweek is immutable, so `gameweek_scores` is written once and trusted forever.
+Footballers and clubs are not: points accumulate and players are transferred, so
+`draft_elements` and `pl_teams` carry `synced_at` and are trusted only for
+`REFERENCE_STALE_AFTER_SECONDS` (six hours, in `src/utils/reference-mapping.ts`). Past
+that — or if a table is empty, missing an element it was asked for, or simply unreachable
+— the reader falls back to the ~850 KB draft bootstrap exactly as it always did, and logs
+why. **These tables are an accelerator, never a source of truth.** Every read that
+consults one can answer without it, so a failed sync or a sleeping database costs latency
+and never correctness. `/api/cron/revalidate` keeps them current every three hours.
 
 The guard that keeps this safe: a gameweek that produced **no** performances is never
 recorded. An unscored gameweek must stay absent so it is retried, rather than being frozen
@@ -314,7 +326,17 @@ So `league_id` is part of the key on every persisted table:
 | `gameweek_scores` | PK `(league_id, gameweek, league_entry)`                    |
 | `gameweeks`       | PK `(league_id, gameweek)`                                  |
 | `league_members`  | PK `(league_id, email)`, unique `(league_id, league_entry)` |
+| `draft_elements`  | PK `(league_id, element_id)`                                |
+| `pl_teams`        | PK `(league_id, code)`                                      |
 | `profiles`        | PK `(user_id)` — deliberately season-independent            |
+
+The two reference tables key differently on purpose. `pl_teams` keys by the season-stable
+`code`, because a club is only ever looked up by code — `profiles.favourite_team` stores
+one and a crest URL is built from one. `draft_elements` keys by the season-scoped
+`element_id`, because ownership hands the reader element ids: `element_status[].element`
+is an id, so a code-keyed table would force a second translation on every lookup. It
+carries `code` as a column regardless, since that is what a headshot URL needs and what
+survives August. `league_id` is what makes the id key safe.
 
 Without it, next season's gameweek 1 collides with this season's and the cache serves the
 wrong year's scores, and a member mapping survives pointing at a number that may by then

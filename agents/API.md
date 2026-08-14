@@ -313,6 +313,18 @@ source for "who owns X now". Good for a draft-recap view.
 The draft game's own static dataset: `elements`, `teams`, `element_types`, `events`,
 `fixtures`, `settings`, `element_stats`.
 
+**This is the payload the reference tables exist to stop re-downloading.** It is ~850 KB
+and carries `code` on every element and every club, both season-stable — 584 of 584 and 20
+of 20, verified against the live payload. That is why one fetch populates both
+`draft_elements` and `pl_teams`: the draft bootstrap's `teams` already carry the `code`,
+`name` and `short_name` that `/profile` otherwise reads from the classic bootstrap, and
+`code` is the one club identifier the two APIs agree on.
+
+`/api/cron/revalidate` fetches it with `cache: 'no-store'`. Going through the ordinary
+six-hour fetch cache would re-upsert a payload up to six hours old while stamping
+`synced_at` as now — a table that looks fresh and is stale, and a cron frequency that buys
+nothing.
+
 > [!IMPORTANT]
 > **No trailing slash** — `/api/bootstrap-static/` 404s here. This is the exact inverse of
 > the classic API, which 301s without one.

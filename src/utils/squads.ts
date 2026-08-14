@@ -1,6 +1,7 @@
 import {
   POSITION_ORDER,
   type DraftChoice,
+  type ElementCode,
   type ElementId,
   type ElementStatus,
   type EntryId,
@@ -10,7 +11,11 @@ import {
 
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
-import { getElementLookup } from './draft-elements';
+import {
+  buildFromBootstrap,
+  getElementLookup,
+  type ElementLookup,
+} from './draft-elements';
 import { cachedRead } from './cache';
 
 /**
@@ -41,6 +46,13 @@ export interface SquadPlayer {
   name: string;
   position: Position;
   club: string;
+  /** Season-stable, and what a headshot URL is built from. Null if unresolved. */
+  code: ElementCode | null;
+  /**
+   * The footballer's season total — **not** what they scored for this manager.
+   * A player traded in at GW10 brings their first nine gameweeks with them.
+   */
+  points: number;
   acquisition: Acquisition;
 }
 
@@ -84,14 +96,15 @@ async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
 async function computeSquads(): Promise<SquadsResponse> {
   const leagueId = getLeagueId();
 
-  const [league, ownership, lookup, choices] = await Promise.all([
+  const [league, ownership, initialLookup, choices] = await Promise.all([
     fetchLeagueDetails(leagueId),
     fetchUpstream<{ element_status: ElementStatus[] }>(
       fplApi.elementStatus(leagueId),
       900,
     ),
-    // Names, positions and clubs come from the shared element lookup, which
-    // holds the ~850 KB static dataset parsed once — see `draft-elements.ts`.
+    // Names, positions, clubs, codes and points come from the shared element
+    // lookup — the reference tables when they can answer, the ~850 KB static
+    // dataset when they cannot. See `draft-elements.ts`.
     getElementLookup(),
     fetchDraftChoices(leagueId),
   ]);
@@ -114,6 +127,19 @@ async function computeSquads(): Promise<SquadsResponse> {
     forEntry.push(status.element);
     owned.set(status.owner, forEntry);
   }
+
+  // The completeness half of the fallback, and the only place it can be
+  // decided: the lookup is built before anybody knows which elements will be
+  // asked for, and ownership is what finally says. A table missing one owned
+  // element falls the **whole** read back rather than leaving a `Player 412`
+  // in somebody's midfield — a hole nobody would think to question, where a
+  // slower page is merely slower.
+  const ownedElements = [...owned.values()].flat();
+  const lookup =
+    initialLookup.source === 'table' &&
+    ownedElements.some((element) => !initialLookup.has(element))
+      ? await refetchFromBootstrap(ownedElements, initialLookup)
+      : initialLookup;
 
   function toSquadPlayer(element: ElementId, owner: EntryId): SquadPlayer {
     const choice = choiceByElement.get(element);
@@ -180,6 +206,34 @@ export const getSquads = cachedRead(
   CACHE_TTL_SECONDS,
   computeSquads,
 );
+
+/**
+ * Rebuild the lookup from the bootstrap after the table came up short.
+ *
+ * Loud, because a fallback nobody can see is a sync that fails for weeks while
+ * the pages quietly keep paying full price. If even the bootstrap cannot be
+ * reached, the incomplete table is still better than nothing: the page renders
+ * with `Player {id}` for the strays rather than failing outright.
+ */
+async function refetchFromBootstrap(
+  ownedElements: ElementId[],
+  fallbackTo: ElementLookup,
+): Promise<ElementLookup> {
+  const missing = ownedElements.filter((element) => !fallbackTo.has(element));
+
+  console.error(
+    `[reference] draft_elements is missing ${missing.length} owned element(s) ` +
+      `(${missing.slice(0, 5).join(', ')}); falling back to the draft bootstrap.`,
+  );
+
+  try {
+    return await buildFromBootstrap();
+  } catch (error) {
+    console.error('[reference] the bootstrap fallback also failed.', error);
+
+    return fallbackTo;
+  }
+}
 
 function byPositionThenName(a: SquadPlayer, b: SquadPlayer): number {
   const positionDelta =
