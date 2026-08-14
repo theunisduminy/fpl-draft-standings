@@ -12,11 +12,7 @@ import {
 
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
-import {
-  buildFromBootstrap,
-  getElementLookup,
-  type ElementLookup,
-} from './draft-elements';
+import { ensureCovers, getElementLookup } from './draft-elements';
 import { cachedRead } from './cache';
 
 /**
@@ -139,18 +135,9 @@ async function computeSquads(): Promise<SquadsResponse> {
     owned.set(status.owner, forEntry);
   }
 
-  // The completeness half of the fallback, and the only place it can be
-  // decided: the lookup is built before anybody knows which elements will be
-  // asked for, and ownership is what finally says. A table missing one owned
-  // element falls the **whole** read back rather than leaving a `Player 412`
-  // in somebody's midfield — a hole nobody would think to question, where a
-  // slower page is merely slower.
-  const ownedElements = [...owned.values()].flat();
-  const lookup =
-    initialLookup.source === 'table' &&
-    ownedElements.some((element) => !initialLookup.has(element))
-      ? await refetchFromBootstrap(ownedElements, initialLookup)
-      : initialLookup;
+  // Ownership is what finally says which elements this page needs, so the
+  // completeness check happens here rather than when the lookup was built.
+  const lookup = await ensureCovers(initialLookup, [...owned.values()].flat());
 
   function toSquadPlayer(element: ElementId, owner: EntryId): SquadPlayer {
     const choice = choiceByElement.get(element);
@@ -230,34 +217,6 @@ export const getSquads = cachedRead(
   CACHE_TTL_SECONDS,
   computeSquads,
 );
-
-/**
- * Rebuild the lookup from the bootstrap after the table came up short.
- *
- * Loud, because a fallback nobody can see is a sync that fails for weeks while
- * the pages quietly keep paying full price. If even the bootstrap cannot be
- * reached, the incomplete table is still better than nothing: the page renders
- * with `Player {id}` for the strays rather than failing outright.
- */
-async function refetchFromBootstrap(
-  ownedElements: ElementId[],
-  fallbackTo: ElementLookup,
-): Promise<ElementLookup> {
-  const missing = ownedElements.filter((element) => !fallbackTo.has(element));
-
-  console.error(
-    `[reference] draft_elements is missing ${missing.length} owned element(s) ` +
-      `(${missing.slice(0, 5).join(', ')}); falling back to the draft bootstrap.`,
-  );
-
-  try {
-    return await buildFromBootstrap();
-  } catch (error) {
-    console.error('[reference] the bootstrap fallback also failed.', error);
-
-    return fallbackTo;
-  }
-}
 
 function byPositionThenName(a: SquadPlayer, b: SquadPlayer): number {
   const positionDelta =

@@ -3,7 +3,7 @@ import { Zap } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { ClubCrest } from '@/components/ClubCrest';
-import { PlayerPhoto } from '@/components/PlayerPhoto';
+import { PlayerPhoto } from '@/components/SquadView/PlayerPhoto';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Position } from '@/interfaces/fpl';
 import type { Squad, SquadPlayer } from '@/utils/squads';

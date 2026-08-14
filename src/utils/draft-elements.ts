@@ -94,6 +94,48 @@ export async function getElementLookup(): Promise<ElementLookup> {
   return toLookup(await readLookupData());
 }
 
+/**
+ * Guarantee a lookup can name every element the caller is about to ask for.
+ *
+ * The completeness half of the fallback, and the only place it can be decided:
+ * the lookup is built before anybody knows which elements will be asked for,
+ * and ownership (or a team sheet) is what finally says. A table missing one of
+ * them falls the **whole** read back rather than leaving a `Player 412` in
+ * somebody's midfield — a hole nobody would think to question, where a slower
+ * page is merely slower.
+ *
+ * Lifted out of `squads.ts` so the invariant is not opt-in: the drawer went in
+ * without it and would have rendered exactly that hole. Every caller of
+ * `getElementLookup` that knows its element set should pass through here.
+ *
+ * If even the bootstrap cannot be reached, the incomplete lookup is still
+ * better than nothing — the page renders with `Player {id}` for the strays
+ * rather than failing outright.
+ */
+export async function ensureCovers(
+  lookup: ElementLookup,
+  elements: readonly ElementId[],
+): Promise<ElementLookup> {
+  if (lookup.source !== 'table') return lookup;
+
+  const missing = elements.filter((element) => !lookup.has(element));
+
+  if (missing.length === 0) return lookup;
+
+  console.error(
+    `[reference] draft_elements is missing ${missing.length} requested element(s) ` +
+      `(${missing.slice(0, 5).join(', ')}); falling back to the draft bootstrap.`,
+  );
+
+  try {
+    return await buildFromBootstrap();
+  } catch (error) {
+    console.error('[reference] the bootstrap fallback also failed.', error);
+
+    return lookup;
+  }
+}
+
 /** Wrap a plain record in the lookup interface. Cheap, and done per call. */
 function toLookup(data: ElementLookupData): ElementLookup {
   return {

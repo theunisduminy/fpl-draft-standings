@@ -109,11 +109,11 @@ function ManagerSelect({
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         aria-label={label}
-        className='h-auto w-full rounded-md border-white/15 bg-[#2a0d33] px-3 py-2.5 text-base text-white md:text-sm'
+        className='h-auto w-full rounded-md border-white/15 bg-card px-3 py-2.5 text-base text-white md:text-sm'
       >
         <SelectValue placeholder={label} />
       </SelectTrigger>
-      <SelectContent className='border-white/20 bg-[#1a0520]'>
+      <SelectContent className='border-white/20 bg-popover'>
         {clearable && (
           <SelectItem
             value={NONE}

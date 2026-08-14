@@ -476,11 +476,21 @@ returns a different club or a different footballer.
 
 ## Our own routes (`src/app/api/**`)
 
-**There is one route handler left, and it is not ours.**
+**There are two route handlers, and only one of them is ours.**
 
-| Route                 | Returns                 | Backed by        |
-| --------------------- | ----------------------- | ---------------- |
-| `/api/auth/[...path]` | Neon Auth's own handler | `auth.handler()` |
+| Route                  | Returns                          | Backed by                                     |
+| ---------------------- | -------------------------------- | --------------------------------------------- |
+| `/api/auth/[...path]`  | Neon Auth's own handler          | `auth.handler()`                              |
+| `/api/cron/revalidate` | Per-step sync outcomes, and `ok` | the reference DAL + `computeSeasonUncached()` |
+
+`/api/cron/revalidate` is the sync job: every three hours it refreshes
+`draft_elements` and `pl_teams` from the draft bootstrap, writes any newly
+finalised gameweek, then expires the cache tags, clears the in-memory map and
+re-warms. Its caller is Vercel Cron rather than a person, so it authenticates
+with a constant-time bearer `CRON_SECRET` comparison and `src/proxy.ts` excludes
+`/api/cron` from the sign-in redirect. That exclusion buys authentication
+written by hand; it does not make the path public, and nothing else may be
+excluded without the same work.
 
 Every page is an `async` Server Component calling `getGameweekData()` or the DAL directly,
 so an `/api/*` route only ever existed to feed a component. `/api/standings`,

@@ -45,7 +45,7 @@ The product surface:
 - `/` — the standings table (F1 scoring) and position distribution
 - `/results` — per-gameweek results, charts and detail views
 - `/rumblers` — the last-place hall of shame
-- `/squads` — who owns whom, with the draft round each player went in
+- `/squads` — one squad at a time, with a second beside it to compare against; each row carries the player's club and season points
 - `/players/[playerId]` — one manager's season: performance, positions, form
 - `/profile` — claim which manager you are (members only)
 - `/auth/sign-in` — the only route a signed-out visitor can reach
@@ -172,7 +172,7 @@ Two consequences worth stating outright:
     │   │       ├── rumblers/  /rumblers
     │   │       ├── squads/    /squads
     │   │       └── players/[playerId]/  /players/:id
-    │   └── api/               Neon Auth + 4 consumer-less GET handlers (see API.md)
+    │   └── api/               Neon Auth + the cron sync job (see API.md)
     ├── components/
     │   ├── ui/                shadcn primitives — chart.tsx is the recharts wrapper
     │   ├── TableView/         standings, draft results, position tables, base-table
@@ -188,7 +188,9 @@ Two consequences worth stating outright:
     │   ├── data/              the DAL — one module per domain
     │   │   ├── gameweeks.ts   persisted finished-gameweek facts
     │   │   ├── league-members.ts  ★ curated email -> manager mapping
-    │   │   └── profiles.ts    display name and bio
+    │   │   ├── elements.ts    draft_elements: read + upsert (no prune)
+│   │   ├── pl-teams.ts    pl_teams: read + upsert, and the allowlist prune
+│   │   └── profiles.ts    display name and bio
     │   ├── actions/           'use server' — validate, write, revalidate
     │   │   └── profile.ts
     │   └── auth/
@@ -200,12 +202,16 @@ Two consequences worth stating outright:
     │   ├── utils.ts           cn()
     │   └── auth/client.ts     browser auth client (sign in/out only)
     └── utils/
-        ├── fpl-api.ts         ★ server-only. Upstream URLs + FPL_LEAGUE_ID. The gateway.
+        ├── fpl-api.ts         ★ server-only. Upstream API URLs + FPL_LEAGUE_ID. The gateway.
+        ├── pl-assets.ts       crest + headshot URLs (browser-loaded, so not in fpl-api)
         ├── gameweek-data.ts   ★ the data layer: fetch, score, rank, aggregate, cache
+        ├── reference-mapping.ts ★ pure: payload→row, row→domain, REFERENCE_STALE_AFTER_SECONDS
+        ├── draft-elements.ts  the element lookup: tables first, bootstrap fallback
+        ├── pl-teams.ts        the 20 clubs: table first, bootstrap fallback
         ├── league.ts          fetchLeagueDetails — the typed league read
         ├── squads.ts          ownership + draft provenance, joined
         ├── player-profile.ts  one manager's season, derived (pure)
-        ├── cache.ts           in-memory TTL Map
+        ├── cache.ts           in-memory TTL Map + the shared-cache wrapper
         ├── formatMatches.ts   (head-to-head only — currently unused)
         ├── lossBlurb.ts       rumbler banter strings
         └── tailwindVars.ts    colour constants for charts
@@ -238,7 +244,7 @@ The app's whole reason to exist. In `src/utils/gameweek-data.ts`:
 
 ## 6. Caching, and what it costs
 
-Three layers now sit in front of the upstream APIs:
+Four layers now sit in front of the upstream APIs:
 
 | Layer                  | Where                                 | TTL     | Survives a cold start?  |
 | ---------------------- | ------------------------------------- | ------- | ----------------------- |

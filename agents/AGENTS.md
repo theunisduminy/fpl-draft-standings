@@ -291,7 +291,11 @@ awards points.
 
 ### Never
 
-- Never write an upstream URL outside `src/utils/fpl-api.ts`.
+- Never write an upstream **API** URL outside `src/utils/fpl-api.ts`. The one exception is
+  the asset host `resources.premierleague.com` (crests and headshots), whose builders live
+  in `src/utils/pl-assets.ts` — the browser loads those images directly, and `fpl-api.ts`
+  is `server-only`, so they cannot live there. That file builds URLs and nothing else: no
+  `fetch`, no league ID, no payload shapes.
 - Never import `@/utils/fpl-api` or `@/utils/gameweek-data` from a client component.
 - Never hard-code the league ID, or any season-scoped identifier, in source.
 - Never treat `{}` or `[]` from upstream as "has data" — see above.

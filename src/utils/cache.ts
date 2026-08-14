@@ -63,6 +63,14 @@ export function cachedRead<T>(
 
   let pending: Promise<T> | null = null;
 
+  // `clearCache` empties the map, but the dedup slot is checked immediately
+  // after it — so without this a caller's in-flight *pre-sync* computation
+  // survives the clear, gets adopted by whoever asks next, and is written back
+  // for the full TTL. Registering the reset lets `clearCache` drop both layers.
+  resets.set(key, () => {
+    pending = null;
+  });
+
   return async function read(): Promise<T> {
     const cached = getCache<T>(key);
     if (cached) return cached;
@@ -82,10 +90,23 @@ export function cachedRead<T>(
   };
 }
 
+/** Per-key hooks that drop an in-flight computation. See `cachedRead`. */
+const resets = new Map<string, () => void>();
+
+/**
+ * Drop cached values — **both** layers this module owns.
+ *
+ * The in-flight promise matters as much as the map: the sync job clears in
+ * order to force a recompute against freshly written tables, and a pending
+ * promise started before the write would quietly serve the old answer and
+ * re-pin it.
+ */
 export function clearCache(key?: string): void {
   if (key) {
     cache.delete(key);
+    resets.get(key)?.();
   } else {
     cache.clear();
+    resets.forEach((reset) => reset());
   }
 }

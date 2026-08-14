@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   REFERENCE_STALE_AFTER_SECONDS,
   isReferenceUsable,
+  latestSync,
   toElementRows,
   toTeamRows,
   toElementDetails,
@@ -183,6 +184,56 @@ describe('toPlTeam', () => {
       name: 'Arsenal',
       short_name: 'ARS',
     });
+  });
+});
+
+describe('latestSync', () => {
+  const fresh = NOW;
+  const ancient = new Date(NOW.getTime() - 400 * 24 * 3600 * 1000);
+
+  it('returns null for no rows', () => {
+    expect(latestSync([])).toBeNull();
+  });
+
+  it('reports the newest stamp, not the oldest', () => {
+    // The regression this exists for. `upsertElements` never prunes, so a
+    // footballer who drops out of the bootstrap keeps their old stamp forever.
+    // Reading the oldest would pin the whole table `stale` for the rest of the
+    // season — every read back to the 850 KB bootstrap, sync still reporting
+    // success. One orphan must not outvote 586 rows written seconds ago.
+    expect(
+      latestSync([
+        { syncedAt: ancient },
+        { syncedAt: fresh },
+        { syncedAt: fresh },
+      ]),
+    ).toEqual(fresh);
+  });
+
+  it('leaves a genuinely old table stale', () => {
+    expect(latestSync([{ syncedAt: ancient }])).toEqual(ancient);
+  });
+
+  it('is order-independent', () => {
+    expect(latestSync([{ syncedAt: fresh }, { syncedAt: ancient }])).toEqual(
+      latestSync([{ syncedAt: ancient }, { syncedAt: fresh }]),
+    );
+  });
+});
+
+describe('an orphaned row does not condemn the table', () => {
+  it('stays usable when one stale row sits among fresh ones', () => {
+    // End to end over the two pure pieces the DAL composes: pick the stamp,
+    // then judge it. Fresh table, one leftover element, still usable.
+    const rows = [
+      elementRow({ elementId: 101, syncedAt: NOW }),
+      elementRow({
+        elementId: 999,
+        syncedAt: new Date(NOW.getTime() - 400 * 24 * 3600 * 1000),
+      }),
+    ];
+
+    expect(isReferenceUsable(rows, latestSync(rows), NOW).usable).toBe(true);
   });
 });
 

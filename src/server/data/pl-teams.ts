@@ -6,6 +6,7 @@ import { getDb } from '@/server/db/client';
 import { plTeams } from '@/server/db/schema';
 import type { NewPlTeamRow, PlTeamRow } from '@/server/db/schema';
 import { getLeagueId } from '@/utils/fpl-api';
+import { latestSync } from '@/utils/reference-mapping';
 
 /**
  * Persistence for the 20 clubs.
@@ -21,7 +22,7 @@ import { getLeagueId } from '@/utils/fpl-api';
 
 export interface StoredTeams {
   rows: PlTeamRow[];
-  /** The oldest stamp in the set — see the note in `elements.ts`. */
+  /** When this table last synced — see the note in `elements.ts`. */
   syncedAt: Date | null;
 }
 
@@ -34,7 +35,7 @@ export async function readTeams(): Promise<StoredTeams> {
     .from(plTeams)
     .where(eq(plTeams.leagueId, leagueId));
 
-  return { rows, syncedAt: oldestSync(rows) };
+  return { rows, syncedAt: latestSync(rows) };
 }
 
 /**
@@ -83,13 +84,4 @@ export async function upsertTeams(rows: NewPlTeamRow[]): Promise<number> {
   );
 
   return rows.length;
-}
-
-function oldestSync(rows: { syncedAt: Date }[]): Date | null {
-  if (rows.length === 0) return null;
-
-  return rows.reduce(
-    (oldest, row) => (row.syncedAt < oldest ? row.syncedAt : oldest),
-    rows[0].syncedAt,
-  );
 }

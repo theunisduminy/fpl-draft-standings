@@ -49,6 +49,31 @@ import type {
  */
 export const REFERENCE_STALE_AFTER_SECONDS = 21_600;
 
+/**
+ * When a set of rows last synced: the **newest** stamp in it.
+ *
+ * Pure, shared by both DAL modules, and tested — because getting it wrong is
+ * silent and total. It was briefly the *oldest* stamp, on the theory that a
+ * staleness check is only as good as its weakest row. But the upsert is a
+ * single atomic `INSERT … ON CONFLICT`, so the partial write that would have
+ * guarded against cannot happen, while `upsertElements` deliberately never
+ * prunes — so one row whose element stops appearing in the bootstrap keeps its
+ * old stamp forever and pins the whole table `stale` for the rest of the
+ * season, sending every read back to the 850 KB bootstrap while the sync job
+ * goes on reporting success.
+ *
+ * Rows that were never written are caught by the completeness check instead,
+ * against the ids a caller actually asked for.
+ */
+export function latestSync(rows: readonly { syncedAt: Date }[]): Date | null {
+  if (rows.length === 0) return null;
+
+  return rows.reduce(
+    (newest, row) => (row.syncedAt > newest ? row.syncedAt : newest),
+    rows[0].syncedAt,
+  );
+}
+
 /** Why a table could not answer, in the reader's words. */
 export type ReferenceUnusable =
   /** No rows at all — never synced, or a different league. */

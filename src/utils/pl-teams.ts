@@ -106,6 +106,15 @@ function byName(a: PlTeam, b: PlTeam): number {
  * `pl_teams` directly, so validation inherits the fallback. An allowlist must
  * not become permissive because a sync failed — and because `upsertTeams`
  * prunes, it does not become permissive because a club was relegated either.
+ *
+ * **The prune takes up to a day to reach every instance, and that is accepted.**
+ * This read sits behind `cachedRead`, whose process-local map is checked before
+ * the shared cache and which no tag operation can reach, so an instance warmed
+ * before a relegation keeps answering from its own copy until the TTL lapses.
+ * The window is the same one the bare `fetch` had before the table existed, the
+ * club list changes once a year, and the worst outcome is that somebody sets
+ * their favourite club to one that just went down. Not worth splitting the
+ * cache's TTLs over.
  */
 export async function isKnownTeamCode(code: TeamCode): Promise<boolean> {
   const teams = await getPremierLeagueTeams();

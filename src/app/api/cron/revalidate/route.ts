@@ -9,7 +9,7 @@ import { upsertTeams } from '@/server/data/pl-teams';
 import { fplApi, getLeagueId } from '@/utils/fpl-api';
 import { toElementRows, toTeamRows } from '@/utils/reference-mapping';
 import { clearCache } from '@/utils/cache';
-import { getGameweekData } from '@/utils/gameweek-data';
+import { computeSeasonUncached, getGameweekData } from '@/utils/gameweek-data';
 import { getSquads } from '@/utils/squads';
 import { getPremierLeagueTeams } from '@/utils/pl-teams';
 
@@ -88,7 +88,10 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   if (inFlight) {
+    // Carries `ok` like every other response: a monitor reads that field, and
+    // a third shape without it reads as a failure when nothing failed.
     return NextResponse.json({
+      ok: true,
       skipped: 'A sync is already running on this instance.',
     });
   }
@@ -118,14 +121,20 @@ async function runSync(): Promise<StepResult[]> {
     step('finalise', finaliseGameweeks),
   ]);
 
-  // Revalidate first, then clear, then warm — and the middle one is the step
-  // that is easy to leave out and impossible to notice missing. `cachedRead`
-  // checks its process-local `Map` **before** the Data Cache, and
-  // `revalidateTag` does not touch that map. Warm without clearing and every
-  // call below returns the entry this process already holds, never running
-  // `compute`: the warm silently no-ops, and the freshly synced tables are not
-  // read by anything until the in-memory TTL happens to lapse.
-  TAGS.forEach((tag) => revalidateTag(tag, 'max'));
+  // Expire, then clear, then warm. Both halves are easy to get wrong in ways
+  // that report success:
+  //
+  // `{ expire: 0 }` rather than `'max'` because `'max'` is
+  // stale-while-revalidate — it serves the old value to the next visitor while
+  // refreshing behind them, and **the warm below is that next visitor**, so it
+  // would cache the pre-sync value for the full TTL and still report `ok`. The
+  // Next docs name this exact case: an external system calling a route handler
+  // that needs data expired immediately.
+  //
+  // `clearCache()` because `cachedRead` checks its process-local `Map` before
+  // the Data Cache and no tag operation touches that map, so warming without it
+  // returns the entry this process already holds and never runs `compute`.
+  TAGS.forEach((tag) => revalidateTag(tag, { expire: 0 }));
   clearCache();
 
   // Each cache warms on its own account. `Promise.all` here would let one
@@ -219,7 +228,11 @@ async function syncReferenceTables(): Promise<string> {
  * `storeFinalisedGameweeks` and this route does not second-guess it.
  */
 async function finaliseGameweeks(): Promise<string> {
-  const season = await getGameweekData();
+  // Deliberately **not** `getGameweekData()`. That wrapper would answer from
+  // the process-local map on a warm instance and return a count without doing
+  // any work — reporting `ok: true` while the write this step exists for never
+  // happened. Writing is the point, so it goes straight to the computation.
+  const season = await computeSeasonUncached();
 
   return `${season.completedGameweeks.length} completed gameweek(s)`;
 }

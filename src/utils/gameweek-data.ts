@@ -130,10 +130,15 @@ async function fetchMissingGameweeks(
  * Compute the season from scratch: upstream, database, scoring, aggregation.
  *
  * Expensive — two upstream calls and two database round trips before any
- * gameweek work, which measured ~2s from here. Always reach it through
+ * gameweek work, which measured ~2s from here. Readers always reach it through
  * `getGameweekData()`, never directly.
+ *
+ * Exported only for the sync job, which must **not** go through the cache: its
+ * whole purpose is to write any newly finalised gameweek, and a cache hit would
+ * return a count without doing that work while still reporting success. Every
+ * other caller wants the cached wrapper.
  */
-async function computeSeason(): Promise<GameweekDataResponse> {
+export async function computeSeasonUncached(): Promise<GameweekDataResponse> {
   const leagueId = getLeagueId();
 
   // The two database reads are keyed off the league alone, so they do not
@@ -227,11 +232,11 @@ async function computeSeason(): Promise<GameweekDataResponse> {
  *
  * Both cache layers live in `cachedRead`; see there for why a per-process map
  * still earns its place in front of the shared one. Revalidate early with
- * `revalidateTag('gameweek-data', 'max')` — which is what the cron route does
- * every evening.
+ * `revalidateTag('gameweek-data', { expire: 0 })` — which is what the cron
+ * route does on every sync.
  */
 export const getGameweekData = cachedRead(
   CACHE_KEY,
   CACHE_TTL_SECONDS,
-  computeSeason,
+  computeSeasonUncached,
 );

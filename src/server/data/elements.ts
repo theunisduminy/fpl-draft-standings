@@ -6,6 +6,7 @@ import { getDb } from '@/server/db/client';
 import { draftElements } from '@/server/db/schema';
 import type { DraftElementRow, NewDraftElementRow } from '@/server/db/schema';
 import { getLeagueId } from '@/utils/fpl-api';
+import { latestSync } from '@/utils/reference-mapping';
 
 /**
  * Persistence for the footballers.
@@ -23,13 +24,19 @@ import { getLeagueId } from '@/utils/fpl-api';
 export interface StoredElements {
   rows: DraftElementRow[];
   /**
-   * The **oldest** `synced_at` in the set, not the newest.
+   * The **newest** `synced_at` in the set: when this table last synced.
    *
-   * A staleness check is only as good as its weakest row. All rows normally
-   * carry the same stamp — a sync rewrites the whole set — so the two agree;
-   * they diverge exactly when a sync failed partway, which is when a reader
-   * most needs to be told the table is stale rather than reassured by whichever
-   * rows did get written.
+   * It was briefly the oldest, on the theory that a staleness check is only as
+   * good as its weakest row. That was wrong in a way that disabled the whole
+   * feature silently. The upsert is a single atomic `INSERT … ON CONFLICT`, so
+   * the partial write it guarded against cannot happen — while `upsertElements`
+   * deliberately never prunes, so **one row whose element stops appearing in
+   * the bootstrap keeps its old stamp forever** and pins the entire table
+   * `stale` for the rest of the season. Every read would fall back to the
+   * 850 KB bootstrap permanently, and the cron would go on reporting `ok`.
+   *
+   * Completeness is what guards against never-written rows, and it is checked
+   * separately against the ids a caller actually asked for.
    *
    * `null` when there are no rows, which the caller reads as `empty` anyway.
    */
@@ -56,7 +63,7 @@ export async function readElements(): Promise<StoredElements> {
     .from(draftElements)
     .where(eq(draftElements.leagueId, leagueId));
 
-  return { rows, syncedAt: oldestSync(rows) };
+  return { rows, syncedAt: latestSync(rows) };
 }
 
 /**
@@ -103,13 +110,4 @@ export async function upsertElements(
  */
 function sqlExcluded(column: string) {
   return sql.raw(`excluded.${column}`);
-}
-
-function oldestSync(rows: { syncedAt: Date }[]): Date | null {
-  if (rows.length === 0) return null;
-
-  return rows.reduce(
-    (oldest, row) => (row.syncedAt < oldest ? row.syncedAt : oldest),
-    rows[0].syncedAt,
-  );
 }
