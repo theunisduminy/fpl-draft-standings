@@ -355,10 +355,28 @@ bios survive the August rollover untouched, while the manager mapping is re-seed
 Schema changes are Drizzle migrations under `drizzle/`:
 
 ```bash
-pnpm db:generate   # write a migration from the schema
-pnpm db:migrate    # apply it
-pnpm db:studio     # browse the data
+pnpm db:generate     # write a migration from the schema
+pnpm db:migrate      # apply it to the sandbox branch (or prod, if no sandbox is set)
+pnpm db:migrate:prod # apply it to production, explicitly
+pnpm db:studio       # browse the data
 ```
+
+> [!IMPORTANT]
+> **`pnpm db:migrate` cannot be pointed at production by unsetting the sandbox variable.**
+> `drizzle.config.ts` calls `loadEnvFile('.env.local')` inside its own process, so
+> `NEON_CONNECTION_STRING_SANDBOX` is re-applied after your shell removed it. The command
+> then migrates the sandbox again and prints **"migrations applied successfully"** —
+> success for a database you did not mean, which is the worst possible way to be wrong.
+>
+> `pnpm db:migrate:prod` sets `DRIZZLE_TARGET=prod`, which is the only thing the config
+> honours over the sandbox. Every run now prints its target and redacted host first
+> (`drizzle-kit → PRODUCTION: ep-….neon.tech/neondb`), so read that line before trusting
+> the tick underneath it.
+
+**Production is migrated by hand, deliberately.** Nothing in the build or the deploy runs
+migrations, so a schema change reaches production only when somebody runs the command
+above. The reference tables land before the code that reads them; the readers fall back to
+the FPL API in the gap, so the ordering is forgiving rather than load-bearing.
 
 Two rules:
 
