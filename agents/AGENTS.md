@@ -256,6 +256,12 @@ awards points.
   page must never fetch its own data over HTTP.
 - **Shared types** live in `src/interfaces/`. **Pure helpers and the FPL scoring layer** live
   in `src/utils/`. **`cn`** lives in `src/lib/utils.ts`.
+- **Reference tables are an accelerator, never a source of truth.** `draft_elements` and
+  `pl_teams` hold the handful of fields anyone reads out of the 850 KB draft bootstrap.
+  Every reader that consults them falls back to the API when the table is empty, stale,
+  incomplete or unreachable, and logs why — so a failed sync makes a page slower, never
+  wrong. The staleness budget is one constant, `REFERENCE_STALE_AFTER_SECONDS` in
+  `src/utils/reference-mapping.ts`, and the cron interval is half of it.
 - **Server-only code lives under `src/server/`** — `db/` (client + Drizzle schema), `data/`
   (the DAL, one module per domain), `actions/` (Server Actions), `auth/` (session and the
   allowlist). Every file there starts with `import 'server-only'`.
@@ -285,7 +291,11 @@ awards points.
 
 ### Never
 
-- Never write an upstream URL outside `src/utils/fpl-api.ts`.
+- Never write an upstream **API** URL outside `src/utils/fpl-api.ts`. The one exception is
+  the asset host `resources.premierleague.com` (crests and headshots), whose builders live
+  in `src/utils/pl-assets.ts` — the browser loads those images directly, and `fpl-api.ts`
+  is `server-only`, so they cannot live there. That file builds URLs and nothing else: no
+  `fetch`, no league ID, no payload shapes.
 - Never import `@/utils/fpl-api` or `@/utils/gameweek-data` from a client component.
 - Never hard-code the league ID, or any season-scoped identifier, in source.
 - Never treat `{}` or `[]` from upstream as "has data" — see above.
@@ -437,7 +447,13 @@ never-imported components (`MatchOddsCard`, `GameweekScoreChart`, `GameweekSumma
 `StreaksTracker`) are deleted; git remembers them if they are ever wanted back.
 
 **There are two route handlers.** `/api/auth/[...path]` is Neon Auth's, and
-`/api/cron/revalidate` drops the cached season on a schedule. Everything else has been
+`/api/cron/revalidate` is the sync job: every three hours it refreshes the two reference
+tables from the draft bootstrap, calls `getGameweekData()` so a newly finalised gameweek
+is written by the robot rather than by whichever visitor arrives first, then revalidates
+the cache tags, clears the in-memory map and re-warms. **The clear is not optional** —
+`cachedRead` checks its process-local `Map` before the Data Cache and `revalidateTag`
+does not touch that map, so warming without `clearCache()` returns the entry the process
+already held and silently runs nothing. Everything else has been
 deleted: `/api/standings`, `/api/gameweek-data`, `/api/rumbler` and `/api/player/[id]` went
 with the Server Components refactor, and `/api/current-event`, `/api/pl-teams`,
 `/api/pl-fixtures` and `/api/matches` followed once nothing imported them.

@@ -45,7 +45,7 @@ The product surface:
 - `/` — the standings table (F1 scoring) and position distribution
 - `/results` — per-gameweek results, charts and detail views
 - `/rumblers` — the last-place hall of shame
-- `/squads` — who owns whom, with the draft round each player went in
+- `/squads` — one squad at a time, with a second beside it to compare against; each row carries the player's club and season points
 - `/players/[playerId]` — one manager's season: performance, positions, form
 - `/profile` — claim which manager you are (members only)
 - `/auth/sign-in` — the only route a signed-out visitor can reach
@@ -172,13 +172,13 @@ Two consequences worth stating outright:
     │   │       ├── rumblers/  /rumblers
     │   │       ├── squads/    /squads
     │   │       └── players/[playerId]/  /players/:id
-    │   └── api/               Neon Auth + 4 consumer-less GET handlers (see API.md)
+    │   └── api/               Neon Auth + the cron sync job (see API.md)
     ├── components/
     │   ├── ui/                shadcn primitives — chart.tsx is the recharts wrapper
     │   ├── TableView/         standings, draft results, position tables, base-table
     │   ├── PlayerView/        per-player charts, summary, form guide
     │   ├── RumblerView/       rumbler cards, dashboard, frequency chart
-    │   ├── SquadView/         squad card (pure server, no client JS)
+    │   ├── SquadView/         squad card + the picker that chooses one or two
     │   ├── Layout/            AppChrome, HeaderNav, SideNav, MobileNav, Footer
     │   └── DetailView/        gameweek summary, score chart, match odds
     ├── server/                ★ server-only. Never imported by a client component.
@@ -188,6 +188,8 @@ Two consequences worth stating outright:
     │   ├── data/              the DAL — one module per domain
     │   │   ├── gameweeks.ts   persisted finished-gameweek facts
     │   │   ├── league-members.ts  ★ curated email -> manager mapping
+    │   │   ├── elements.ts    draft_elements: read + upsert (no prune)
+    │   │   ├── pl-teams.ts    pl_teams: read + upsert, and the allowlist prune
     │   │   └── profiles.ts    display name and bio
     │   ├── actions/           'use server' — validate, write, revalidate
     │   │   └── profile.ts
@@ -200,12 +202,16 @@ Two consequences worth stating outright:
     │   ├── utils.ts           cn()
     │   └── auth/client.ts     browser auth client (sign in/out only)
     └── utils/
-        ├── fpl-api.ts         ★ server-only. Upstream URLs + FPL_LEAGUE_ID. The gateway.
+        ├── fpl-api.ts         ★ server-only. Upstream API URLs + FPL_LEAGUE_ID. The gateway.
+        ├── pl-assets.ts       crest + headshot URLs (browser-loaded, so not in fpl-api)
         ├── gameweek-data.ts   ★ the data layer: fetch, score, rank, aggregate, cache
+        ├── reference-mapping.ts ★ pure: payload→row, row→domain, REFERENCE_STALE_AFTER_SECONDS
+        ├── draft-elements.ts  the element lookup: tables first, bootstrap fallback
+        ├── pl-teams.ts        the 20 clubs: table first, bootstrap fallback
         ├── league.ts          fetchLeagueDetails — the typed league read
         ├── squads.ts          ownership + draft provenance, joined
         ├── player-profile.ts  one manager's season, derived (pure)
-        ├── cache.ts           in-memory TTL Map
+        ├── cache.ts           in-memory TTL Map + the shared-cache wrapper
         ├── formatMatches.ts   (head-to-head only — currently unused)
         ├── lossBlurb.ts       rumbler banter strings
         └── tailwindVars.ts    colour constants for charts
@@ -238,13 +244,14 @@ The app's whole reason to exist. In `src/utils/gameweek-data.ts`:
 
 ## 6. Caching, and what it costs
 
-Three layers now sit in front of the upstream APIs:
+Four layers now sit in front of the upstream APIs:
 
-| Layer                  | Where                      | TTL     | Survives a cold start?  |
-| ---------------------- | -------------------------- | ------- | ----------------------- |
-| Next.js `fetch` cache  | `.next/cache`              | 300 s   | Yes (and across builds) |
-| In-memory result cache | `src/utils/cache.ts` Map   | 3 600 s | **No**                  |
-| **Finished gameweeks** | **Neon `gameweek_scores`** | forever | **Yes**                 |
+| Layer                  | Where                                 | TTL     | Survives a cold start?  |
+| ---------------------- | ------------------------------------- | ------- | ----------------------- |
+| Next.js `fetch` cache  | `.next/cache`                         | 300 s   | Yes (and across builds) |
+| In-memory result cache | `src/utils/cache.ts` Map              | 3 600 s | **No**                  |
+| **Finished gameweeks** | **Neon `gameweek_scores`**            | forever | **Yes**                 |
+| **Reference data**     | **Neon `draft_elements`, `pl_teams`** | 6 h     | **Yes**                 |
 
 Plus promise deduplication in `getGameweekData()`, so concurrent requests on one instance
 share a single computation.
@@ -258,6 +265,17 @@ the gap, and stores what it fetched. Steady state is therefore **9 calls a week*
 gameweek), not 344 — and a cold start costs one query rather than a full rebuild. The
 batching still applies to whatever is genuinely missing, so a first run, or a rebuilt
 database, behaves exactly as it always did.
+
+**Reference data works the same way, with one difference that matters.** A finished
+gameweek is immutable, so `gameweek_scores` is written once and trusted forever.
+Footballers and clubs are not: points accumulate and players are transferred, so
+`draft_elements` and `pl_teams` carry `synced_at` and are trusted only for
+`REFERENCE_STALE_AFTER_SECONDS` (six hours, in `src/utils/reference-mapping.ts`). Past
+that — or if a table is empty, missing an element it was asked for, or simply unreachable
+— the reader falls back to the ~850 KB draft bootstrap exactly as it always did, and logs
+why. **These tables are an accelerator, never a source of truth.** Every read that
+consults one can answer without it, so a failed sync or a sleeping database costs latency
+and never correctness. `/api/cron/revalidate` keeps them current every three hours.
 
 The guard that keeps this safe: a gameweek that produced **no** performances is never
 recorded. An unscored gameweek must stay absent so it is retried, rather than being frozen
@@ -314,7 +332,17 @@ So `league_id` is part of the key on every persisted table:
 | `gameweek_scores` | PK `(league_id, gameweek, league_entry)`                    |
 | `gameweeks`       | PK `(league_id, gameweek)`                                  |
 | `league_members`  | PK `(league_id, email)`, unique `(league_id, league_entry)` |
+| `draft_elements`  | PK `(league_id, element_id)`                                |
+| `pl_teams`        | PK `(league_id, code)`                                      |
 | `profiles`        | PK `(user_id)` — deliberately season-independent            |
+
+The two reference tables key differently on purpose. `pl_teams` keys by the season-stable
+`code`, because a club is only ever looked up by code — `profiles.favourite_team` stores
+one and a crest URL is built from one. `draft_elements` keys by the season-scoped
+`element_id`, because ownership hands the reader element ids: `element_status[].element`
+is an id, so a code-keyed table would force a second translation on every lookup. It
+carries `code` as a column regardless, since that is what a headshot URL needs and what
+survives August. `league_id` is what makes the id key safe.
 
 Without it, next season's gameweek 1 collides with this season's and the cache serves the
 wrong year's scores, and a member mapping survives pointing at a number that may by then
@@ -333,10 +361,28 @@ bios survive the August rollover untouched, while the manager mapping is re-seed
 Schema changes are Drizzle migrations under `drizzle/`:
 
 ```bash
-pnpm db:generate   # write a migration from the schema
-pnpm db:migrate    # apply it
-pnpm db:studio     # browse the data
+pnpm db:generate     # write a migration from the schema
+pnpm db:migrate      # apply it to the sandbox branch (or prod, if no sandbox is set)
+pnpm db:migrate:prod # apply it to production, explicitly
+pnpm db:studio       # browse the data
 ```
+
+> [!IMPORTANT]
+> **`pnpm db:migrate` cannot be pointed at production by unsetting the sandbox variable.**
+> `drizzle.config.ts` calls `loadEnvFile('.env.local')` inside its own process, so
+> `NEON_CONNECTION_STRING_SANDBOX` is re-applied after your shell removed it. The command
+> then migrates the sandbox again and prints **"migrations applied successfully"** —
+> success for a database you did not mean, which is the worst possible way to be wrong.
+>
+> `pnpm db:migrate:prod` sets `DRIZZLE_TARGET=prod`, which is the only thing the config
+> honours over the sandbox. Every run now prints its target and redacted host first
+> (`drizzle-kit → PRODUCTION: ep-….neon.tech/neondb`), so read that line before trusting
+> the tick underneath it.
+
+**Production is migrated by hand, deliberately.** Nothing in the build or the deploy runs
+migrations, so a schema change reaches production only when somebody runs the command
+above. The reference tables land before the code that reads them; the readers fall back to
+the FPL API in the gap, so the ordering is forgiving rather than load-bearing.
 
 Two rules:
 

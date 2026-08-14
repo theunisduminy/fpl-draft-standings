@@ -2,7 +2,8 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { getSquads } from '@/utils/squads';
-import { SquadCard } from '@/components/SquadView/SquadCard';
+import { getCurrentUser } from '@/server/auth/server';
+import { SquadPicker } from '@/components/SquadView/SquadPicker';
 import { SquadsSkeleton } from '@/components/SquadView/SquadsSkeleton';
 import { SkeletonRegion } from '@/components/SkeletonRegion';
 import { PageShell } from '@/components/Layout/PageShell';
@@ -31,7 +32,12 @@ export default function SquadsPage() {
 }
 
 async function Squads() {
-  const { squads, freeAgentCount, drafted } = await getSquads();
+  // The session read is cheap and already cached per request; it only decides
+  // which squad the picker opens on.
+  const [{ squads, freeAgentCount, drafted }, user] = await Promise.all([
+    getSquads(),
+    getCurrentUser(),
+  ]);
 
   if (!drafted) {
     return (
@@ -43,11 +49,7 @@ async function Squads() {
 
   return (
     <>
-      <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
-        {squads.map((squad) => (
-          <SquadCard key={squad.leagueEntry} squad={squad} />
-        ))}
-      </div>
+      <SquadPicker squads={squads} initialLeagueEntry={user?.leagueEntry} />
 
       <p className='text-xs text-white/30'>
         {freeAgentCount} players unowned. Ownership is live: it follows trades

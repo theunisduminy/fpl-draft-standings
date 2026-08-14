@@ -9,7 +9,7 @@ import type {
 
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
-import { getElementLookup } from './draft-elements';
+import { ensureCovers, getElementLookup } from './draft-elements';
 
 /**
  * One manager's team sheet for one gameweek, with what each footballer scored.
@@ -80,13 +80,21 @@ export async function getGameweekSquad(
   const entry = league.league_entries.find((e) => e.id === leagueEntry);
   if (!entry) return null;
 
-  const [picks, live, lookup] = await Promise.all([
+  const [picks, live, initialLookup] = await Promise.all([
     fetchEntryPicks(entry.entry_id, gameweek),
     livePromise,
     lookupPromise,
   ]);
 
   if (picks.length === 0) return null;
+
+  // The picks are what say which elements this team sheet needs, so the
+  // completeness check happens here — the same gate `/squads` applies. Without
+  // it a table missing one element renders `Player 412` in a real team sheet.
+  const lookup = await ensureCovers(
+    initialLookup,
+    picks.map((pick) => pick.element),
+  );
 
   const players = [...picks]
     .sort((a, b) => a.position - b.position)

@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { Zap } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { ClubCrest } from '@/components/ClubCrest';
+import { PlayerPhoto } from '@/components/SquadView/PlayerPhoto';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Position } from '@/interfaces/fpl';
-import type { Acquisition, Squad, SquadPlayer } from '@/utils/squads';
+import type { Squad, SquadPlayer } from '@/utils/squads';
 
 /**
  * The colour a position gets, everywhere it appears.
@@ -69,6 +71,8 @@ export function SquadCard({ squad }: { squad: Squad }) {
 function PlayerRow({ player }: { player: SquadPlayer }) {
   return (
     <li className='flex items-center gap-3 py-2'>
+      <PlayerPhoto code={player.code} name={player.name} />
+
       <Badge
         variant='outline'
         className={`w-11 shrink-0 justify-center border px-0 text-[10px] font-bold ${POSITION_CLASSES[player.position]}`}
@@ -76,51 +80,27 @@ function PlayerRow({ player }: { player: SquadPlayer }) {
         {player.position}
       </Badge>
 
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-medium text-white'>{player.name}</p>
-        <p className='text-xs text-white/40'>{player.club}</p>
-      </div>
+      <p className='min-w-0 flex-1 truncate text-sm font-medium text-white'>
+        {player.name}
+      </p>
 
-      <AcquisitionLabel acquisition={player.acquisition} />
+      {/* Its own column, so the crests line up down the card rather than
+          sitting wherever each name happens to end. */}
+      <span className='flex w-14 shrink-0 items-center gap-1.5 text-xs text-white/40'>
+        {player.clubCode !== null && (
+          <ClubCrest
+            code={player.clubCode}
+            name={player.club}
+            className='h-4 w-4'
+          />
+        )}
+        {player.club}
+      </span>
+
+      <span className='shrink-0 text-sm font-bold text-white tabular-nums'>
+        {player.points}
+        <span className='ml-1 text-xs font-normal text-white/40'>pts</span>
+      </span>
     </li>
-  );
-}
-
-/**
- * Where the player came from.
- *
- * Deliberately quiet — it is a footnote on the row, not the point of it, and
- * for most players it just reads as the round they went in.
- */
-function AcquisitionLabel({ acquisition }: { acquisition: Acquisition }) {
-  if (acquisition.kind === 'free-agent') {
-    return (
-      <span className='shrink-0 text-xs text-white/30' title='Not drafted'>
-        Free agent
-      </span>
-    );
-  }
-
-  if (acquisition.kind === 'acquired') {
-    return (
-      <span
-        className='shrink-0 text-xs text-amber-400/70'
-        title={`Drafted by someone else in round ${acquisition.draftedRound}`}
-      >
-        Traded
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className='shrink-0 text-xs text-white/30 tabular-nums'
-      title={`Round ${acquisition.round}, pick ${acquisition.pick}${
-        acquisition.wasAuto ? ' (auto)' : ''
-      }`}
-    >
-      R{acquisition.round}
-      {acquisition.wasAuto && <span className='text-white/50'> ⚡</span>}
-    </span>
   );
 }

@@ -313,6 +313,31 @@ source for "who owns X now". Good for a draft-recap view.
 The draft game's own static dataset: `elements`, `teams`, `element_types`, `events`,
 `fixtures`, `settings`, `element_stats`.
 
+**This is the payload the reference tables exist to stop re-downloading.** It is ~850 KB
+and carries `code` on every element and every club, both season-stable — 584 of 584 and 20
+of 20, verified against the live payload. That is why one fetch populates both
+`draft_elements` and `pl_teams`: the draft bootstrap's `teams` already carry the `code`,
+`name` and `short_name` that `/profile` otherwise reads from the classic bootstrap, and
+`code` is the one club identifier the two APIs agree on.
+
+`/api/cron/revalidate` fetches it with `cache: 'no-store'`. Going through the ordinary
+six-hour fetch cache would re-upsert a payload up to six hours old while stamping
+`synced_at` as now — a table that looks fresh and is stale, and a cron frequency that buys
+nothing.
+
+> [!WARNING]
+> **`elements[].total_points` is last season's until just before GW1.** Upstream carries
+> the previous season's totals through the whole pre-season and resets them shortly before
+> the first deadline. Observed on 2026-08-14, with `current_event: null` and GW1's deadline
+> a week away: 400 of 587 elements had non-zero `total_points` **and** non-zero `minutes` —
+> Haaland on 239 points from 2953 minutes and 34 starts — while `event_points` was 0 for
+> every player.
+>
+> So a squad rendered in pre-season shows last year's points against players who have not
+> kicked a ball this season. That is upstream's number, not a stale sync, and it corrects
+> itself on kick-off. `events.current === null` (or `/api/game`'s `current_event`) is how
+> to tell the two apart if you ever need to.
+
 > [!IMPORTANT]
 > **No trailing slash** — `/api/bootstrap-static/` 404s here. This is the exact inverse of
 > the classic API, which 301s without one.
@@ -418,13 +443,54 @@ All 380 fixtures. No consumer in the app; `fplApi.fixtures()` builds the URL.
 
 ---
 
+## Images (`resources.premierleague.com`)
+
+Not an API — an asset host, and the only upstream URLs deliberately **not** in
+`fpl-api.ts`. These images are loaded by the browser, so the builders have to be
+importable from a client component, and `fpl-api.ts` is `server-only`. They live
+in [`src/utils/pl-assets.ts`](../src/utils/pl-assets.ts) instead; that file is
+still the single place the URLs are written.
+
+```
+https://resources.premierleague.com/premierleague/badges/t{teamCode}.svg
+https://resources.premierleague.com/premierleague/photos/players/{size}/p{elementCode}.png
+```
+
+**Both take a `code`, never an `id`.** Codes are stable across seasons; the
+sibling `id` fields are re-minted every August, so a URL built from one silently
+returns a different club or a different footballer.
+
+- **Crests.** `{teamCode}` is `teams[].code` — from either bootstrap, they
+  agree (Arsenal is `code` 3, `id` 1 in both). All 20 current clubs return
+  `200 image/svg+xml`. `badges/50/t{code}.png` is the raster equivalent.
+- **Photos.** `{elementCode}` is `elements[].code` — six digits, not the 1–581
+  of `ElementId`. `{size}` is one of `40x40` (16 KB), `110x140` (108 KB) or
+  `250x250` (331 KB); only the first is sane in a list of fifteen.
+- **A bad code answers `403`, not `404`** — and never a placeholder. Nothing
+  reaches a log, so anything rendering a photo needs an `onError` fallback;
+  `PlayerPhoto` draws initials. Squad entries appear days before photos do.
+- **The season-scoped prefixes `403`.** `premierleague25/badges/…` fails; only
+  the unversioned `premierleague/…` prefix works.
+
+---
+
 ## Our own routes (`src/app/api/**`)
 
-**There is one route handler left, and it is not ours.**
+**There are two route handlers, and only one of them is ours.**
 
-| Route                 | Returns                 | Backed by        |
-| --------------------- | ----------------------- | ---------------- |
-| `/api/auth/[...path]` | Neon Auth's own handler | `auth.handler()` |
+| Route                  | Returns                          | Backed by                                     |
+| ---------------------- | -------------------------------- | --------------------------------------------- |
+| `/api/auth/[...path]`  | Neon Auth's own handler          | `auth.handler()`                              |
+| `/api/cron/revalidate` | Per-step sync outcomes, and `ok` | the reference DAL + `computeSeasonUncached()` |
+
+`/api/cron/revalidate` is the sync job: every three hours it refreshes
+`draft_elements` and `pl_teams` from the draft bootstrap, writes any newly
+finalised gameweek, then expires the cache tags, clears the in-memory map and
+re-warms. Its caller is Vercel Cron rather than a person, so it authenticates
+with a constant-time bearer `CRON_SECRET` comparison and `src/proxy.ts` excludes
+`/api/cron` from the sign-in redirect. That exclusion buys authentication
+written by hand; it does not make the path public, and nothing else may be
+excluded without the same work.
 
 Every page is an `async` Server Component calling `getGameweekData()` or the DAL directly,
 so an `/api/*` route only ever existed to feed a component. `/api/standings`,

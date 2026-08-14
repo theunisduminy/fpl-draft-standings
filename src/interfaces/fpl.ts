@@ -64,6 +64,18 @@ export type ElementId = Brand<number, 'ElementId'>;
 export type TeamCode = Brand<number, 'TeamCode'>;
 
 /**
+ * `elements[].code` — a footballer, **stable across seasons**.
+ *
+ * The player-side twin of {@link TeamCode}, and distinct from {@link ElementId}
+ * in exactly the same way: `id` is re-minted every August and only means
+ * anything inside the season and the API that issued it, while `code` follows
+ * the person. It is what a headshot URL is built from
+ * (`resources.premierleague.com/.../p{code}.png`), and what `draft_elements`
+ * stores so a persisted row still names the right footballer next season.
+ */
+export type ElementCode = Brand<number, 'ElementCode'>;
+
+/**
  * Brand a number that is already known to be a league entry.
  *
  * For values crossing into the app from somewhere the type system cannot see:
@@ -81,6 +93,10 @@ export const asElementId = (value: number): ElementId => value as ElementId;
 
 /** Brand a number already known to be a team code — a database column, a payload. */
 export const asTeamCode = (value: number): TeamCode => value as TeamCode;
+
+/** Brand a number already known to be an element code. */
+export const asElementCode = (value: number): ElementCode =>
+  value as ElementCode;
 
 /**
  * Parse an untrusted team code — a form field.
@@ -185,6 +201,8 @@ export interface ElementStatus {
 /** One footballer from the **draft** bootstrap. */
 export interface DraftElement {
   id: ElementId;
+  /** Season-stable, unlike `id`. See {@link ElementCode}. */
+  code: ElementCode;
   web_name: string;
   first_name: string;
   second_name: string;
@@ -198,6 +216,12 @@ export interface DraftElement {
 /** One club from the draft bootstrap. */
 export interface DraftTeam {
   id: number;
+  /**
+   * The same season-stable {@link TeamCode} the classic bootstrap uses. It is
+   * the only club identifier the two APIs agree on, which is what makes a join
+   * across them safe where an `id`-based one would not be.
+   */
+  code: TeamCode;
   name: string;
   short_name: string;
 }
