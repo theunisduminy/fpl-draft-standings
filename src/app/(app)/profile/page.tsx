@@ -8,6 +8,7 @@ import { getPremierLeagueTeams } from '@/utils/pl-teams';
 import { buildPlayerProfile } from '@/utils/player-profile';
 import { asTeamCode } from '@/interfaces/fpl';
 import { cn } from '@/lib/utils';
+import { ClubCrest } from '@/components/ClubCrest';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
 import { ProfileForm } from '@/components/Profile/ProfileForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +42,7 @@ export default async function ProfilePage() {
         subtitle='Profiles are for the managers in this league'
       >
         <Card className='max-w-4xl border-white/10 bg-[#2a0d33]'>
-          <CardContent className='space-y-4 pt-6'>
+          <CardContent className='space-y-4 pt-4 md:pt-6'>
             <p className='text-sm text-white/60'>
               You are signed in, but your address is not mapped to a manager
               yet. Ask the league admin to add you, or sign out and try another
@@ -98,7 +99,18 @@ export default async function ProfilePage() {
           {manager?.team_name ?? 'Not in this season yet'}
         </IdentityCard>
         <IdentityCard label='Signed in as'>{user.email}</IdentityCard>
-        <IdentityCard label='Favourite club'>
+        <IdentityCard
+          label='Favourite club'
+          aside={
+            club && (
+              <ClubCrest
+                code={club.code}
+                name={club.name}
+                className='h-10 w-10'
+              />
+            )
+          }
+        >
           {club?.name ?? 'No allegiance'}
         </IdentityCard>
       </div>
@@ -173,15 +185,21 @@ export default async function ProfilePage() {
 function IdentityCard({
   label,
   children,
+  aside,
 }: {
   label: string;
   children: React.ReactNode;
+  /** Sits to the right, centred against both lines. The crest uses it. */
+  aside?: React.ReactNode;
 }) {
   return (
     <Card className='border-white/10 bg-[#2a0d33]'>
-      <CardContent className='pt-6'>
-        <p className='text-xs text-white/40'>{label}</p>
-        <p className='truncate text-base font-bold text-white'>{children}</p>
+      <CardContent className='flex items-center justify-between gap-3 pt-4 md:pt-6'>
+        <div className='min-w-0'>
+          <p className='text-xs text-white/40'>{label}</p>
+          <p className='truncate text-base font-bold text-white'>{children}</p>
+        </div>
+        {aside}
       </CardContent>
     </Card>
   );

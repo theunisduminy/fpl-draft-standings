@@ -5,7 +5,22 @@ import { useRouter } from 'next/navigation';
 
 import { updateProfile } from '@/server/actions/profile';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ClubCrest } from '@/components/ClubCrest';
 import type { PlTeam, TeamCode } from '@/interfaces/fpl';
+
+/**
+ * Radix rejects an empty string as an item value, so "no allegiance" needs a
+ * sentinel. It is mapped back to `''` in the hidden input below, which is what
+ * `updateProfile` already reads as "cleared".
+ */
+const NO_TEAM = 'none';
 
 /**
  * Edit your own display name and bio.
@@ -41,6 +56,9 @@ export function ProfileForm({
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [team, setTeam] = useState(
+    favouriteTeam === null ? NO_TEAM : String(favouriteTeam),
+  );
 
   return (
     <form
@@ -89,19 +107,44 @@ export function ProfileForm({
         <label htmlFor='favouriteTeam' className='text-sm text-white/70'>
           Favourite team <span className='text-white/30'>(optional)</span>
         </label>
-        <select
-          id='favouriteTeam'
+        {/* Radix renders a button, not a form control, so the value reaches
+            the action through this input rather than the trigger. */}
+        <input
+          type='hidden'
           name='favouriteTeam'
-          defaultValue={favouriteTeam ?? ''}
-          className='w-full rounded-md border border-white/15 bg-[#1a0520] px-3 py-2 text-base text-white md:text-sm'
-        >
-          <option value=''>No allegiance</option>
-          {teams.map((team) => (
-            <option key={team.code} value={team.code}>
-              {team.name}
-            </option>
-          ))}
-        </select>
+          value={team === NO_TEAM ? '' : team}
+        />
+        <Select value={team} onValueChange={setTeam}>
+          <SelectTrigger
+            id='favouriteTeam'
+            aria-label='Favourite team'
+            className='h-auto w-full rounded-md border-white/15 bg-[#1a0520] px-3 py-2.5 text-base text-white md:text-sm'
+          >
+            {/* No crest here: `SelectValue` renders the chosen item's own
+                children, which already carry one. */}
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className='border-white/20 bg-[#1a0520]'>
+            <SelectItem
+              value={NO_TEAM}
+              className='text-white focus:bg-white/10 focus:text-white'
+            >
+              No allegiance
+            </SelectItem>
+            {teams.map((plTeam) => (
+              <SelectItem
+                key={plTeam.code}
+                value={String(plTeam.code)}
+                className='text-white focus:bg-white/10 focus:text-white'
+              >
+                <span className='flex items-center gap-2'>
+                  <ClubCrest name={plTeam.name} code={plTeam.code} />
+                  {plTeam.name}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className='flex items-center gap-3'>

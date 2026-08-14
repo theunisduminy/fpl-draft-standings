@@ -199,6 +199,7 @@ async function buildBootstrapData(): Promise<ElementLookupData> {
         positions.get(element.element_type)?.singular_name_short,
       ),
       club: clubs.get(element.team)?.short_name ?? '—',
+      clubCode: clubs.get(element.team)?.code ?? null,
       code: asElementCode(element.code),
       points: element.total_points,
     };
@@ -218,6 +219,7 @@ function unknownElement(element: ElementId): ElementDetails {
     name: `Player ${element}`,
     position: 'UNK',
     club: '—',
+    clubCode: null,
     code: null,
     points: 0,
   };

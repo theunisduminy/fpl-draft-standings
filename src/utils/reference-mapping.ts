@@ -7,6 +7,7 @@ import {
   type ElementId,
   type PlTeam,
   type Position,
+  type TeamCode,
 } from '@/interfaces/fpl';
 import type {
   DraftElementRow,
@@ -187,6 +188,12 @@ export interface ElementDetails {
   /** Season-stable, and what a headshot URL is built from. */
   code: ElementCode | null;
   /**
+   * The club's crest identity — `teams[].code`, what the crest SVG is named
+   * after. Null when the club could not be resolved, in which case `club` is
+   * the em dash and there is nothing to draw.
+   */
+  clubCode: TeamCode | null;
+  /**
    * The footballer's **season total** — everything they have scored, not what
    * they scored for whoever owns them now. A player traded in at GW10 brings
    * their first nine gameweeks with them here. A manager's own total is the F1
@@ -215,6 +222,7 @@ export function toElementDetails(
     name: row.webName,
     position: toPosition(row.position),
     club: clubsByCode.get(row.teamCode)?.short_name ?? '—',
+    clubCode: clubsByCode.get(row.teamCode)?.code ?? null,
     code: asElementCode(row.code),
     points: row.totalPoints,
   };

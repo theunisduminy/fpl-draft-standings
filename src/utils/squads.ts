@@ -7,6 +7,7 @@ import {
   type EntryId,
   type LeagueEntryId,
   type Position,
+  type TeamCode,
 } from '@/interfaces/fpl';
 
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
@@ -48,9 +49,18 @@ export interface SquadPlayer {
   club: string;
   /** Season-stable, and what a headshot URL is built from. Null if unresolved. */
   code: ElementCode | null;
+  /** The club's crest identity. Null when the element cannot be resolved. */
+  clubCode: TeamCode | null;
   /**
-   * The footballer's season total — **not** what they scored for this manager.
-   * A player traded in at GW10 brings their first nine gameweeks with them.
+   * The footballer's season total.
+   *
+   * **Everything they have scored this season, not what they scored for this
+   * manager.** A player traded in at GW10 brings their first nine gameweeks
+   * with them here. The manager's own total is the F1 score, which is computed
+   * from gameweek results and owes nothing to this number.
+   *
+   * Pre-season this is last season's total: upstream carries it until shortly
+   * before GW1. See `agents/API.md`.
    */
   points: number;
   acquisition: Acquisition;
@@ -67,6 +77,7 @@ export interface Squad {
 }
 
 export interface SquadsResponse {
+  /** In league order, leader first. */
   squads: Squad[];
   /** Elements owned by nobody. */
   freeAgentCount: number;
@@ -166,6 +177,13 @@ async function computeSquads(): Promise<SquadsResponse> {
     };
   }
 
+  // League position, which `details` already carries — no extra call, and no
+  // need for the season computation just to know who is top. Anyone missing
+  // from `standings` sorts last rather than to the front on a 0.
+  const rankByEntry = new Map<LeagueEntryId, number>(
+    league.standings.map((standing) => [standing.league_entry, standing.rank]),
+  );
+
   // The one place the two manager identities meet: ownership is looked up by
   // `entry_id`, but the squad is keyed by `id` — the league entry — because
   // that is what the rest of the app calls a player.
@@ -187,7 +205,13 @@ async function computeSquads(): Promise<SquadsResponse> {
   });
 
   return {
-    squads,
+    // Sorted by league position, so `squads[0]` is the leader — which is what
+    // the compare column opens against.
+    squads: squads.sort(
+      (a, b) =>
+        (rankByEntry.get(a.leagueEntry) ?? Infinity) -
+        (rankByEntry.get(b.leagueEntry) ?? Infinity),
+    ),
     freeAgentCount,
     drafted: squads.some((squad) => squad.players.length > 0),
   };

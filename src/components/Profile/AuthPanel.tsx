@@ -37,8 +37,12 @@ export function AuthPanel({
           await authClient.signOut();
           window.location.reload();
         }}
+        // Resting state is quiet — signing out is not the point of any page it
+        // sits on. The warning colour arrives on hover, where it is a reply to
+        // someone already reaching for it.
         className={cn(
-          'border-white/20 text-white/80 hover:bg-white/10',
+          'border-white/20 text-white/80',
+          'hover:border-destructive/60 hover:bg-destructive/15 hover:text-destructive',
           className,
         )}
       >
