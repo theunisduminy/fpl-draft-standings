@@ -191,6 +191,11 @@ export interface ElementDetails {
    * they scored for whoever owns them now. A player traded in at GW10 brings
    * their first nine gameweeks with them here. A manager's own total is the F1
    * score, which is computed from gameweek results and owes nothing to this.
+   *
+   * **Between seasons it is the season just gone.** Upstream resets it shortly
+   * before GW1, so a squad rendered in pre-season shows last year's points
+   * against players who have not kicked a ball. Deliberately left alone: it is
+   * upstream's number and it fixes itself on kick-off.
    */
   points: number;
 }

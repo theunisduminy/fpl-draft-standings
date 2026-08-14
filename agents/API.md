@@ -325,6 +325,19 @@ six-hour fetch cache would re-upsert a payload up to six hours old while stampin
 `synced_at` as now — a table that looks fresh and is stale, and a cron frequency that buys
 nothing.
 
+> [!WARNING]
+> **`elements[].total_points` is last season's until just before GW1.** Upstream carries
+> the previous season's totals through the whole pre-season and resets them shortly before
+> the first deadline. Observed on 2026-08-14, with `current_event: null` and GW1's deadline
+> a week away: 400 of 587 elements had non-zero `total_points` **and** non-zero `minutes` —
+> Haaland on 239 points from 2953 minutes and 34 starts — while `event_points` was 0 for
+> every player.
+>
+> So a squad rendered in pre-season shows last year's points against players who have not
+> kicked a ball this season. That is upstream's number, not a stale sync, and it corrects
+> itself on kick-off. `events.current === null` (or `/api/game`'s `current_event`) is how
+> to tell the two apart if you ever need to.
+
 > [!IMPORTANT]
 > **No trailing slash** — `/api/bootstrap-static/` 404s here. This is the exact inverse of
 > the classic API, which 301s without one.

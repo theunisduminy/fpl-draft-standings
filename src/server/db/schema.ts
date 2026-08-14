@@ -205,7 +205,16 @@ export const draftElements = pgTable(
      * and the only one that survives August.
      */
     teamCode: integer('team_code').notNull(),
-    /** Season total. Stale between syncs by design — see KTD4 in the plan. */
+    /**
+     * Season total. Stale between syncs by design — see KTD4 in the plan.
+     *
+     * **Pre-season this is the _previous_ season's total.** Upstream carries it
+     * until shortly before GW1 and resets it then, so between the draft and the
+     * first kick-off this column reads 239 for Haaland while no gameweek has
+     * been played. That is upstream's number, not a sync bug, and it corrects
+     * itself without intervention. `events.current === null` in the bootstrap
+     * is how you tell the two apart.
+     */
     totalPoints: integer('total_points').notNull(),
     /**
      * When this row was last written. Read rather than assumed: the staleness
