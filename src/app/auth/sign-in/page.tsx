@@ -44,7 +44,7 @@ export default async function SignInPage() {
         </div>
 
         <Card className='border-white/10 bg-[#2a0d33]'>
-          <CardContent className='space-y-5 pt-6'>
+          <CardContent className='space-y-5 pt-4 md:pt-6'>
             <p className='text-center text-sm text-white/60'>
               Sign in with the Google account that is on the league list.
             </p>

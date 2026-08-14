@@ -50,11 +50,7 @@ export function ViewTeamDrawer({
   // Matches Tailwind's `md`, the breakpoint the rest of this table changes at.
   const isDesktop = useMediaQuery('(min-width: 48rem)');
 
-  function onOpenChange(next: boolean) {
-    setOpen(next);
-
-    if (!next || loadedGameweek === gameweek) return;
-
+  function load() {
     setError(null);
     startTransition(async () => {
       const result = await readGameweekSquad(leagueEntry, gameweek);
@@ -66,6 +62,15 @@ export function ViewTeamDrawer({
         setError(result.error);
       }
     });
+  }
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+
+    // Already holding this gameweek's squad, so opening costs nothing.
+    if (!next || loadedGameweek === gameweek) return;
+
+    load();
   }
 
   const starters = squad?.players.filter((player) => player.starting) ?? [];
@@ -98,7 +103,19 @@ export function ViewTeamDrawer({
 
         <ScrollArea className='custom-scrollbar flex-1 overflow-y-auto'>
           <div className='space-y-6 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
-            {error && <p className='text-sm text-red-400'>{error}</p>}
+            {error && (
+              <div className='space-y-3'>
+                <p className='text-sm text-red-400'>{error}</p>
+                <button
+                  type='button'
+                  onClick={load}
+                  disabled={pending}
+                  className='rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:border-[#00edfd]/50 hover:text-[#00edfd] disabled:opacity-50'
+                >
+                  {pending ? 'Trying again…' : 'Try again'}
+                </button>
+              </div>
+            )}
 
             {!error && !showSquad && <SquadLoading />}
 

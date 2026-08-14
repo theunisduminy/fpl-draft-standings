@@ -53,6 +53,18 @@ export type EntryId = Brand<number, 'EntryId'>;
 export type ElementId = Brand<number, 'ElementId'>;
 
 /**
+ * `elements[].code` — a footballer, **stable across seasons**.
+ *
+ * What `TeamCode` is to a club. It addresses the photo on the Premier League's
+ * asset host (`photos/players/…/p{code}.png`), and it is the identifier to
+ * store if a footballer ever needs a row of ours. Six digits, so it does not
+ * collide with the 1–581 of {@link ElementId} by accident — but it is not
+ * interchangeable with one, and the URL built from the wrong number is a 403,
+ * not an error anyone sees in a log.
+ */
+export type ElementCode = Brand<number, 'ElementCode'>;
+
+/**
  * `teams[].code` — a Premier League club, **stable across seasons**.
  *
  * The only FPL identifier in this file that is not season-scoped, and the
@@ -78,6 +90,10 @@ export const asEntryId = (value: number): EntryId => value as EntryId;
 
 /** Brand a number already known to be an element ID. */
 export const asElementId = (value: number): ElementId => value as ElementId;
+
+/** Brand a number already known to be an element code. */
+export const asElementCode = (value: number): ElementCode =>
+  value as ElementCode;
 
 /** Brand a number already known to be a team code — a database column, a payload. */
 export const asTeamCode = (value: number): TeamCode => value as TeamCode;
@@ -185,6 +201,8 @@ export interface ElementStatus {
 /** One footballer from the **draft** bootstrap. */
 export interface DraftElement {
   id: ElementId;
+  /** The season-stable identity, and the one the photo URL is built from. */
+  code: ElementCode;
   web_name: string;
   first_name: string;
   second_name: string;
@@ -198,6 +216,8 @@ export interface DraftElement {
 /** One club from the draft bootstrap. */
 export interface DraftTeam {
   id: number;
+  /** The same `TeamCode` the classic bootstrap uses — Arsenal is 3 in both. */
+  code: TeamCode;
   name: string;
   short_name: string;
 }

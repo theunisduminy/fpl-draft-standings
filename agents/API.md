@@ -418,6 +418,37 @@ All 380 fixtures. No consumer in the app; `fplApi.fixtures()` builds the URL.
 
 ---
 
+## Images (`resources.premierleague.com`)
+
+Not an API — an asset host, and the only upstream URLs deliberately **not** in
+`fpl-api.ts`. These images are loaded by the browser, so the builders have to be
+importable from a client component, and `fpl-api.ts` is `server-only`. They live
+in [`src/utils/pl-assets.ts`](../src/utils/pl-assets.ts) instead; that file is
+still the single place the URLs are written.
+
+```
+https://resources.premierleague.com/premierleague/badges/t{teamCode}.svg
+https://resources.premierleague.com/premierleague/photos/players/{size}/p{elementCode}.png
+```
+
+**Both take a `code`, never an `id`.** Codes are stable across seasons; the
+sibling `id` fields are re-minted every August, so a URL built from one silently
+returns a different club or a different footballer.
+
+- **Crests.** `{teamCode}` is `teams[].code` — from either bootstrap, they
+  agree (Arsenal is `code` 3, `id` 1 in both). All 20 current clubs return
+  `200 image/svg+xml`. `badges/50/t{code}.png` is the raster equivalent.
+- **Photos.** `{elementCode}` is `elements[].code` — six digits, not the 1–581
+  of `ElementId`. `{size}` is one of `40x40` (16 KB), `110x140` (108 KB) or
+  `250x250` (331 KB); only the first is sane in a list of fifteen.
+- **A bad code answers `403`, not `404`** — and never a placeholder. Nothing
+  reaches a log, so anything rendering a photo needs an `onError` fallback;
+  `PlayerPhoto` draws initials. Squad entries appear days before photos do.
+- **The season-scoped prefixes `403`.** `premierleague25/badges/…` fails; only
+  the unversioned `premierleague/…` prefix works.
+
+---
+
 ## Our own routes (`src/app/api/**`)
 
 **There is one route handler left, and it is not ours.**

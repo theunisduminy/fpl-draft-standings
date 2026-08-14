@@ -5,11 +5,13 @@ import {
   type DraftElement,
   type DraftElementType,
   type DraftTeam,
+  type ElementCode,
   type ElementId,
   type ElementStatus,
   type EntryId,
   type LeagueEntryId,
   type Position,
+  type TeamCode,
 } from '@/interfaces/fpl';
 
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
@@ -41,9 +43,22 @@ export type Acquisition =
 
 export interface SquadPlayer {
   element: ElementId;
+  /** Season-stable, and what the headshot URL is built from. */
+  code: ElementCode | null;
   name: string;
   position: Position;
   club: string;
+  /** The club's crest identity. Null when the element cannot be resolved. */
+  clubCode: TeamCode | null;
+  /**
+   * The footballer's season total, from the draft bootstrap.
+   *
+   * **Everything they have scored this season, not what they scored for this
+   * manager.** A player traded in at GW10 brings their first nine gameweeks
+   * with them here. The manager's own total is the F1 score, which is computed
+   * from gameweek results and owes nothing to this number.
+   */
+  points: number;
   acquisition: Acquisition;
 }
 
@@ -58,6 +73,7 @@ export interface Squad {
 }
 
 export interface SquadsResponse {
+  /** In league order, leader first. */
   squads: Squad[];
   /** Elements owned by nobody. */
   freeAgentCount: number;
@@ -149,16 +165,28 @@ async function computeSquads(): Promise<SquadsResponse> {
       acquisition = { kind: 'acquired', draftedRound: choice.round };
     }
 
+    const club = details ? clubs.get(details.team) : undefined;
+
     return {
       element,
+      code: details?.code ?? null,
       name: details?.web_name ?? `Player ${element}`,
       position: details
         ? toPosition(positions.get(details.element_type)?.singular_name_short)
         : 'UNK',
-      club: details ? (clubs.get(details.team)?.short_name ?? '—') : '—',
+      club: club?.short_name ?? '—',
+      clubCode: club?.code ?? null,
+      points: details?.total_points ?? 0,
       acquisition,
     };
   }
+
+  // League position, which `details` already carries — no extra call, and no
+  // need for the season computation just to know who is top. Anyone missing
+  // from `standings` sorts last rather than to the front on a 0.
+  const rankByEntry = new Map<LeagueEntryId, number>(
+    league.standings.map((standing) => [standing.league_entry, standing.rank]),
+  );
 
   // The one place the two manager identities meet: ownership is looked up by
   // `entry_id`, but the squad is keyed by `id` — the league entry — because
@@ -181,7 +209,13 @@ async function computeSquads(): Promise<SquadsResponse> {
   });
 
   return {
-    squads,
+    // Sorted by league position, so `squads[0]` is the leader — which is what
+    // the compare column opens against.
+    squads: squads.sort(
+      (a, b) =>
+        (rankByEntry.get(a.leagueEntry) ?? Infinity) -
+        (rankByEntry.get(b.leagueEntry) ?? Infinity),
+    ),
     freeAgentCount,
     drafted: squads.some((squad) => squad.players.length > 0),
   };

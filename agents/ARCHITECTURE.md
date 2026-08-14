@@ -178,7 +178,7 @@ Two consequences worth stating outright:
     │   ├── TableView/         standings, draft results, position tables, base-table
     │   ├── PlayerView/        per-player charts, summary, form guide
     │   ├── RumblerView/       rumbler cards, dashboard, frequency chart
-    │   ├── SquadView/         squad card (pure server, no client JS)
+    │   ├── SquadView/         squad card + the picker that chooses one or two
     │   ├── Layout/            AppChrome, HeaderNav, SideNav, MobileNav, Footer
     │   └── DetailView/        gameweek summary, score chart, match odds
     ├── server/                ★ server-only. Never imported by a client component.

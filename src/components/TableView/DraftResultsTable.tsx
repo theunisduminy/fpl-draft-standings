@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { BaseTable, type TableColumn } from './base-table';
 import {
   draftResultsTableConfig,
@@ -18,15 +19,36 @@ export default function DraftResultsTable({
 }: {
   data: GameweekDataResponse;
 }) {
-  // `null` means "the reader hasn't chosen yet", so we fall back to the most
-  // recent gameweek. Deriving the default beats storing it: setting state from
-  // inside useMemo triggers a cascading render, which React 19 flags.
+  // `null` means "the reader hasn't chosen yet", so we fall back to `?gw=` and
+  // then to the most recent gameweek. Deriving the default beats storing it:
+  // setting state from inside useMemo triggers a cascading render, which React
+  // 19 flags.
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
   const gameweeks = data.completedGameweeks;
+  const requestedGameweek = Number(useSearchParams().get('gw'));
 
   // `completedGameweeks` arrives newest-first.
-  const activeGameweek = selectedGameweek ?? gameweeks[0] ?? 0;
+  const activeGameweek =
+    selectedGameweek ??
+    (gameweeks.includes(requestedGameweek)
+      ? requestedGameweek
+      : gameweeks[0]) ??
+    0;
+
+  /**
+   * Select a gameweek and mirror it into the URL.
+   *
+   * `history.replaceState`, deliberately, **not** `router.replace`: the table
+   * already holds every gameweek, so a navigation would re-render the route on
+   * the server — a couple of seconds of force-dynamic work — to arrive at
+   * markup the client could produce instantly. This way `/results?gw=5` is
+   * shareable and the pills stay free.
+   */
+  function selectGameweek(gameweek: number) {
+    setSelectedGameweek(gameweek);
+    window.history.replaceState(null, '', `?gw=${gameweek}`);
+  }
 
   const formattedResults: GameweekResult[] = useMemo(() => {
     if (!activeGameweek) return [];
@@ -129,7 +151,7 @@ export default function DraftResultsTable({
       <GameweekSelector
         gameweeks={gameweeks}
         selectedGameweek={activeGameweek}
-        onSelectGameweek={setSelectedGameweek}
+        onSelectGameweek={selectGameweek}
       />
 
       <BaseTable
@@ -148,7 +170,8 @@ export default function DraftResultsTable({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-4'>
+            {/* 2×2 on mobile, one row on desktop. */}
+            <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
               <StatCard
                 icon={<TrendingUp className='h-4 w-4 text-yellow-400' />}
                 label='Highest'
@@ -191,16 +214,16 @@ function StatCard({
   /** Whoever the stat belongs to. A tie is more than one badge. */
   names?: string[];
 }) {
-  // Exactly two rows, whether or not there is a name to show: label above,
-  // value and name on one baseline below. The name sits to the right so the
-  // cards without one (average, difference) end at the same height.
+  // Label above, then value and name on one baseline. At half a phone's width
+  // there is rarely room for both, so the names wrap under the value; the grid
+  // stretches every card in a row to the tallest, so they still line up.
   return (
     <div className='rounded-lg bg-[#1a0520] p-3'>
       <div className='mb-1 flex items-center gap-2'>
         {icon}
         <span className='text-xs text-white/50'>{label}</span>
       </div>
-      <div className='flex items-center justify-between gap-2'>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
         <p className='text-sm font-bold text-white md:text-base'>{value}</p>
         <div className='flex min-w-0 flex-wrap justify-end gap-1'>
           {names?.map((name) => (
