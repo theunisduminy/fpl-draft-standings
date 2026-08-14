@@ -134,8 +134,16 @@ async function runSync(): Promise<StepResult[]> {
   // `clearCache()` because `cachedRead` checks its process-local `Map` before
   // the Data Cache and no tag operation touches that map, so warming without it
   // returns the entry this process already holds and never runs `compute`.
-  TAGS.forEach((tag) => revalidateTag(tag, { expire: 0 }));
-  clearCache();
+  // Wrapped like its siblings, not left bare. An unguarded throw here would
+  // escape `runSync` and return a 500 with none of the `{ ok, steps }` shape
+  // the rest of the route is built around — a monitor would see a dead
+  // endpoint rather than "invalidation failed, the other two worked".
+  const invalidate = await step('invalidate', async () => {
+    TAGS.forEach((tag) => revalidateTag(tag, { expire: 0 }));
+    clearCache();
+
+    return `${TAGS.length} tags expired, in-memory cache cleared`;
+  });
 
   // Each cache warms on its own account. `Promise.all` here would let one
   // failure report the whole step as failed, which is how "squads warmed fine,
@@ -173,7 +181,7 @@ async function runSync(): Promise<StepResult[]> {
     return summary;
   });
 
-  return [reference, finalisation, warm];
+  return [reference, finalisation, invalidate, warm];
 }
 
 /**
@@ -193,14 +201,7 @@ async function runSync(): Promise<StepResult[]> {
  */
 async function syncReferenceTables(): Promise<string> {
   const leagueId = getLeagueId();
-
-  const response = await fetch(fplApi.draftBootstrap(), { cache: 'no-store' });
-
-  if (!response.ok) {
-    throw new Error(`Draft bootstrap request failed with ${response.status}`);
-  }
-
-  const bootstrap = (await response.json()) as DraftBootstrap;
+  const bootstrap = await fetchDraftBootstrap();
 
   // `{}` and `[]` from upstream mean "nothing yet", never "has data" — and a
   // sync that wrote nothing must say so rather than reporting success on an
@@ -216,6 +217,88 @@ async function syncReferenceTables(): Promise<string> {
   ]);
 
   return `${elements} elements, ${teams} clubs`;
+}
+
+/** How long one attempt at the 850 KB payload may take before it is abandoned. */
+const BOOTSTRAP_TIMEOUT_MS = 20_000;
+/** Attempts, not retries: one immediate retry after the first failure. */
+const BOOTSTRAP_ATTEMPTS = 2;
+const BOOTSTRAP_RETRY_DELAY_MS = 1_000;
+
+/**
+ * The draft bootstrap, uncached, bounded, and retried once.
+ *
+ * **The timeout is the load-bearing half, and not for the reason it looks.**
+ * `inFlight` stays set for as long as this runs, so an unbounded fetch that
+ * hangs does not merely lose one sync — every later cron sees the guard still
+ * held and returns "already running", and the job stops forever without
+ * anything reporting a failure. A bounded attempt cannot wedge it.
+ *
+ * The retry is for what was actually observed: this exact call failed with a
+ * bare `fetch failed` on two separate first runs against production and
+ * succeeded immediately afterwards both times. `cache: 'no-store'` means there
+ * is no stored response to fall back on, so a transient blip is a lost sync.
+ *
+ * A 4xx is **not** retried. That is upstream saying the request itself is
+ * wrong — a rotated league id, a moved path — and a second attempt cannot fix
+ * it, it only spends the window twice.
+ */
+async function fetchDraftBootstrap(): Promise<DraftBootstrap> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= BOOTSTRAP_ATTEMPTS; attempt++) {
+    const outcome = await attemptBootstrapFetch();
+
+    if (outcome.ok) return outcome.bootstrap;
+    if (!outcome.retryable) throw outcome.error;
+
+    lastError = outcome.error;
+
+    if (attempt < BOOTSTRAP_ATTEMPTS) {
+      console.error(
+        `[cron] draft bootstrap attempt ${attempt} failed; retrying.`,
+        outcome.error,
+      );
+      await new Promise((resolve) =>
+        setTimeout(resolve, BOOTSTRAP_RETRY_DELAY_MS),
+      );
+    }
+  }
+
+  throw lastError;
+}
+
+type BootstrapAttempt =
+  | { ok: true; bootstrap: DraftBootstrap }
+  | { ok: false; error: Error; retryable: boolean };
+
+async function attemptBootstrapFetch(): Promise<BootstrapAttempt> {
+  try {
+    const response = await fetch(fplApi.draftBootstrap(), {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(BOOTSTRAP_TIMEOUT_MS),
+    });
+
+    if (response.ok) {
+      return { ok: true, bootstrap: (await response.json()) as DraftBootstrap };
+    }
+
+    return {
+      ok: false,
+      error: new Error(
+        `Draft bootstrap request failed with ${response.status}`,
+      ),
+      retryable: response.status >= 500,
+    };
+  } catch (error) {
+    // A throw here is a network failure, a timeout, or malformed JSON — all
+    // the transient kind, none of them a verdict from upstream.
+    return {
+      ok: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+      retryable: true,
+    };
+  }
 }
 
 /**

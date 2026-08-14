@@ -6,7 +6,7 @@ import { getDb } from '@/server/db/client';
 import { plTeams } from '@/server/db/schema';
 import type { NewPlTeamRow, PlTeamRow } from '@/server/db/schema';
 import { getLeagueId } from '@/utils/fpl-api';
-import { latestSync } from '@/utils/reference-mapping';
+import { isCompleteClubPayload, latestSync } from '@/utils/reference-mapping';
 
 /**
  * Persistence for the 20 clubs.
@@ -54,8 +54,6 @@ export async function readTeams(): Promise<StoredTeams> {
  * extra club, not none.
  */
 export async function upsertTeams(rows: NewPlTeamRow[]): Promise<number> {
-  // An empty payload means the fetch gave us nothing, not that the Premier
-  // League folded. Pruning on it would empty the allowlist.
   if (rows.length === 0) return 0;
 
   const leagueId = getLeagueId();
@@ -72,6 +70,19 @@ export async function upsertTeams(rows: NewPlTeamRow[]): Promise<number> {
         syncedAt: new Date(),
       },
     });
+
+  // Upsert always; prune only from a payload complete enough to prune with.
+  // An empty payload means the fetch gave us nothing, not that the Premier
+  // League folded — and a *short* one is the case that actually bites: deleting
+  // every club it omits narrows an allowlist a public Server Action consults,
+  // so a half-delivered response would make real clubs unacceptable input.
+  if (!isCompleteClubPayload(rows)) {
+    console.error(
+      `[reference] pl_teams payload had ${rows.length} clubs; upserted without pruning.`,
+    );
+
+    return rows.length;
+  }
 
   await db.delete(plTeams).where(
     and(

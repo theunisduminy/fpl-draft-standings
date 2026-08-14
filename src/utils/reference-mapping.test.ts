@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   REFERENCE_STALE_AFTER_SECONDS,
+  PREMIER_LEAGUE_CLUBS,
+  isCompleteClubPayload,
   isReferenceUsable,
   latestSync,
+  missingElements,
   toElementRows,
   toTeamRows,
   toElementDetails,
@@ -283,29 +286,8 @@ describe('isReferenceUsable', () => {
     expect(isReferenceUsable([elementRow()], past, NOW).usable).toBe(false);
   });
 
-  it('returns incomplete, naming the missing id, when one is absent', () => {
-    const result = isReferenceUsable([elementRow()], fresh, NOW, [
-      asElementId(101),
-      asElementId(999),
-    ]);
-
-    expect(result).toMatchObject({ usable: false, reason: 'incomplete' });
-    expect(result.usable === false && result.detail).toContain('999');
-  });
-
-  it('is usable when every requested id is present and fresh', () => {
-    expect(
-      isReferenceUsable([elementRow()], fresh, NOW, [asElementId(101)]).usable,
-    ).toBe(true);
-  });
-
-  it('is usable with no id list at all — the club read has nothing to miss', () => {
+  it('is usable when the rows are present and fresh', () => {
     expect(isReferenceUsable([elementRow()], fresh, NOW).usable).toBe(true);
-  });
-
-  it('is usable when the requested list is empty', () => {
-    // A manager with no squad yet is not a reason to download 850 KB.
-    expect(isReferenceUsable([elementRow()], fresh, NOW, []).usable).toBe(true);
   });
 
   it('treats a missing timestamp on a populated table as stale', () => {
@@ -314,5 +296,59 @@ describe('isReferenceUsable', () => {
       usable: false,
       reason: 'stale',
     });
+  });
+});
+
+describe('missingElements', () => {
+  const known = new Set([101, 102].map(asElementId));
+  const isKnown = (element: ReturnType<typeof asElementId>) =>
+    known.has(element);
+
+  it('names the elements the lookup cannot answer', () => {
+    expect(
+      missingElements(isKnown, [asElementId(101), asElementId(999)]),
+    ).toEqual([asElementId(999)]);
+  });
+
+  it('returns nothing when every element is covered', () => {
+    expect(
+      missingElements(isKnown, [asElementId(101), asElementId(102)]),
+    ).toEqual([]);
+  });
+
+  it('returns nothing for an empty request', () => {
+    // A manager with no squad yet is not a reason to download 850 KB.
+    expect(missingElements(isKnown, [])).toEqual([]);
+  });
+
+  it('reports every absentee, not just the first', () => {
+    // The caller falls the whole read back either way, but the log names them
+    // and a count of one would misdescribe a table that lost a hundred rows.
+    expect(
+      missingElements(isKnown, [asElementId(998), asElementId(999)]),
+    ).toHaveLength(2);
+  });
+});
+
+describe('isCompleteClubPayload', () => {
+  const clubs = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ code: i }));
+
+  it('accepts a full twenty', () => {
+    expect(isCompleteClubPayload(clubs(PREMIER_LEAGUE_CLUBS))).toBe(true);
+  });
+
+  it('refuses a short payload, which is the one that would narrow the allowlist', () => {
+    expect(isCompleteClubPayload(clubs(3))).toBe(false);
+  });
+
+  it('refuses an empty payload', () => {
+    expect(isCompleteClubPayload([])).toBe(false);
+  });
+
+  it('accepts more than twenty rather than guessing', () => {
+    // If upstream ever ships 21, writing them is right; refusing to prune on a
+    // payload larger than expected would be the wrong kind of caution.
+    expect(isCompleteClubPayload(clubs(21))).toBe(true);
   });
 });

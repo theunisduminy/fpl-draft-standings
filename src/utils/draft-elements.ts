@@ -8,6 +8,7 @@ import { readElements } from '@/server/data/elements';
 import { readTeams } from '@/server/data/pl-teams';
 import {
   isReferenceUsable,
+  missingElements,
   toElementDetails,
   toPlTeam,
   toPosition,
@@ -118,7 +119,7 @@ export async function ensureCovers(
 ): Promise<ElementLookup> {
   if (lookup.source !== 'table') return lookup;
 
-  const missing = elements.filter((element) => !lookup.has(element));
+  const missing = missingElements(lookup.has, elements);
 
   if (missing.length === 0) return lookup;
 

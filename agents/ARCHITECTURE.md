@@ -189,8 +189,8 @@ Two consequences worth stating outright:
     │   │   ├── gameweeks.ts   persisted finished-gameweek facts
     │   │   ├── league-members.ts  ★ curated email -> manager mapping
     │   │   ├── elements.ts    draft_elements: read + upsert (no prune)
-│   │   ├── pl-teams.ts    pl_teams: read + upsert, and the allowlist prune
-│   │   └── profiles.ts    display name and bio
+    │   │   ├── pl-teams.ts    pl_teams: read + upsert, and the allowlist prune
+    │   │   └── profiles.ts    display name and bio
     │   ├── actions/           'use server' — validate, write, revalidate
     │   │   └── profile.ts
     │   └── auth/

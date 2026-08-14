@@ -74,14 +74,51 @@ export function latestSync(rows: readonly { syncedAt: Date }[]): Date | null {
   );
 }
 
+/** The Premier League is twenty clubs. It has been since 1995. */
+export const PREMIER_LEAGUE_CLUBS = 20;
+
+/**
+ * May this club payload be trusted to *prune* with, not merely to write?
+ *
+ * Upserting from a short payload is harmless — the rows it does carry are
+ * correct. Pruning from one is not: `isKnownTeamCode` reads that table as an
+ * allowlist on behalf of `updateProfile`, a public POST endpoint, so deleting
+ * every club the payload happens to omit can make real clubs unacceptable
+ * input. A half-delivered response would quietly narrow the dropdown to
+ * whatever survived.
+ *
+ * Refusing to prune trades back only the lesser failure R10a already accepts:
+ * a relegated club stays acceptable until a full payload arrives. Lives here,
+ * in the pure layer, because it is a rule — and because the emptiness check it
+ * replaces sat in the untested DAL, where deleting it passed every test.
+ */
+export function isCompleteClubPayload(rows: readonly unknown[]): boolean {
+  return rows.length >= PREMIER_LEAGUE_CLUBS;
+}
+
+/**
+ * Which of the requested elements this lookup cannot name.
+ *
+ * The completeness rule, extracted so the path that actually runs is the path
+ * under test. It briefly lived as an optional argument to `isReferenceUsable`,
+ * which no caller ever passed once `ensureCovers` took the job — four tests
+ * pinning a branch production never reached, while the real rule ran untested
+ * inside an impure function. The repo's testing law is explicit that a rule
+ * worth having is a rule worth pinning; this is where it can be.
+ */
+export function missingElements(
+  isKnown: (element: ElementId) => boolean,
+  requested: readonly ElementId[],
+): ElementId[] {
+  return requested.filter((element) => !isKnown(element));
+}
+
 /** Why a table could not answer, in the reader's words. */
 export type ReferenceUnusable =
   /** No rows at all — never synced, or a different league. */
   | 'empty'
   /** Older than the budget, or of unknown age. */
-  | 'stale'
-  /** Fresh, but missing something the caller asked for. */
-  | 'incomplete';
+  | 'stale';
 
 export type ReferenceVerdict =
   | { usable: true }
@@ -90,20 +127,18 @@ export type ReferenceVerdict =
 /**
  * May these rows be used instead of the bootstrap?
  *
- * Three ways to say no, and the caller logs which one — a fallback has to be
+ * Two ways to say no, and the caller logs which one — a fallback has to be
  * silent to the reader and visible to the operator, or a sync can fail for
  * weeks while the pages quietly keep paying full price.
  *
- * `requestedElementIds` is optional because the two callers differ in kind: a
- * squad read knows exactly which footballers it needs and a table missing one
- * of them is unusable, while a club read wants the whole table and has nothing
- * to be incomplete against.
+ * Deliberately **not** completeness: this answers "may these rows be trusted?",
+ * which is a property of the table alone. Whether they cover what a particular
+ * caller needs is `missingElements`, asked later by whoever knows the answer.
  */
 export function isReferenceUsable<T extends object>(
   rows: readonly T[],
   syncedAt: Date | null,
   now: Date,
-  requestedElementIds?: readonly ElementId[],
 ): ReferenceVerdict {
   // Checked before staleness: an empty table is never merely old, and the
   // operator reading the log wants "never populated", not "expired".
@@ -127,27 +162,6 @@ export function isReferenceUsable<T extends object>(
       reason: 'stale',
       detail: `${Math.round(ageSeconds)}s old, budget ${REFERENCE_STALE_AFTER_SECONDS}s`,
     };
-  }
-
-  if (requestedElementIds && requestedElementIds.length > 0) {
-    // Only the element table is ever asked for coverage, and only its rows
-    // carry an `elementId`. The cast is the narrowing that entails: a club row
-    // reaching here would have to have been passed an id list, which nothing
-    // does — `pl_teams` wants the whole table and has nothing to be missing.
-    const held = new Set(
-      (rows as readonly { elementId?: number }[]).map((row) => row.elementId),
-    );
-    const missing = requestedElementIds.filter((id) => !held.has(id));
-
-    // All or nothing. Falling back for one absentee costs a download; serving
-    // them as "Unknown" puts a hole in a squad nobody would think to question.
-    if (missing.length > 0) {
-      return {
-        usable: false,
-        reason: 'incomplete',
-        detail: `missing ${missing.length} element(s): ${missing.slice(0, 5).join(', ')}`,
-      };
-    }
   }
 
   return { usable: true };
