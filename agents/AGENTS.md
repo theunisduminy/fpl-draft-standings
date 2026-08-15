@@ -54,8 +54,9 @@ Vercel agree on the runtime. Change one and change the other.
 
 ## The core boundary: upstream API access is server-only, always
 
-**Rule: the browser never calls `draft.premierleague.com` or `fantasy.premierleague.com`
-directly.** All upstream access flows through server-only modules.
+**Rule: the browser never calls `draft.premierleague.com`, `fantasy.premierleague.com` or
+`footballapi.pulselive.com` directly.** All upstream access flows through server-only
+modules.
 
 ```
   app/**/page.tsx                ── async Server Component: reads its own data
@@ -63,12 +64,14 @@ directly.** All upstream access flows through server-only modules.
      │                              client components are leaves, for interaction only
      ▼
   src/utils/gameweek-data.ts     ── the data layer: fetch, score, rank, aggregate
+  src/utils/premier-league-data.ts  the Pulse table + fixtures
      │                              (in-memory TTL cache + promise dedup)
      ▼
   src/utils/fpl-api.ts           ── `import 'server-only'`
      │                              the ONLY place upstream URLs and FPL_LEAGUE_ID live
+     │                              `fplApi` for the two FPL games, `pulseApi` for Pulse
      ▼
-  draft.premierleague.com  /  fantasy.premierleague.com
+  draft.premierleague.com · fantasy.premierleague.com · footballapi.pulselive.com
 ```
 
 **Pages read their own data.** There is no client-fetch layer any more: no `apiHelper`, no
@@ -208,6 +211,12 @@ specific behaviours have already caused real bugs in this repo:
 - **`league_entries[].id` and `league_entries[].entry_id` are different numbers.** `id` is
   the league entry (what we use as the player ID everywhere); `entry_id` goes in
   `/api/entry/...` URLs.
+- **Pre-season Pulse returns all 20 clubs on zero, not an empty array.** `entries.length` is
+  `20` in August, so a length check answers "we have a table" about a page of noughts. Read
+  `tables[0].gameWeek` instead.
+- **Pulse's season list must be picked by highest `id`, never by parsing the label.** Its
+  labels are not one format: `"English Premier League Season 2026/2027"` sits directly above
+  `"2025/26"` in the same response.
 
 All of it, with observed payloads, is in [API.md](./API.md). When you add an endpoint,
 document it there in the same change.
@@ -241,6 +250,10 @@ Upstream returns `{}` and `[]` for "nothing yet" and 404s for "not applicable", 
 same season. Check `Object.keys(x).length` / `x.length`, never `if (x)`. A gameweek with no
 data must be **absent** from the results, never scored as zeros — zeros rank, and ranking
 awards points.
+
+**And `0` is a real value, not "not yet".** Test `typeof score === 'number'`, never
+truthiness, or a completed goalless draw renders as a fixture still to kick off. Any field
+where "none" and "not known yet" are both plausible needs the same care.
 
 ---
 
@@ -355,6 +368,36 @@ awards points.
   `pnpm dlx shadcn@latest add <component>` — `components.json` is already pointed at
   `src/app/globals.css` with no config file, which is the v4 layout.
 
+### Never assemble a Tailwind class name at runtime
+
+**Tailwind scans source text.** A class built from a variable is a string it has never seen,
+so it generates no rule for it — and nothing fails. Not the build, not the typecheck, not
+lint.
+
+```ts
+// ✗ compiles, typechecks, and silently produces no CSS
+return `hidden ${hideBelow}:table-cell`;
+
+// ✓ every class spelled out where the scanner can read it
+const HIDDEN_BELOW = {
+  sm: 'hidden sm:table-cell',
+  md: 'hidden md:table-cell',
+  lg: 'hidden lg:table-cell',
+} as const;
+```
+
+This shipped. `hiddenClasses` in `base-table.tsx` built its class that way, so the
+stylesheet held `.md\:table-cell` and nothing else — `md` survived only because
+`table-skeleton.tsx` happens to spell that string out literally. Every column marked `sm` or
+`lg` kept its `hidden` and never got `table-cell` back: **invisible at every width** rather
+than hidden below one. On the league table that meant Form and W/D/L never appeared at all.
+
+The failure mode is what makes this a law. A missing column reads as a design decision, not
+a bug, so it survives review — it took someone asking where the form column had gone. Any
+variable that picks a class picks a **whole class** from a literal lookup;
+`HIDDEN_BELOW` in `base-table.tsx` and `COLUMNS` in `SectionTabs` are both that shape. The
+same applies to a colour ramp, a grid width, or a breakpoint chosen by data.
+
 ---
 
 ## Language and voice
@@ -386,19 +429,41 @@ awards points.
 **Vitest, colocated `*.test.ts`, run with `pnpm test`.** Config is `vitest.config.mts` — the
 `@/` alias has to be repeated there, because Vitest does not read `tsconfig.json` paths.
 
-**Test the scoring layer, not the fetching.** Everything worth testing here is pure, and it
-lives in [`src/utils/scoring.ts`](../src/utils/scoring.ts): `assignRanks`, `scoreGameweek`,
-`aggregatePlayers`, `buildRumblerData`. `gameweek-data.ts` keeps the fetch, the database and
-the cache, and calls into that module. **Keep that split.** A rule that only exists inside
-an `async` function wrapped around 344 upstream calls cannot be tested, and every rule in
-here has already been broken once in production:
+**Test the rules, not the fetching.** The split is always the same pair: a pure module holds
+every rule, and an `async` sibling holds the fetch, the database and the cache and calls
+into it.
+
+| Pure (tested)          | Impure sibling           | What the rules decide                      |
+| ---------------------- | ------------------------ | ------------------------------------------ |
+| `scoring.ts`           | `gameweek-data.ts`       | ranks, F1 points, rumblers, aggregation    |
+| `premier-league.ts`    | `premier-league-data.ts` | Pulse payload → table, fixtures, matchdays |
+| `chart-scales.ts`      | the chart components     | which band, which colour, which tick       |
+| `reference-mapping.ts` | the reference readers    | payload → row, row → domain, staleness     |
+
+**Keep that split.** A rule that only exists inside an `async` function wrapped around 344
+upstream calls cannot be tested, and every rule in `scoring.ts` has already been broken once
+in production:
 
 - an unscored gameweek must be **absent**, not zeros — `{}` is truthy, and zeros rank
 - ties share the higher rank and consume the lower ones (`1, 1, 3`)
 - `standings` with `total: 0` is post-draft, not a season — the derived sum stands
 
-Adding a rule to the scoring layer means adding the test that pins it. Component tests are a
-separate decision; there is no jsdom environment configured and no need for one yet.
+**A rule that decides a colour or a scale is a rule.** `chart-scales.ts` exists because five
+defects shipped while those rules lived as untested helpers inside chart components: an
+all-drawn head-to-head record painted as the heaviest defeat, contradicting the
+tie-is-a-draw rule that `scoring.ts` tests two files away; a grid that saturated to solid
+green and red one gameweek into a season, because every pair had met once so every ratio was
+1 or 0; a manager with no recent result sorting to the top of the form guide, because
+dividing by `played.length || 1` gave them an average of 0, which beats first place; a box
+plot rendering with no axis labels when scores cluster; and a bump chart rendering with no
+lines at all, after its series were keyed by league entry on one side and display name on
+the other. Typecheck, lint, tests and the build passed on every one of them. **Presentation
+logic fails silently — it renders something**, so it needs pinning more than logic that
+throws, not less.
+
+Adding a rule to any of those modules means adding the test that pins it. Component tests
+are a separate decision; there is no jsdom environment configured, so **layout is verified
+by eye, never by CI** — say so when a change is layout-only.
 
 CI is `.github/workflows/ci.yml`: `pnpm lint`, `typecheck`, `test` and `format:check` on
 every pull request and every push to `main`. Each step carries `if: '!cancelled()'` so one
@@ -427,7 +492,7 @@ Port 3000 is frequently taken by another project on this machine — a `307 → 
 **`rm -rf .next` before trusting any data-shape debugging.** Next persists its fetch cache
 across builds and will happily serve you last season's payload.
 
-`pnpm lint` currently reports **0 errors and 4 warnings**. The warnings are a known,
+`pnpm lint` currently reports **0 errors and 2 warnings**. The warnings are a known,
 pre-existing backlog — see below. Do not add to them.
 
 ---
@@ -450,17 +515,16 @@ pre-existing backlog — see below. Do not add to them.
 the Next 16 / React 19 upgrade that surfaced them. They are a backlog to work off. Fix the
 violations, then promote the rule back to `error` in `eslint.config.mjs`.
 
-| Rule                                 | Count | What it means here                                                             |
-| ------------------------------------ | ----- | ------------------------------------------------------------------------------ |
-| `@typescript-eslint/no-explicit-any` | 3     | Recharts tooltip/label payloads, and the generic row type in `base-table.tsx`. |
-| `import/no-anonymous-default-export` | 1     | `eslint.config.mjs` exporting its config array inline.                         |
+| Rule                                 | Count | What it means here                                     |
+| ------------------------------------ | ----- | ------------------------------------------------------ |
+| `@typescript-eslint/no-explicit-any` | 1     | The generic row type in `base-table.tsx`.              |
+| `import/no-anonymous-default-export` | 1     | `eslint.config.mjs` exporting its config array inline. |
 
 The `react-hooks` warnings are gone: `set-state-in-effect` and `exhaustive-deps` both came
 from client-side data fetching, which the Server Components refactor removed outright. The
 `no-explicit-any` count fell from ~26 to 3 when the upstream payloads were typed into
-[`src/interfaces/fpl.ts`](../src/interfaces/fpl.ts).
-
-Two further known defects, both pre-existing and neither yet fixed:
+[`src/interfaces/fpl.ts`](../src/interfaces/fpl.ts), and to 1 when the recharts tooltip and
+label payloads were typed.
 
 Both of the defects that used to be listed here are fixed. Inter is now mapped into the
 theme as `--font-sans`, so it is the sans face everywhere and no element needs a font

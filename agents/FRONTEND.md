@@ -42,15 +42,17 @@ genuinely needs the browser.
 
 Components are grouped by the view they serve, not by type:
 
-| Folder                        | Holds                                                                                                                         |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `src/components/ui/`          | shadcn primitives. Nothing app-specific.                                                                                      |
-| `src/components/TableView/`   | Standings, draft results, position tables, and the table base                                                                 |
-| `src/components/PlayerView/`  | Per-player charts, summary cards, form guide                                                                                  |
-| `src/components/RumblerView/` | Rumbler cards, dashboard, frequency chart                                                                                     |
-| `src/components/DetailView/`  | Gameweek summary, score chart, match odds                                                                                     |
-| `src/components/Layout/`      | `HeaderNav`, `MobileNav`, `Footer`                                                                                            |
-| `src/components/*.tsx` (root) | Genuinely cross-view pieces only — `ErrorDisplay`, `SkeletonTable`, `GameweekSelector`, `PlayerLink`, `Select`, `ViewButtons` |
+| Folder                              | Holds                                                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/components/ui/`                | shadcn primitives. Nothing app-specific.                                                                                                         |
+| `src/components/TableView/`         | Standings, draft results, position tables, and the table base                                                                                    |
+| `src/components/PlayerView/`        | Per-player charts, summary cards, form guide                                                                                                     |
+| `src/components/RumblerView/`       | Rumbler cards, dashboard, frequency chart                                                                                                        |
+| `src/components/SquadView/`         | Squad card and the picker that chooses one squad or two                                                                                          |
+| `src/components/PremierLeagueView/` | The real league table, fixtures and results                                                                                                      |
+| `src/components/Profile/`           | The onboarding form and its pieces                                                                                                               |
+| `src/components/Layout/`            | `AppChrome`, `HeaderNav`, `SideNav`, `MobileNav`, `Footer`                                                                                       |
+| `src/components/*.tsx` (root)       | Genuinely cross-view pieces only — `ErrorDisplay`, `SkeletonTable`, `GameweekSelector`, `PlayerLink`, `SectionTabs`, `ChartCard`, and a few more |
 
 A component used by exactly one view belongs in that view's folder. Promote to the root only
 when a second view imports it.
@@ -84,6 +86,13 @@ beats any class, so the two mechanisms could not be mixed on one table. **`hideB
 (`'sm' | 'md' | 'lg'`) hides a column's header and its cells together; never write
 `hidden md:table-cell` into `className` and `cellClassName` by hand, because the two halves
 have to agree.
+
+`hideBelow` resolves through the `HIDDEN_BELOW` literal map, and it must stay a literal map.
+Building `` `hidden ${hideBelow}:table-cell` `` at runtime is a class Tailwind's scanner
+never sees, so it generated no rule and every `sm` and `lg` column was invisible at **every**
+width for as long as the code existed. See
+[`AGENTS.md`](./AGENTS.md#never-assemble-a-tailwind-class-name-at-runtime) — the same trap
+applies to any class a variable picks.
 
 **A column config may be a function** when a cell needs something the component owns —
 `draftResultsColumns(onViewTeam)`. Columns stay data and stay in `table-configs.tsx`
@@ -131,9 +140,60 @@ data as a prop has no loading state and no error state to render.
 - **`ChartTooltipContent` is the tooltip.** Don't build a custom one.
 - **Chart colours come from `ChartConfig` or `src/utils/tailwindVars.ts`**, not inline hex
   in the chart body.
+- **`ChartCard` is the wrapper**, not a hand-rolled `Card` + `CardHeader` + `CardTitle`. It
+  owns the title size, the caption, and the `action` slot beside the title. Per-chart
+  variation goes in `contentClassName`, which is the only thing that genuinely differs.
 - Charts are client components by necessity — recharts needs the DOM. Keep the data shaping
   outside the component where you can, so the refactor to Server Components only has to move
   the fetch.
+
+### Aspect ratio is `aspect-video`, and it lives in the primitive
+
+`ChartContainer` defaults to `aspect-video`, not stock shadcn's `aspect-square`. A square is
+wrong at both ends of the layout: at half width it towers over the card beside it, and at
+full width it is as tall as the page is wide, which flattens every crossing on a line chart.
+
+The lesson is the location of the fix, not the ratio. **Three consumers had each overridden
+it independently before anyone changed the default** — a defect rediscovered more than once
+belongs in the primitive. If you find yourself passing the same override a third time, that
+is the signal.
+
+### The rules that pick a colour or a scale live in `chart-scales.ts`
+
+**Never derive a band, a ramp step, an axis tick or a series key inside a chart component.**
+Those are rules, and rules go in [`src/utils/chart-scales.ts`](../src/utils/chart-scales.ts)
+with tests beside them — `versusBand`, `heatStep`, `scaleTicks`, `seriesKey`, `bumpSeries`.
+Five shipped defects lived in exactly that code while it was untested helpers inside
+components; [`AGENTS.md`](./AGENTS.md#testing) lists them. Presentation logic never throws,
+so nothing catches it but a test or an eye.
+
+Two encoding rules follow from the same rework:
+
+- **Encode magnitude, not only order.** A rank tells you who won; it cannot tell a one-point
+  defeat from a hammering. If every chart on a page encodes rank, one of them should be
+  showing margin instead.
+- **Ordinal data gets a single-hue ramp, never a rainbow.** `--color-heat-*` is the
+  sequential ramp for magnitude and `--color-versus-*` the diverging one for a two-sided
+  comparison, both defined in `globals.css`. Categorical hues are for identity
+  (`--color-series-*`) and nothing else. A diverging cell must print its number as well as
+  its colour.
+- **Floor a ratio on small samples.** One gameweek into a season every pair has met once, so
+  every ratio is 1 or 0 and the whole grid saturates. Outer bands require
+  `MIN_DECISIVE_MEETINGS`; anything that colours by proportion needs the same floor.
+
+### Choose the axis the reader will compare along
+
+Two shapes on the season tab were wrong for the question they answered, and both failures
+were about what the eye can compare:
+
+- **A stacked bar whose total is constant carries no information in its length.** Every
+  manager plays the same number of gameweeks, so only the segment boundaries meant anything,
+  and reading them asked for eight length comparisons buried inside one bar. A grid puts the
+  same numbers on a shared scale: a column reads down, a row reads across.
+- **A "last five" window must be chosen once for the card, not per row.** Taking each
+  manager's own last five results and padding short rows meant a column could mean different
+  gameweeks on different rows. Pick the gameweeks for the card, then look each manager up by
+  event.
 
 ---
 
@@ -147,14 +207,28 @@ data as a prop has no loading state and no error state to render.
 - **The palette is HSL triplets in `:root`**, consumed as `hsl(var(--token))`. Keep that
   indirection: it is what makes the planned design refresh a single-file change.
 
+- **A `backdrop-filter` promotes its whole subtree onto one composited layer**, where
+  fractional pixel positions stop being snapped and text and icons read as slightly out of
+  focus. That is what the `glass-panel` utility exists for: it paints the blur on a
+  `::before` **behind** the panel, so the panel's own children stay on the normal layer. Use
+  it rather than putting `backdrop-blur` on a container that holds content, and use `.glass`
+  only for a purely decorative surface.
+- **A hand-written rule in `globals.css` is unlayered, and unlayered beats `@layer
+utilities`** — which is every Tailwind utility. `glass-panel` deliberately sets no
+  `position` for exactly that reason: a `position: relative` there silently overrode the
+  `fixed` on both navigations and dropped them into the page flow. A custom class states
+  only what cannot be a utility, and the caller keeps positioning.
+
 > **Known drift.** A number of components still hard-code the brand purple as
 > `bg-[#2a0d33]`, `bg-[#1a0520]` and `border-white/10` — including `ErrorDisplay` and
-> several cards. That predates this rule. Don't add more; fold the existing ones into the
-> design refresh.
+> several cards, 77 occurrences at the last count. That predates this rule. Don't add more;
+> fold the existing ones into the design refresh.
 
-> **Known bug.** `font-inter` is applied to `<body>` but no theme entry maps it, so the app
-> renders in the default sans stack despite loading Inter. Fixing it changes the typography
-> of the whole app, so it belongs to the design refresh rather than a drive-by edit.
+> **Check the token before trusting a `hover:` variant.** A stock variant is written against
+> stock tokens, and ours are not stock: `--accent` here is a saturated cyan, not a near-white
+> tint. The "View team" button went out illegible because its hover background and its hover
+> text resolved to the same cyan. Read what the token actually is before relying on a
+> variant's built-in hover pair.
 
 ---
 

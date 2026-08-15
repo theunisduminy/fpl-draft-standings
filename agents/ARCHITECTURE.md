@@ -1,6 +1,6 @@
 ---
 name: Better Draft — Architecture
-last_updated: 2026-08-13
+last_updated: 2026-08-15
 ---
 
 # Architecture
@@ -34,18 +34,21 @@ behind that gate, each enforced somewhere different:
   account clears it.
 - **A member** — that session's email also has a row in `league_members`. `getCurrentUser()`
   returns `null` for anyone else.
-- **Onboarded** — a display name and a bio are on record. `(app)/(onboarded)/layout.tsx`
-  sends anyone missing either to `/profile` and keeps them there.
+- **Onboarded** — a display name, a bio **and** a favourite club are on record.
+  `(app)/(onboarded)/layout.tsx` sends anyone missing any of the three to `/profile` and
+  keeps them there. `isProfileComplete` in `src/server/auth/server.ts` is the one place that
+  decides; the `required` attributes on the form are a courtesy.
 
 `/profile` is the funnel for the two failure cases, which is why it sits outside
 `(onboarded)`: a stranger sees why they are not in, a member sees the form.
 
 The product surface:
 
-- `/` — the standings table (F1 scoring) and position distribution
+- `/` — the standings board, and a season tab of charts plus a rivals tab of comparisons
 - `/results` — per-gameweek results, charts and detail views
 - `/rumblers` — the last-place hall of shame
 - `/squads` — one squad at a time, with a second beside it to compare against; each row carries the player's club and season points
+- `/premier-league` — the **real** league table, and every fixture and result
 - `/players/[playerId]` — one manager's season: performance, positions, form
 - `/profile` — claim which manager you are (members only)
 - `/auth/sign-in` — the only route a signed-out visitor can reach
@@ -55,6 +58,15 @@ and are read from the FPL API. What the database holds is exactly two things: **
 immutable facts** (finished gameweek scores, so we don't refetch a season of history on
 every cold start) and **data with no upstream source at all** (profiles, and later bets).
 The F1 scoring table itself is neither — it is _our policy_, and it lives in code.
+
+**There are three upstreams, not two.** Neither FPL game can answer "what is the Premier
+League table?" — the classic bootstrap carries `played`, `win`, `draw`, `loss`, `points` and
+`position` on every club and leaves every one of them at zero. So `/premier-league` reads
+the **Pulse API** behind premierleague.com instead. Deriving a table from finished fixtures
+was considered and rejected: it cannot see a points deduction, so it would disagree with the
+official table by a few points in exactly the season where that matters, and it would do it
+silently. **There is deliberately no fallback** — if Pulse is unreachable the page says so.
+A page whose whole point is being authoritative must fail loudly rather than serve a guess.
 
 ---
 
@@ -83,10 +95,12 @@ connection string is a real credential, and it must never reach the browser.
 │   src/server/data/**         ── the DAL: one module per domain    │
 │   src/server/db/client.ts    ── ONLY file that builds a db client │
 │   src/utils/gameweek-data.ts ── score · rank · aggregate          │
+│   src/utils/premier-league-data.ts ── the Pulse table + fixtures  │
 │   src/utils/fpl-api.ts       ── ONLY file with upstream URLs      │
 └──────────────│──────────────────────────────│─────────────────────┘
                ▼                              ▼
    Neon Postgres (+ neon_auth)   draft.premierleague.com · fantasy.…
+                                 footballapi.pulselive.com
 ```
 
 Two rules follow, and neither has exceptions:
@@ -171,6 +185,7 @@ Two consequences worth stating outright:
     │   │       ├── results/   /results
     │   │       ├── rumblers/  /rumblers
     │   │       ├── squads/    /squads
+    │   │       ├── premier-league/  /premier-league — the real table (Pulse)
     │   │       └── players/[playerId]/  /players/:id
     │   └── api/               Neon Auth + the cron sync job (see API.md)
     ├── components/
@@ -179,8 +194,9 @@ Two consequences worth stating outright:
     │   ├── PlayerView/        per-player charts, summary, form guide
     │   ├── RumblerView/       rumbler cards, dashboard, frequency chart
     │   ├── SquadView/         squad card + the picker that chooses one or two
-    │   ├── Layout/            AppChrome, HeaderNav, SideNav, MobileNav, Footer
-    │   └── DetailView/        gameweek summary, score chart, match odds
+    │   ├── PremierLeagueView/ the real table, fixtures and results
+    │   ├── Profile/           the onboarding form
+    │   └── Layout/            AppChrome, HeaderNav, SideNav, MobileNav, Footer
     ├── server/                ★ server-only. Never imported by a client component.
     │   ├── db/
     │   │   ├── client.ts      ★ the ONLY file that builds a db client
@@ -205,6 +221,10 @@ Two consequences worth stating outright:
         ├── fpl-api.ts         ★ server-only. Upstream API URLs + FPL_LEAGUE_ID. The gateway.
         ├── pl-assets.ts       crest + headshot URLs (browser-loaded, so not in fpl-api)
         ├── gameweek-data.ts   ★ the data layer: fetch, score, rank, aggregate, cache
+        ├── scoring.ts         ★ pure: ranks, F1 points, rumblers — the tested rules
+        ├── premier-league.ts  ★ pure: Pulse payload → table, fixtures, matchdays
+        ├── premier-league-data.ts  the Pulse fetch + cache (no fallback, by design)
+        ├── chart-scales.ts    ★ pure: which band, which ramp step, which tick
         ├── reference-mapping.ts ★ pure: payload→row, row→domain, REFERENCE_STALE_AFTER_SECONDS
         ├── draft-elements.ts  the element lookup: tables first, bootstrap fallback
         ├── pl-teams.ts        the 20 clubs: table first, bootstrap fallback
@@ -281,6 +301,19 @@ The guard that keeps this safe: a gameweek that produced **no** performances is 
 recorded. An unscored gameweek must stay absent so it is retried, rather than being frozen
 into the database as a set of zeros — which is the persistent version of the bug where all
 eight managers tied on rank 1 and banked a win.
+
+**A new cached read is not finished until the cron job knows about it.** `TAGS` in
+`/api/cron/revalidate` is a hand-written list, so a `cachedRead` whose tag is missing from it
+is simply never revalidated — nothing warns, and the page just serves an older answer than
+everything beside it. The Pulse reads shipped that way and had to be registered afterwards.
+Adding a tag means adding it to that list in the same change.
+
+**A module-level memo sits outside every layer in the table above.** `clearCache()` drops
+what `cachedRead` owns; nothing drops a `let` at module scope. That is deliberate for the
+Pulse `compSeasons` ID and for the club list — both change once a year, serverless instances
+are short-lived, and the worst case is one instance reading last season for a few minutes at
+the one moment anyone would notice. It is the wrong shape for anything that changes within a
+season, because there is no way to invalidate it short of a deploy.
 
 > [!WARNING]
 > The Next.js `fetch` cache **persists in `.next/cache` across builds**. A stale
@@ -400,23 +433,25 @@ integrity cost of leaving it off is nil.
 
 ## 7. Where to start — entry points by task
 
-| Task                                    | Start here                                | Then                                                          |
-| --------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
-| Add a new upstream call                 | `src/utils/fpl-api.ts`                    | Document the shape in [`API.md`](./API.md)                    |
-| Change how scoring or ranking works     | `src/utils/gameweek-data.ts`              | `F1_POINTS`, `assignRanks`, §5 above                          |
-| Add an API route                        | `src/app/api/<name>/route.ts`             | Copy the `{ error, message }` contract                        |
-| Add a page                              | `src/app/<route>/page.tsx`                | [`FRONTEND.md`](./FRONTEND.md)                                |
-| Add a table                             | `src/components/TableView/base-table.tsx` | `table-configs.tsx`                                           |
-| Add a chart                             | `src/components/ui/chart.tsx`             | An existing chart in `PlayerView/`                            |
-| Change theme colours or radii           | `src/app/globals.css` (`@theme inline`)   | [`FRONTEND.md`](./FRONTEND.md) — tokens, not hex              |
-| Add a shadcn primitive                  | `pnpm dlx shadcn@latest add <component>`  | `components.json` is already v4-shaped                        |
-| Debug "the data looks like last season" | `rm -rf .next`                            | §6 above, then [`API.md`](./API.md)                           |
-| Point the app at a different league     | `.env.local` → `FPL_LEAGUE_ID`            | [`API.md`](./API.md#the-league-id-is-an-environment-variable) |
-| Add a table or change the schema        | `src/server/db/schema.ts`                 | `pnpm db:generate` then `pnpm db:migrate`                     |
-| Add a database read                     | `src/server/data/<domain>.ts`             | Never `@/server/db/**` from a page or route                   |
-| Add a write                             | `src/server/actions/<domain>.ts`          | Validate, call the DAL, `revalidatePath`                      |
-| Gate something behind sign-in           | already gated — `src/proxy.ts`            | For members-only, check `getCurrentUser()` in the page too    |
-| Add someone to the league               | `league-members.json`                     | `pnpm db:seed:members`                                        |
+| Task                                    | Start here                                | Then                                                               |
+| --------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------ |
+| Add a new upstream call                 | `src/utils/fpl-api.ts`                    | Document the shape in [`API.md`](./API.md)                         |
+| Change how scoring or ranking works     | `src/utils/scoring.ts`                    | `F1_POINTS`, `assignRanks`, §5 above — add the test                |
+| Change the real Premier League table    | `src/utils/premier-league.ts`             | `premier-league-data.ts` for the fetch; [`API.md`](./API.md)       |
+| Change a chart's colours or bands       | `src/utils/chart-scales.ts`               | Never inside the component — [`FRONTEND.md`](./FRONTEND.md)        |
+| Add an API route                        | `src/app/api/<name>/route.ts`             | Copy the `{ error, message }` contract                             |
+| Add a page                              | `src/app/<route>/page.tsx`                | [`FRONTEND.md`](./FRONTEND.md)                                     |
+| Add a table                             | `src/components/TableView/base-table.tsx` | `table-configs.tsx`                                                |
+| Add a chart                             | `ChartCard` + `ChartContainer`            | An existing chart on the season tab; rules go in `chart-scales.ts` |
+| Change theme colours or radii           | `src/app/globals.css` (`@theme inline`)   | [`FRONTEND.md`](./FRONTEND.md) — tokens, not hex                   |
+| Add a shadcn primitive                  | `pnpm dlx shadcn@latest add <component>`  | `components.json` is already v4-shaped                             |
+| Debug "the data looks like last season" | `rm -rf .next`                            | §6 above, then [`API.md`](./API.md)                                |
+| Point the app at a different league     | `.env.local` → `FPL_LEAGUE_ID`            | [`API.md`](./API.md#the-league-id-is-an-environment-variable)      |
+| Add a table or change the schema        | `src/server/db/schema.ts`                 | `pnpm db:generate` then `pnpm db:migrate`                          |
+| Add a database read                     | `src/server/data/<domain>.ts`             | Never `@/server/db/**` from a page or route                        |
+| Add a write                             | `src/server/actions/<domain>.ts`          | Validate, call the DAL, `revalidatePath`                           |
+| Gate something behind sign-in           | already gated — `src/proxy.ts`            | For members-only, check `getCurrentUser()` in the page too         |
+| Add someone to the league               | `league-members.json`                     | `pnpm db:seed:members`                                             |
 
 ---
 
