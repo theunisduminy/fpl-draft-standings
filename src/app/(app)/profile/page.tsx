@@ -1,7 +1,8 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { getCurrentUser } from '@/server/auth/server';
+import { getCurrentUser, type SignedInUser } from '@/server/auth/server';
 import { getProfileByUserId } from '@/server/data/profiles';
 import { getGameweekData } from '@/utils/gameweek-data';
 import { getPremierLeagueTeams } from '@/utils/pl-teams';
@@ -11,6 +12,8 @@ import { cn } from '@/lib/utils';
 import { ClubCrest } from '@/components/ClubCrest';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
 import { ProfileForm } from '@/components/Profile/ProfileForm';
+import { ProfileSkeleton } from '@/components/Profile/ProfileSkeleton';
+import { SkeletonRegion } from '@/components/SkeletonRegion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageShell } from '@/components/Layout/PageShell';
 
@@ -28,6 +31,20 @@ export const dynamic = 'force-dynamic';
  *
  * The layout matches every other page: `PageShell` heading on the left, content
  * below it, the width owned by `AppChrome`.
+ *
+ * **Only the session is awaited here.** It is two database reads, and both the
+ * heading and the not-a-member branch turn on it. Everything expensive — the
+ * season, the club list, the stored profile — is awaited inside `ProfileBody`,
+ * behind the Suspense boundary, so the heading is not held up by a season read
+ * that can be 344 upstream calls. This page used to await all four before
+ * rendering anything at all, which made it the one page in the app where the
+ * title waited on the FPL API.
+ *
+ * **There is no `loading.tsx`, and that is not an oversight.** Its title is the
+ * one title on the site that is not a static string: `'Finish your profile'`
+ * for someone onboarding, `'Your profile'` for everyone else. A route shell
+ * cannot know which, and guessing means a visible flip from one heading to the
+ * other a moment after paint — worse than the short wait on a session read.
  */
 export default async function ProfilePage() {
   const user = await getCurrentUser();
@@ -55,6 +72,45 @@ export default async function ProfilePage() {
     );
   }
 
+  const onboarding = !user.profileComplete;
+
+  return (
+    <PageShell
+      title={onboarding ? 'Finish your profile' : 'Your profile'}
+      subtitle={
+        onboarding
+          ? 'A display name, a bio and your club, and the league is yours'
+          : user.email
+      }
+    >
+      <Suspense
+        fallback={
+          <SkeletonRegion>
+            <ProfileSkeleton />
+          </SkeletonRegion>
+        }
+      >
+        <ProfileBody user={user} onboarding={onboarding} />
+      </Suspense>
+    </PageShell>
+  );
+}
+
+/**
+ * Everything the page needs a read for: the identity cards, the form and the
+ * season summary.
+ *
+ * `onboarding` is passed down rather than re-derived, so the heading above the
+ * boundary and the form below it cannot disagree about which of the two states
+ * this page is in.
+ */
+async function ProfileBody({
+  user,
+  onboarding,
+}: {
+  user: SignedInUser;
+  onboarding: boolean;
+}) {
   const [season, profile, teams] = await Promise.all([
     getGameweekData(),
     getProfileByUserId(user.id),
@@ -70,25 +126,22 @@ export default async function ProfilePage() {
   // so the two can never disagree about what a rumbler count is.
   const stats = buildPlayerProfile(season, user.leagueEntry)?.stats;
   const played = stats && stats.totalGameweeks > 0;
-  const onboarding = !user.profileComplete;
   const favouriteTeam = profile?.favouriteTeam
     ? asTeamCode(profile.favouriteTeam)
     : null;
   const club = teams.find((team) => team.code === favouriteTeam);
 
   return (
-    <PageShell
-      title={onboarding ? 'Finish your profile' : 'Your profile'}
-      subtitle={
-        onboarding
-          ? 'A display name and a bio, and the league is yours'
-          : user.email
-      }
-    >
-      {/* Four facts across the top, then the form beside the season summary.
-          The page fills the container rather than stopping short of it: the
-          cure for a lot of empty space to the right of a form is more to read,
-          not a narrower column. */}
+    // Four facts across the top, then the form beside the season summary. The
+    // page fills the container rather than stopping short of it: the cure for a
+    // lot of empty space to the right of a form is more to read, not a narrower
+    // column.
+    //
+    // `space-y-6` because these two grids used to be direct children of
+    // `PageShell`, which owns that rhythm. Behind a Suspense boundary they are
+    // one child, so the spacing has to be restated here — and in
+    // `ProfileSkeleton`, or the shape shifts when the data lands.
+    <div className='space-y-6'>
       <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
         <IdentityCard label='You are'>
           {manager
@@ -111,7 +164,7 @@ export default async function ProfilePage() {
             )
           }
         >
-          {club?.name ?? 'No allegiance'}
+          {club?.name ?? 'Not picked yet'}
         </IdentityCard>
       </div>
 
@@ -171,7 +224,7 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
       </div>
-    </PageShell>
+    </div>
   );
 }
 

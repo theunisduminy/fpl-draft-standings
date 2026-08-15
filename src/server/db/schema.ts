@@ -140,8 +140,14 @@ export const profiles = pgTable('profiles', {
    * first time a promoted club sorted differently. See `TeamCode` in
    * `src/interfaces/fpl.ts`.
    *
-   * Nullable: unlike a display name and a bio, this is not part of compulsory
-   * onboarding.
+   * Compulsory, alongside the display name and the bio: `isProfileComplete`
+   * requires all three. It is shown on the profile, not on the standings.
+   *
+   * Still **nullable in the database**, and deliberately. Completeness is a
+   * rule, and the app decides its rules in code — a `NOT NULL` migration would
+   * have had to invent a club for every member who signed up before it, and
+   * there is no right answer to invent. Those rows stay null, the gate reads
+   * them as incomplete, and their owners pick a club once.
    */
   favouriteTeam: integer('favourite_team'),
   createdAt: timestamp('created_at', { withTimezone: true })

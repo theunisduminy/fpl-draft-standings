@@ -184,8 +184,17 @@ export function aggregatePlayers(
 
   const players = Object.values(playerMetrics);
   players.sort((a, b) => b.f1_score - a.f1_score);
+
+  // Through `assignRanks`, not `index + 1`. A dense position ranks two managers
+  // on the same F1 score 1st and 2nd, while `standingsByGameweek` — which the
+  // move column and the bump chart both read — shares the higher rank. Two
+  // surfaces on one page disagreeing about a tie is the bug; the league's rule
+  // is that ties share (1, 1, 3), so the board follows it too.
+  const f1Ranks = assignRanks(
+    players.map((player) => ({ id: player.id, event_total: player.f1_score })),
+  );
   players.forEach((player, index) => {
-    player.f1_ranking = index + 1;
+    player.f1_ranking = f1Ranks[index].rank;
   });
 
   const pointsRanks = rankByPoints(players);
@@ -221,6 +230,340 @@ export function rankByPoints(
 }
 
 /**
+ * Where one manager stood after a given gameweek.
+ *
+ * `f1_score` is cumulative, so a snapshot is the standings table as it was that
+ * week rather than that week's result.
+ */
+export interface SeasonPlace {
+  league_entry: LeagueEntryId;
+  f1_score: number;
+  rank: number;
+}
+
+/** The standings after one gameweek, sorted best first. */
+export interface SeasonSnapshot {
+  gameweek: number;
+  places: SeasonPlace[];
+}
+
+/**
+ * The standings as they stood after each gameweek, oldest first.
+ *
+ * **One derivation, two surfaces.** The week-on-week move column and the bump
+ * chart are both questions about this same series, and two separate loops would
+ * be two chances to disagree about a tie. Ranking goes
+ * through {@link assignRanks}, so a tie here behaves exactly as it does in the
+ * season table: shared higher rank, lower ranks consumed.
+ *
+ * Every manager who appears anywhere in `performances` appears in every
+ * snapshot, scoring 0 until their first gameweek. A ladder whose membership
+ * changed week to week would draw lines that begin in mid-air.
+ *
+ * Gameweeks are taken from the data, not from a range: an unplayed gameweek is
+ * absent upstream and must stay absent here, never a flat week of zeros.
+ */
+export function standingsByGameweek(
+  performances: GameweekPerformance[],
+): SeasonSnapshot[] {
+  if (performances.length === 0) return [];
+
+  const gameweeks = Array.from(
+    new Set(performances.map((performance) => performance.event)),
+  ).sort((a, b) => a - b);
+
+  const entries = Array.from(
+    new Set(performances.map((performance) => performance.league_entry)),
+  );
+
+  const cumulative = new Map<LeagueEntryId, number>(
+    entries.map((entry) => [entry, 0]),
+  );
+
+  return gameweeks.map((gameweek) => {
+    performances
+      .filter((performance) => performance.event === gameweek)
+      .forEach((performance) => {
+        const gained = F1_POINTS[performance.rank - 1] || 0;
+        cumulative.set(
+          performance.league_entry,
+          (cumulative.get(performance.league_entry) ?? 0) + gained,
+        );
+      });
+
+    const places = assignRanks(
+      entries.map((entry) => ({
+        league_entry: entry,
+        event_total: cumulative.get(entry) ?? 0,
+      })),
+    ).map((place) => ({
+      league_entry: place.league_entry,
+      f1_score: place.event_total,
+      rank: place.rank,
+    }));
+
+    return { gameweek, places };
+  });
+}
+
+/**
+ * How far each manager moved between the last two snapshots.
+ *
+ * Positive is up the table, because that is how a reader reads an up arrow: a
+ * manager who went from 5th to 3rd moved `+2`. With fewer than two snapshots
+ * the map is empty and every row renders as "new" — which is the only way a
+ * manager is missing, since `standingsByGameweek` puts every manager in every
+ * snapshot.
+ *
+ * A `Map` rather than a plain object, and the reason is the key type. An object
+ * index signature erases the `LeagueEntryId` brand to `number` — the widening
+ * AGENTS.md forbids, and the one that stops mattering the moment somebody
+ * indexes it with an `EntryId` by mistake. A `Map` keeps the brand, and Next
+ * serialises it across the server/client boundary in the RSC payload, so the
+ * reason this used to be an object no longer holds.
+ */
+export function standingsMovement(
+  snapshots: SeasonSnapshot[],
+): Map<LeagueEntryId, number> {
+  const movement = new Map<LeagueEntryId, number>();
+
+  if (snapshots.length < 2) return movement;
+
+  const previous = snapshots[snapshots.length - 2];
+  const current = snapshots[snapshots.length - 1];
+
+  const previousRanks = new Map(
+    previous.places.map((place) => [place.league_entry, place.rank]),
+  );
+
+  current.places.forEach((place) => {
+    const before = previousRanks.get(place.league_entry);
+    if (before === undefined) return;
+
+    movement.set(place.league_entry, before - place.rank);
+  });
+
+  return movement;
+}
+
+/** One manager singled out for something, with the number that did it. */
+export interface LedgerFact {
+  league_entry: LeagueEntryId;
+  value: number;
+  /** Set only where the fact names a week, e.g. the best single gameweek. */
+  gameweek?: number;
+}
+
+/**
+ * The six facts in the league ledger.
+ *
+ * Each is `null` until the season has enough played gameweeks to mean
+ * anything, and the component renders a dash rather than inventing a leader.
+ *
+ * **Ties resolve to one manager**, by the highest value then the lowest league
+ * entry, so the row is stable between renders. The ledger is a summary strip,
+ * not a record book; the tables below it are where a reader goes for the
+ * full order.
+ */
+export interface LeagueLedger {
+  mostWins: LedgerFact | null;
+  mostPodiums: LedgerFact | null;
+  bestWeek: LedgerFact | null;
+  /** Lowest spread of finishing positions. Needs at least three gameweeks. */
+  steadiest: LedgerFact | null;
+  /** The **longest** run of consecutive podium finishes, not the current one. */
+  hotStreak: LedgerFact | null;
+  /** Last places, counted the way {@link buildRumblerData} counts them. */
+  mostRumblers: LedgerFact | null;
+}
+
+/** Gameweeks below which "steadiest" is noise rather than a finding. */
+const STEADIEST_MINIMUM_GAMEWEEKS = 3;
+
+export function buildLeagueLedger(
+  performances: GameweekPerformance[],
+): LeagueLedger {
+  const byEntry = groupByEntry(performances);
+  const entries = Array.from(byEntry.keys());
+
+  const empty = {
+    mostWins: null,
+    mostPodiums: null,
+    bestWeek: null,
+    steadiest: null,
+    hotStreak: null,
+    mostRumblers: null,
+  };
+
+  if (entries.length === 0) return empty;
+
+  const rumblerCounts = countRumblers(performances);
+
+  /**
+   * The manager who wins one fact.
+   *
+   * `wins` says which end of the scale that is. Five of the six facts want the
+   * highest number; "steadiest" wants the lowest spread, and it used to fit by
+   * storing its value **negated** so a single "highest wins" sort served all
+   * six. That put a minus sign in a public `value: number` that only a comment
+   * warned about, leaving every reader of a `LedgerFact` one forgotten
+   * `Math.abs` away from rendering "±-1.4 places". A comparator argument costs
+   * one line and keeps every value the number it claims to be.
+   *
+   * The league entry breaks a tie either way, so the strip does not reshuffle
+   * between two managers on the same number.
+   */
+  const best = (
+    score: (runs: GameweekPerformance[]) => LedgerFact | null,
+    wins: 'highest' | 'lowest' = 'highest',
+  ): LedgerFact | null => {
+    const facts = entries
+      .map((entry) => score(byEntry.get(entry) ?? []))
+      .filter((fact): fact is LedgerFact => fact !== null);
+
+    if (facts.length === 0) return null;
+
+    return facts.sort(
+      (a, b) =>
+        (wins === 'highest' ? b.value - a.value : a.value - b.value) ||
+        a.league_entry - b.league_entry,
+    )[0];
+  };
+
+  const countWhere = (
+    runs: GameweekPerformance[],
+    matches: (performance: GameweekPerformance) => boolean,
+  ): LedgerFact | null => {
+    if (runs.length === 0) return null;
+
+    const value = runs.filter(matches).length;
+
+    return value > 0 ? { league_entry: runs[0].league_entry, value } : null;
+  };
+
+  return {
+    mostWins: best((runs) => countWhere(runs, (run) => run.rank === 1)),
+    mostPodiums: best((runs) => countWhere(runs, (run) => run.rank <= 3)),
+    bestWeek: best((runs) => {
+      if (runs.length === 0) return null;
+
+      const week = [...runs].sort((a, b) => b.event_total - a.event_total)[0];
+
+      return {
+        league_entry: week.league_entry,
+        value: week.event_total,
+        gameweek: week.event,
+      };
+    }),
+    steadiest: best(
+      (runs) => {
+        if (runs.length < STEADIEST_MINIMUM_GAMEWEEKS) return null;
+
+        return {
+          league_entry: runs[0].league_entry,
+          value: standardDeviation(runs.map((run) => run.rank)),
+        };
+      },
+      // The one fact where a smaller number is the better one.
+      'lowest',
+    ),
+    hotStreak: best((runs) => {
+      const value = longestRun([...runs].sort((a, b) => a.event - b.event));
+
+      return value > 1 ? { league_entry: runs[0].league_entry, value } : null;
+    }),
+    mostRumblers: best((runs) => {
+      if (runs.length === 0) return null;
+
+      const value = rumblerCounts.get(runs[0].league_entry) ?? 0;
+
+      return value > 0 ? { league_entry: runs[0].league_entry, value } : null;
+    }),
+  };
+}
+
+function groupByEntry(
+  performances: GameweekPerformance[],
+): Map<LeagueEntryId, GameweekPerformance[]> {
+  const byEntry = new Map<LeagueEntryId, GameweekPerformance[]>();
+
+  performances.forEach((performance) => {
+    const runs = byEntry.get(performance.league_entry) ?? [];
+    runs.push(performance);
+    byEntry.set(performance.league_entry, runs);
+  });
+
+  return byEntry;
+}
+
+/** One week's performances per gameweek, in one place. */
+function groupByGameweek(
+  performances: GameweekPerformance[],
+): Map<number, GameweekPerformance[]> {
+  const byGameweek = new Map<number, GameweekPerformance[]>();
+
+  performances.forEach((performance) => {
+    const week = byGameweek.get(performance.event) ?? [];
+    week.push(performance);
+    byGameweek.set(performance.event, week);
+  });
+
+  return byGameweek;
+}
+
+/**
+ * Whoever finished last in one gameweek — the rumbler, or rumblers on a tie.
+ *
+ * **The worst rank present, never a hard-coded 8.** A week where the bottom two
+ * tie ends at rank 7 with nobody 8th, and a fixed comparison would report no
+ * rumbler at all. Both the ledger and the rumblers page call this, so the two
+ * cannot disagree about who was rumbled.
+ */
+function rumblersOf(week: GameweekPerformance[]): GameweekPerformance[] {
+  const worstRank = Math.max(...week.map((performance) => performance.rank));
+  return week.filter((performance) => performance.rank === worstRank);
+}
+
+export function countRumblers(
+  performances: GameweekPerformance[],
+): Map<LeagueEntryId, number> {
+  const counts = new Map<LeagueEntryId, number>();
+
+  groupByGameweek(performances).forEach((week) => {
+    rumblersOf(week).forEach((performance) => {
+      counts.set(
+        performance.league_entry,
+        (counts.get(performance.league_entry) ?? 0) + 1,
+      );
+    });
+  });
+
+  return counts;
+}
+
+/** The longest run of consecutive podium finishes in a season, in order. */
+function longestRun(runs: GameweekPerformance[]): number {
+  let longest = 0;
+  let current = 0;
+
+  runs.forEach((run) => {
+    current = run.rank <= 3 ? current + 1 : 0;
+    if (current > longest) longest = current;
+  });
+
+  return longest;
+}
+
+/** Population standard deviation. Small, fixed samples; no correction needed. */
+function standardDeviation(values: number[]): number {
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance =
+    values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+
+  return Math.sqrt(variance);
+}
+
+/**
  * The rumbler for each gameweek: whoever finished last, newest gameweek first.
  *
  * Last place is the **worst rank present**, not rank 8. A gameweek where two
@@ -231,17 +574,9 @@ export function buildRumblerData(
   performances: GameweekPerformance[],
   leagueEntries: LeagueEntry[],
 ): RumblerGameweekData[] {
-  const byEvent: Record<number, GameweekPerformance[]> = {};
-  performances.forEach((gw) => {
-    (byEvent[gw.event] ??= []).push(gw);
-  });
-
-  return Object.entries(byEvent)
-    .map(([eventStr, eventPerformances]) => {
-      const worstRank = Math.max(...eventPerformances.map((p) => p.rank));
-      const rumblers = eventPerformances.filter((p) => p.rank === worstRank);
-
-      const rumblerDetails = rumblers.map((rumbler) => {
+  return Array.from(groupByGameweek(performances).entries())
+    .map(([gameweek, eventPerformances]) => {
+      const rumblerDetails = rumblersOf(eventPerformances).map((rumbler) => {
         const player = leagueEntries.find(
           (entry) => entry.id === rumbler.league_entry,
         );
@@ -253,7 +588,7 @@ export function buildRumblerData(
       });
 
       return {
-        gameweek: parseInt(eventStr, 10),
+        gameweek,
         points: rumblerDetails[0]?.points || 0,
         entry_names: rumblerDetails.map((r) => r.entry_name),
         player_names: rumblerDetails.map((r) => r.player_name),

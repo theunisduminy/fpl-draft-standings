@@ -1,88 +1,65 @@
+import { TableSkeleton } from '@/components/TableView/table-skeleton';
 import {
-  SkeletonCardBody,
-  TableSkeleton,
-} from '@/components/TableView/table-skeleton';
-import { Card } from '@/components/ui/card';
+  SECTION_TABS_STRIP_CLASS,
+  STANDINGS_COLUMN_SHAPES,
+  STANDINGS_HIDDEN_BELOW_MD,
+} from '@/components/shapes';
+import { LEDGER_GRID_CLASS } from '@/components/TableView/LeagueLedger';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 
 /**
  * Loading shape for `/`.
  *
- * Mirrors the page: the season-lead card, then the tab strip and standings
- * table on mobile, or the table stacked above the four position charts on
- * desktop. Shared by the page's Suspense fallback and `loading.tsx`, so
+ * Mirrors the page: the two-tab strip, then the board and the ledger strip
+ * beneath it. Shared by the page's Suspense fallback and `loading.tsx`, so
  * soft-nav and stream look identical.
  *
- * The eight rows are not a guess — the league is eight managers, so the table
+ * **Only the default tab is drawn**, because only the default tab is ever
+ * rendered before the reader touches anything. That is the one real gain from
+ * dropping the desktop's stacked layout: there is a single shape to keep in
+ * step with the page instead of two, and no charts to guess the height of.
+ *
+ * The eight rows are not a guess — the league is eight managers, so the board
  * lands at exactly this height.
  */
 export function StandingsSkeleton() {
   return (
-    <div className='space-y-6'>
-      <SeasonLeadSkeleton />
+    <div className='space-y-4'>
+      <Skeleton className={SECTION_TABS_STRIP_CLASS} />
 
-      <div className='md:hidden'>
-        <Skeleton className='h-9 w-full rounded-lg' />
-        <div className='mt-4'>
-          <TableSkeleton columns={3} rows={8} />
-        </div>
-      </div>
+      {/* The board's own widths and hidden columns, from the module both this
+          server-rendered shell and the client table config read. */}
+      <TableSkeleton
+        columns={STANDINGS_COLUMN_SHAPES.length}
+        rows={8}
+        hideBelowMd={STANDINGS_HIDDEN_BELOW_MD}
+        widths={STANDINGS_COLUMN_SHAPES.map((column) => column.width)}
+      />
 
-      <div className='hidden space-y-8 md:block'>
-        <TableSkeleton columns={3} rows={8} />
-        <PositionChartsSkeleton />
-      </div>
+      <LedgerSkeleton />
     </div>
   );
 }
 
-/** The two halves of `SeasonLead`, at the height the real card lands at. */
-function SeasonLeadSkeleton() {
+/**
+ * Six cells in one bordered block, at the height the real strip lands at.
+ *
+ * The wrapper class is imported from `LeagueLedger` rather than restated, so
+ * the loading block cannot drift a breakpoint away from the real one.
+ */
+function LedgerSkeleton() {
   return (
-    <Card className='overflow-hidden border-white/10 bg-[#2a0d33]'>
-      <div className='grid gap-px bg-white/5 sm:grid-cols-2'>
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className='space-y-2 bg-[#2a0d33] p-4'>
-            <div className='flex items-center gap-2'>
-              <Skeleton className='h-4 w-4 shrink-0 rounded' />
-              <SkeletonText size='label' width='md' />
-            </div>
-            <SkeletonText size='title' width='lg' />
-            <div className='flex items-baseline justify-between gap-2'>
-              <SkeletonText size='body' width='sm' />
-              <SkeletonText size='label' width='md' />
-            </div>
+    <div className={LEDGER_GRID_CLASS}>
+      {Array.from({ length: 6 }).map((_, cell) => (
+        <div key={cell} className='space-y-1.5 bg-card p-3 md:p-3.5'>
+          <div className='flex items-center gap-1.5'>
+            <Skeleton className='h-3.5 w-3.5 shrink-0 rounded' />
+            <SkeletonText size='label' width='md' />
           </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-/** The four charts under the standings table, in their real two-column grid. */
-export function PositionChartsSkeleton() {
-  return (
-    <div className='w-full space-y-4'>
-      <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-        <SkeletonCardBody
-          title='Position distribution'
-          bodyClassName='h-64 w-full rounded-md'
-        />
-        <SkeletonCardBody
-          title='Form guide'
-          bodyClassName='h-64 w-full rounded-md'
-        />
-      </div>
-      <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-        <SkeletonCardBody
-          title='Position trajectory'
-          bodyClassName='h-64 w-full rounded-md'
-        />
-        <SkeletonCardBody
-          title='Podium race'
-          bodyClassName='h-64 w-full rounded-md'
-        />
-      </div>
+          <SkeletonText size='body' width='md' />
+          <SkeletonText size='label' width='sm' />
+        </div>
+      ))}
     </div>
   );
 }

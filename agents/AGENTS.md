@@ -122,7 +122,7 @@ The proxy is only the first of them. Do not confuse the three:
 | ------------- | ------------------------------------------ | ------------------------------ |
 | **Signed in** | a valid Neon session — any Google account  | `src/proxy.ts`                 |
 | **A member**  | that email is in `league_members`          | `getCurrentUser()` → `null`    |
-| **Onboarded** | a display name **and** a bio are on record | `(app)/(onboarded)/layout.tsx` |
+| **Onboarded** | a name, a bio **and** a club are on record | `(app)/(onboarded)/layout.tsx` |
 
 The last two are enforced together, in one layout: `(onboarded)` redirects to `/profile`
 unless `getCurrentUser()` returns a user whose `profileComplete` is true. So a stranger with
@@ -281,9 +281,21 @@ awards points.
   cannot 404 each have their own; `/` needs the `(home)` route group (now nested inside
   `(app)`) to get one, because at the group root it would cover `/players/**` too.
 
+  `/profile` is the one route that cannot 404 and still has none, deliberately: its title is
+  the only one on the site that is not a static string (`Finish your profile` when
+  onboarding, `Your profile` otherwise). A route shell cannot know which, and a guess means
+  a visible flip a moment after paint.
+
 - **Every page carries an in-page `<Suspense>` as well**, around the data-dependent subtree
   only. Pair it with `PageShell`, which paints the heading above the boundary — the title is
-  a static string, so nobody should wait on the FPL API to see it.
+  a static string, so nobody should wait on the FPL API to see it. `/profile` awaits only
+  the session above its boundary, which is two database reads; the season, the club list and
+  the stored profile are all read inside the streamed subtree.
+
+  A page that puts its whole body behind one boundary must restate `PageShell`'s `space-y-6`
+  inside both the body **and** the skeleton — behind a boundary the body is a single child,
+  so it no longer inherits that rhythm, and a skeleton that forgets it shifts on handover.
+
 - **UI primitives** from shadcn/ui live in `src/components/ui/` — use these before building
   anything custom (see [FRONTEND.md](./FRONTEND.md)).
 - **Feature components** are grouped by view: `TableView/`, `PlayerView/`, `RumblerView/`,

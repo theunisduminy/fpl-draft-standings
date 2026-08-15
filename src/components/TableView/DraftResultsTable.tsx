@@ -2,11 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BaseTable } from './base-table';
-import {
-  draftResultsColumns,
-  tableConfigs,
-  GameweekResult,
-} from './table-configs';
+import { draftResultsColumns, GameweekResult } from './table-configs';
 import { GameweekDataResponse } from '@/interfaces/players';
 import { GameweekSelector } from '@/components/GameweekSelector';
 import { useViewTeam, ViewTeamDrawer } from './ViewTeamDrawer';
@@ -86,8 +82,6 @@ export default function DraftResultsTable({
     });
   }, [data, activeGameweek]);
 
-  const config = tableConfigs.draftResults;
-
   // One drawer for the whole table; the rows only name a target.
   const viewTeam = useViewTeam(activeGameweek);
 
@@ -129,7 +123,7 @@ export default function DraftResultsTable({
         subtitle=''
         data={formattedResults}
         columns={columns}
-        emptyMessage={config.emptyMessage}
+        emptyMessage='No gameweek results available yet.'
         getRowKey={(result) => result.league_entry}
       />
     );

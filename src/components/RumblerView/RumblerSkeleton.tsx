@@ -1,6 +1,7 @@
 import { GameweekSelectorSkeleton } from '@/components/GameweekSelectorSkeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { SECTION_TABS_STRIP_CLASS } from '@/components/shapes';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 
 /**
@@ -13,7 +14,7 @@ import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 export function RumblerSkeleton() {
   return (
     <div className='w-full'>
-      <Skeleton className='h-9 w-full rounded-lg md:w-[400px]' />
+      <Skeleton className={SECTION_TABS_STRIP_CLASS} />
 
       <div className='mt-6 w-full space-y-4'>
         <GameweekSelectorSkeleton />

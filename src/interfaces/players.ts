@@ -50,8 +50,14 @@ export interface PlayerDetails {
   /**
    * Where they would stand if the league ranked on points instead of finishes.
    *
-   * Carried as a field rather than derived per view: two surfaces need it, and
-   * a ranking recomputed from a filtered list is a different ranking.
+   * Carried as a field rather than derived per view, because a ranking
+   * recomputed from a filtered list is a different ranking.
+   *
+   * **Nothing renders it today.** The standings board used to print "2nd on
+   * points" under the points column and no longer does. It stays because it is
+   * one line of the season aggregate, it is pinned by tests, and the
+   * points-versus-finishes disagreement is the league's defining quirk — the
+   * next surface that wants to say it should not have to re-derive it.
    */
   points_ranking: number;
   total_wins: number;

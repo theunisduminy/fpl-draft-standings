@@ -3,8 +3,9 @@ import 'server-only';
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 
 import { getLeagueMemberByEmail } from '@/server/data/league-members';
-import { getProfileByUserId, type ProfileRow } from '@/server/data/profiles';
+import { getProfileByUserId } from '@/server/data/profiles';
 import { asLeagueEntryId, type LeagueEntryId } from '@/interfaces/fpl';
+import { isProfileComplete } from '@/utils/profile-completeness';
 
 /**
  * Neon Auth (managed Better Auth). Identity lives in this project's own
@@ -43,9 +44,9 @@ export type SignedInUser = {
   /** Which manager they are, from the curated `league_members` mapping. */
   leagueEntry: LeagueEntryId;
   /**
-   * Both a display name and a bio are on record. Onboarding is compulsory —
-   * `src/app/(app)/(onboarded)/layout.tsx` sends anyone without these to
-   * `/profile` and keeps them there.
+   * A display name, a bio and a favourite club are all on record. Onboarding
+   * is compulsory — `src/app/(app)/(onboarded)/layout.tsx` sends anyone
+   * without these to `/profile` and keeps them there.
    */
   profileComplete: boolean;
 };
@@ -88,13 +89,4 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
     leagueEntry: asLeagueEntryId(member.leagueEntry),
     profileComplete: isProfileComplete(profile),
   };
-}
-
-/**
- * Both fields, both non-blank. Whitespace does not count as a bio, so the check
- * trims — otherwise a single space would satisfy the gate and the compulsory
- * part of compulsory onboarding would be one keystroke deep.
- */
-function isProfileComplete(profile: ProfileRow | null): boolean {
-  return Boolean(profile?.displayName?.trim() && profile?.bio?.trim());
 }

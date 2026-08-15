@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/server/auth/server';
 import { upsertProfile } from '@/server/data/profiles';
 import { isKnownTeamCode } from '@/utils/pl-teams';
 import { parseTeamCode, type TeamCode } from '@/interfaces/fpl';
+import { isProfileComplete } from '@/utils/profile-completeness';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -20,6 +21,12 @@ const MAX_BIO = 500;
  * tamper with — which manager someone is comes from the curated
  * `league_members` mapping, so it is not an input to validate. It is not an
  * input at all.
+ *
+ * All three of display name, bio and favourite club are compulsory, and this
+ * is one of the two places that is true — `isProfileComplete` is the other,
+ * and it decides who gets past the onboarding gate. Keep them in step: a field
+ * required here but not there lets someone save a profile the gate then
+ * bounces, and the reverse traps them on a form that will not accept anything.
  */
 export async function updateProfile(formData: FormData): Promise<ActionResult> {
   const user = await getCurrentUser();
@@ -53,20 +60,28 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: `Bio must be ${MAX_BIO} characters or fewer.` };
   }
 
-  // Optional, unlike the two above — but if it is set it has to be real. A
+  // Compulsory, like the two above, and it has to be real on top of that. A
   // `<select>` proves nothing: this is a POST endpoint and the body is whatever
   // the caller sent, so the code is checked against the ones upstream returned.
   const rawTeam = (formData.get('favouriteTeam') as string | null)?.trim();
-  let favouriteTeam: TeamCode | null = null;
 
-  if (rawTeam) {
-    const parsed = parseTeamCode(rawTeam);
+  if (!rawTeam) {
+    return { ok: false, error: 'Pick the club you support.' };
+  }
 
-    if (!parsed || !(await isKnownTeamCode(parsed))) {
-      return { ok: false, error: 'That is not a Premier League club.' };
-    }
+  const favouriteTeam: TeamCode | null = parseTeamCode(rawTeam);
 
-    favouriteTeam = parsed;
+  if (!favouriteTeam || !(await isKnownTeamCode(favouriteTeam))) {
+    return { ok: false, error: 'That is not a Premier League club.' };
+  }
+
+  // The gate's own rule, asked of the values about to be stored. The three
+  // checks above are the ones that can explain themselves to a person; this is
+  // the one that guarantees a save cannot produce a row the onboarding gate
+  // then calls incomplete — which would bounce the member back to this form
+  // from every page, forever, having just been told it saved.
+  if (!isProfileComplete({ displayName, bio, favouriteTeam })) {
+    return { ok: false, error: 'That profile is missing something.' };
   }
 
   await upsertProfile({ userId: user.id, displayName, bio, favouriteTeam });

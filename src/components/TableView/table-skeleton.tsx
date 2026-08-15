@@ -1,4 +1,8 @@
-import { TABLE_CELL_CLASS, TABLE_HEAD_CLASS } from './base-table';
+import {
+  TABLE_CELL_CLASS,
+  TABLE_HEAD_CLASS,
+  TABLE_ROW_CLASS,
+} from './base-table';
 import {
   Table,
   TableBody,
@@ -8,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { Skeleton, SkeletonText, cellWidth } from '@/components/ui/skeleton';
 
 /**
@@ -27,11 +32,33 @@ export function TableSkeleton({
   rows = 8,
   /** The first column of both real tables leads with a rank badge. */
   leadingBadge = true,
+  hideBelowMd = [],
+  widths = [],
 }: {
   columns?: number;
   rows?: number;
   leadingBadge?: boolean;
+  /**
+   * Column indexes the real table hides below `md`, so the placeholder hides
+   * the same ones. Without it a four-column skeleton hands over to a
+   * three-column table on a phone, which is a layout shift by construction.
+   */
+  hideBelowMd?: number[];
+  /**
+   * The real columns' width classes, in order — the same strings the table
+   * config gives them, breakpoints included.
+   *
+   * Passed in rather than imported, because `table-configs` is a `'use client'`
+   * module and this file is deliberately a server leaf so a `loading.tsx` does
+   * not ship the interactive table. Omitted, the first column takes half and
+   * the rest divide the remainder, which is only ever an approximation of the
+   * board it stands in for.
+   */
+  widths?: string[];
 }) {
+  const hidden = (col: number) =>
+    hideBelowMd.includes(col) ? 'hidden md:table-cell' : '';
+
   return (
     <div className='w-full space-y-4'>
       <Card className='overflow-hidden border-white/10 bg-[#2a0d33]'>
@@ -42,8 +69,12 @@ export function TableSkeleton({
                 {Array.from({ length: columns }).map((_, col) => (
                   <TableHead
                     key={col}
-                    className={TABLE_HEAD_CLASS}
-                    style={{ width: col === 0 ? '50%' : undefined }}
+                    className={cn(TABLE_HEAD_CLASS, widths[col], hidden(col))}
+                    style={
+                      widths.length === 0 && col === 0
+                        ? { width: '50%' }
+                        : undefined
+                    }
                   >
                     <SkeletonText size='label' width='sm' />
                   </TableHead>
@@ -52,13 +83,20 @@ export function TableSkeleton({
             </TableHeader>
             <TableBody>
               {Array.from({ length: rows }).map((_, row) => (
-                <TableRow key={row} className='border-white/5'>
+                <TableRow key={row} className={TABLE_ROW_CLASS}>
                   {Array.from({ length: columns }).map((_, col) => (
-                    <TableCell key={col} className={TABLE_CELL_CLASS}>
+                    <TableCell
+                      key={col}
+                      className={cn(TABLE_CELL_CLASS, hidden(col))}
+                    >
                       {col === 0 && leadingBadge ? (
-                        <div className='flex items-center gap-3'>
-                          <Skeleton className='h-6 w-6 shrink-0 rounded-full' />
-                          <div className='space-y-1.5'>
+                        // `min-w-0` for the same reason the real cell has it:
+                        // without it the text block is sized by its widest
+                        // child and the row refuses to shrink, which in a
+                        // scrollable container means a scrollbar.
+                        <div className='flex min-w-0 items-center gap-3'>
+                          <Skeleton className='h-8 w-8 shrink-0 rounded-full' />
+                          <div className='min-w-0 space-y-1.5'>
                             <SkeletonText size='body' width='md' />
                             <SkeletonText size='label' width='sm' />
                           </div>
@@ -79,34 +117,5 @@ export function TableSkeleton({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-/**
- * A card whose title is real and whose body is a placeholder.
- *
- * "The page is all data" is almost never true — a card's heading is a static
- * string, known before any read, so it renders for real and only the body
- * waits. That also means the skeleton does not have to guess the heading's
- * dimensions.
- */
-export function SkeletonCardBody({
-  title,
-  bodyClassName,
-}: {
-  title: string;
-  bodyClassName: string;
-}) {
-  return (
-    <Card className='border-white/10 bg-[#2a0d33]'>
-      <div className='flex flex-col space-y-1.5 p-6 pb-3'>
-        <h3 className='text-base font-semibold tracking-tight text-white md:text-lg'>
-          {title}
-        </h3>
-      </div>
-      <CardContent className='pt-0'>
-        <Skeleton className={bodyClassName} />
-      </CardContent>
-    </Card>
   );
 }
