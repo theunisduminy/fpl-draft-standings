@@ -176,6 +176,23 @@ export interface GameweekFixtures {
 }
 
 /**
+ * One matchday within a gameweek: a Saturday, a Sunday, the Monday night game.
+ *
+ * A Premier League gameweek is spread over three or four days, so a flat list
+ * of ten reads as one block when it is really several. The day is the heading
+ * a fixture list is organised by everywhere else football is published.
+ */
+export interface MatchdayFixtures {
+  /**
+   * `"Sat 22 Aug 2026"` — the date half of Pulse's own kick-off label, so the
+   * heading agrees with the times beneath it to the minute and to the
+   * timezone. Fixtures with no date yet collect under `"Date to be confirmed"`.
+   */
+  day: string;
+  fixtures: PlFixture[];
+}
+
+/**
  * Everything the Premier League page renders, read once on the server.
  *
  * `hasStarted` is computed rather than inferred at the call site, because the

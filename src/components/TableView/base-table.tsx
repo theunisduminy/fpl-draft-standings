@@ -97,10 +97,30 @@ export const TABLE_ROW_HOVER_CLASS = [
   '[&>td:last-child]:rounded-r-sm',
 ].join(' ');
 
-/** `hidden` plus the matching `table-cell` at the breakpoint, or nothing. */
+/**
+ * `hidden` plus the matching `table-cell` at the breakpoint, or nothing.
+ *
+ * **Written out as literals, because Tailwind reads the source.** This was a
+ * template — `` `hidden ${hideBelow}:table-cell` `` — and a class assembled at
+ * runtime is a class Tailwind has never seen, so it generates no rule for it.
+ * The compiled stylesheet contained `.md\:table-cell` and nothing else, and
+ * only by accident: `table-skeleton.tsx` happens to spell that one out. Every
+ * column marked `sm` or `lg` therefore kept the `hidden` and never got the
+ * `table-cell` back, so it was invisible at *every* width rather than hidden
+ * below one.
+ *
+ * It failed silently and looked like a design decision, which is what made it
+ * survive review — the table simply had fewer columns than it should. Same
+ * trap, and same fix, as `COLUMNS` in `SectionTabs`.
+ */
+const HIDDEN_BELOW = {
+  sm: 'hidden sm:table-cell',
+  md: 'hidden md:table-cell',
+  lg: 'hidden lg:table-cell',
+} as const;
+
 function hiddenClasses(hideBelow: TableColumn<unknown>['hideBelow']): string {
-  if (!hideBelow) return '';
-  return `hidden ${hideBelow}:table-cell`;
+  return hideBelow ? HIDDEN_BELOW[hideBelow] : '';
 }
 
 function alignClass(align: TableColumn<unknown>['align']): string {

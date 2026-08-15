@@ -3,6 +3,7 @@ import type {
   FormResult,
   GameweekFixtures,
   LeagueTableRow,
+  MatchdayFixtures,
   PlClub,
   PlFixture,
   PulseCompSeasonsResponse,
@@ -212,6 +213,42 @@ export function groupByGameweek(fixtures: PlFixture[]): GameweekFixtures[] {
         (a, b) => (a.kickoffMillis ?? 0) - (b.kickoffMillis ?? 0),
       ),
     }));
+}
+
+/** Where a fixture with no scheduled date collects. */
+export const DATE_TBC = 'Date to be confirmed';
+
+/**
+ * Split one gameweek's fixtures into matchdays.
+ *
+ * A gameweek runs Friday to Monday, so ten fixtures in one list read as a
+ * single block when they are really three or four separate afternoons.
+ *
+ * **The day comes from Pulse's own label, split on the comma**, not from a
+ * `Date`. Deriving it here would render the server's timezone on the first
+ * paint and the reader's after hydration — a visible flip and a hydration
+ * warning — and it would let the heading disagree with the kick-off times
+ * printed under it. Pulse has already localised both halves of
+ * `"Sat 22 Aug 2026, 12:30 BST"` to UK time, which is the right zone for a
+ * Premier League kick-off.
+ *
+ * Input order is preserved: `groupByGameweek` has already sorted by kick-off,
+ * so days come out chronologically without sorting again. Anything undated
+ * collects under {@link DATE_TBC}, which upstream does use — a fixture moved
+ * for television loses its slot for weeks.
+ */
+export function groupByDay(fixtures: PlFixture[]): MatchdayFixtures[] {
+  const byDay = new Map<string, PlFixture[]>();
+
+  for (const fixture of fixtures) {
+    const day = fixture.kickoffLabel?.split(', ')[0] || DATE_TBC;
+    const bucket = byDay.get(day);
+
+    if (bucket) bucket.push(fixture);
+    else byDay.set(day, [fixture]);
+  }
+
+  return [...byDay.entries()].map(([day, list]) => ({ day, fixtures: list }));
 }
 
 /**

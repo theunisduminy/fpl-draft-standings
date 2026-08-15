@@ -7,7 +7,9 @@ import type {
   PulseTeam,
 } from '@/interfaces/premier-league';
 import {
+  DATE_TBC,
   formFrom,
+  groupByDay,
   groupByGameweek,
   hasSeasonStarted,
   newestCompSeasonId,
@@ -264,6 +266,50 @@ describe('toFixture', () => {
 
     expect(mapped?.home.code).toBe(3);
     expect(mapped?.away.code).toBe(7);
+  });
+});
+
+describe('groupByDay', () => {
+  const on = (id: number, label: string | undefined) =>
+    toFixture(fixture({ id, kickoff: label ? { label } : {} }))!;
+
+  it('splits a gameweek into its matchdays, in the order given', () => {
+    const days = groupByDay([
+      on(1, 'Fri 21 Aug 2026, 20:00 BST'),
+      on(2, 'Sat 22 Aug 2026, 12:30 BST'),
+      on(3, 'Sat 22 Aug 2026, 15:00 BST'),
+      on(4, 'Mon 24 Aug 2026, 20:00 BST'),
+    ]);
+
+    expect(days.map((d) => d.day)).toEqual([
+      'Fri 21 Aug 2026',
+      'Sat 22 Aug 2026',
+      'Mon 24 Aug 2026',
+    ]);
+    // No re-sorting: `groupByGameweek` already ordered by kick-off, so the
+    // Saturday pair must come out 12:30 then 15:00.
+    expect(days[1].fixtures.map((f) => f.id)).toEqual([2, 3]);
+  });
+
+  it('collects an undated fixture rather than dropping it', () => {
+    // A fixture moved for television loses its slot for weeks, and it still
+    // has to appear in the gameweek.
+    const days = groupByDay([
+      on(1, 'Sat 22 Aug 2026, 15:00 BST'),
+      on(2, undefined),
+    ]);
+
+    expect(days.map((d) => d.day)).toEqual(['Sat 22 Aug 2026', DATE_TBC]);
+    expect(days[1].fixtures).toHaveLength(1);
+  });
+
+  it('keeps two clubs meeting on the same day in one block', () => {
+    expect(
+      groupByDay([
+        on(1, 'Sat 22 Aug 2026, 12:30 BST'),
+        on(2, 'Sat 22 Aug 2026, 17:30 BST'),
+      ]),
+    ).toHaveLength(1);
   });
 });
 
