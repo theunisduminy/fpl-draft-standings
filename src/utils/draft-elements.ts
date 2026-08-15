@@ -8,6 +8,7 @@ import { readElements } from '@/server/data/elements';
 import { readTeams } from '@/server/data/pl-teams';
 import {
   isReferenceUsable,
+  reportUnusableReference,
   missingElements,
   toElementDetails,
   toPlTeam,
@@ -268,16 +269,9 @@ function unknownElement(element: ElementId): ElementDetails {
   };
 }
 
-/**
- * A fallback is silent to the reader and loud to the operator.
- *
- * Without the log, a sync can fail for weeks while every page quietly goes on
- * paying full price for a table that exists to avoid it.
- */
+/** Report the fallback, then hand back the `null` every caller returns. */
 function fallingBack(table: string, reason: string, detail?: string): null {
-  console.error(
-    `[reference] ${table} unusable (${reason}${detail ? `: ${detail}` : ''}); falling back to the draft bootstrap.`,
-  );
+  reportUnusableReference(table, reason, detail, 'draft bootstrap');
 
   return null;
 }
