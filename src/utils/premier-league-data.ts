@@ -56,7 +56,7 @@ const DATA_TTL_SECONDS = 300;
  * the five-minute score refresh does not re-ask a question whose answer
  * changes annually.
  */
-const getCompSeasonId = cachedRead(
+const readCompSeasonId = cachedRead(
   SEASON_KEY,
   SEASON_TTL_SECONDS,
   async (): Promise<number> => {
@@ -74,6 +74,48 @@ const getCompSeasonId = cachedRead(
     return id;
   },
 );
+
+/**
+ * The season ID, held for the life of the process.
+ *
+ * **This memo exists because it is the one blocking call in the path.** The
+ * other two reads run concurrently, but this one cannot join them: it builds
+ * their URLs, so it has to resolve first. That makes it the only round trip
+ * every uncached load pays in series, and it answers a question whose answer
+ * changes once a year, in June.
+ *
+ * It is deliberately *not* `cachedRead`, and that is the whole point. That
+ * helper returns the raw computation outside production, so a value changing
+ * annually was being re-fetched on every single request in development — a
+ * blocking round trip before either of the reads that actually matter. The
+ * rule it is bending exists so that "the code I just wrote is the code that
+ * runs"; a season ID is not code anyone is iterating on, and a stale one is
+ * indistinguishable from a fresh one for a year at a time.
+ *
+ * The promise is stored rather than the number, so concurrent callers on a
+ * cold process share one request instead of each starting their own. A
+ * rejection is cleared: caching a failure for the life of the process would
+ * mean one bad minute at boot took the page down until the next deploy.
+ *
+ * **The revalidate job cannot reach this.** `clearCache` drops the two layers
+ * `cachedRead` owns; nothing drops a module-level variable, so an instance
+ * warmed before a season rollover keeps its ID until the process recycles.
+ * That is the same trade `pl-teams.ts` documents for the club list, and it is
+ * accepted for the same reason: serverless instances are short-lived, the
+ * value changes in June, and the worst case is one instance reading last
+ * season for a few minutes at the one moment of the year anyone would notice.
+ */
+let seasonIdPromise: Promise<number> | null = null;
+
+function getCompSeasonId(): Promise<number> {
+  seasonIdPromise ??= readCompSeasonId().catch((error: unknown) => {
+    seasonIdPromise = null;
+
+    throw error;
+  });
+
+  return seasonIdPromise;
+}
 
 /** The table and every fixture, cached. The page calls this and nothing else. */
 export async function getPremierLeagueData(): Promise<PremierLeagueData> {
