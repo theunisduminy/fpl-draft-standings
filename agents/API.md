@@ -598,6 +598,15 @@ never needs paging. `statuses=U,L,C` is upcoming, live and complete, which is ev
   `status` is `L`.
 - **`goals[]` carries `personId`, not a name.** Rendering scorers would need a further
   lookup; the app does not currently do it.
+- **Use `kickoff.label`, never `kickoff.millis`, for anything rendered.** The label is
+  already localised to UK time, which is the right zone for a Premier League kick-off, and
+  it is a string, so it renders identically on the server and in the browser. Formatting the
+  millis instead paints the server's timezone first and the reader's after hydration — a
+  visible flip and a hydration warning. `groupByDay` takes the matchday heading from
+  `"Sat 22 Aug 2026, 12:30 BST"` by one split on the comma, so the heading and the times
+  printed under it come from one string and cannot disagree.
+- **`kickoff` can be absent.** A fixture moved for television loses its slot for weeks;
+  those collect under `DATE_TBC` rather than being dropped or dated.
 - **`altIds.opta`** is `"g" + the classic API's fixture `code``, if a Premier League result
   ever needs joining to an FPL gameweek.
 
