@@ -3,7 +3,11 @@ import 'server-only';
 import { fplApi } from '@/utils/fpl-api';
 import { asTeamCode, type PlTeam, type TeamCode } from '@/interfaces/fpl';
 import { readTeams } from '@/server/data/pl-teams';
-import { isReferenceUsable, toPlTeam } from './reference-mapping';
+import {
+  isReferenceUsable,
+  reportUnusableReference,
+  toPlTeam,
+} from './reference-mapping';
 import { cachedRead } from './cache';
 
 /**
@@ -54,9 +58,11 @@ async function resolvePremierLeagueTeams(): Promise<PlTeam[]> {
       return stored.rows.map(toPlTeam).sort(byName);
     }
 
-    console.error(
-      `[reference] pl_teams unusable (${verdict.reason}${verdict.detail ? `: ${verdict.detail}` : ''}); ` +
-        'falling back to the classic bootstrap.',
+    reportUnusableReference(
+      'pl_teams',
+      verdict.reason,
+      verdict.detail,
+      'classic bootstrap',
     );
   }
 

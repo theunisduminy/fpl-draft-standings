@@ -259,9 +259,19 @@ awards points.
 - **Reference tables are an accelerator, never a source of truth.** `draft_elements` and
   `pl_teams` hold the handful of fields anyone reads out of the 850 KB draft bootstrap.
   Every reader that consults them falls back to the API when the table is empty, stale,
-  incomplete or unreachable, and logs why — so a failed sync makes a page slower, never
-  wrong. The staleness budget is one constant, `REFERENCE_STALE_AFTER_SECONDS` in
-  `src/utils/reference-mapping.ts`, and the cron interval is half of it.
+  incomplete or unreachable, and logs why through `reportUnusableReference` — so a failed
+  sync makes a page slower, never wrong. The staleness budget is one constant,
+  `REFERENCE_STALE_AFTER_SECONDS` in `src/utils/reference-mapping.ts`, and the cron
+  interval is half of it.
+
+  **Locally the tables are stale by construction**, and that is not a bug to fix. Dev
+  reads the sandbox branch (`NEON_CONNECTION_STRING_SANDBOX` wins in
+  `src/server/db/client.ts`) and no cron runs against a laptop, so the sandbox goes stale
+  overnight every night. `reportUnusableReference` therefore warns once per table per
+  process in development and errors on every occurrence in production. Refresh the
+  sandbox by calling `/api/cron/revalidate` on your own dev server with the `CRON_SECRET`
+  bearer token — that process reads the sandbox, so the job writes it.
+
 - **Server-only code lives under `src/server/`** — `db/` (client + Drizzle schema), `data/`
   (the DAL, one module per domain), `actions/` (Server Actions), `auth/` (session and the
   allowlist). Every file there starts with `import 'server-only'`.

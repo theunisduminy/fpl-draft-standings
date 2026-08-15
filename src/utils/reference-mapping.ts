@@ -280,3 +280,51 @@ export function toPlTeam(row: PlTeamRow): PlTeam {
 export function toPosition(raw: string | undefined): Position {
   return POSITION_ORDER.includes(raw as Position) ? (raw as Position) : 'UNK';
 }
+
+/**
+ * Report that a reference table could not be used, and why.
+ *
+ * **A fallback is silent to the reader and loud to the operator.** The page
+ * renders correctly either way, so without this line a sync can die and every
+ * request goes on quietly paying full price for the table that exists to avoid
+ * it. That is not hypothetical: this log is the only reason we discovered the
+ * cron had never once fired in production.
+ *
+ * **Quieter in development, and only there.** Local reads the sandbox branch
+ * (see `src/server/db/client.ts`), which nothing syncs on a schedule — no cron
+ * runs against a laptop — so its tables go stale overnight *by construction*
+ * and the warning is expected rather than actionable. At `console.error` Next's
+ * dev overlay promotes it to a modal on every render of any page that reads a
+ * reference table, which trains you to dismiss the one signal that matters. So
+ * in development it warns once per table per process and says what to do; in
+ * production nothing changes, and every occurrence is still an error.
+ *
+ * The dedupe key is the table alone, not the table and reason: a second reason
+ * for the same table is the same actionable fact — that table is not syncing.
+ */
+const reportedTables = new Set<string>();
+
+export function reportUnusableReference(
+  table: string,
+  reason: string,
+  detail: string | undefined,
+  fallback: string,
+): void {
+  const message =
+    `[reference] ${table} unusable (${reason}${detail ? `: ${detail}` : ''}); ` +
+    `falling back to the ${fallback}.`;
+
+  if (process.env.NODE_ENV !== 'development') {
+    console.error(message);
+    return;
+  }
+
+  if (reportedTables.has(table)) return;
+  reportedTables.add(table);
+
+  console.warn(
+    `${message} Expected locally: nothing syncs the sandbox branch on a ` +
+      'schedule. Refresh it by calling /api/cron/revalidate on your dev ' +
+      'server with the CRON_SECRET bearer token. Logged once per process.',
+  );
+}
