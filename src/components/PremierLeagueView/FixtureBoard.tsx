@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { ClubCrest } from '@/components/ClubCrest';
 import { GameweekSelector } from '@/components/GameweekSelector';
+import { groupByDay } from '@/utils/premier-league';
 import { cn } from '@/lib/utils';
 import type { GameweekFixtures, PlFixture } from '@/interfaces/premier-league';
 
@@ -59,13 +60,24 @@ export function FixtureBoard({
 
       <p className='text-xs text-white/50'>{summarise(current.fixtures)}</p>
 
-      <ul className='divide-y divide-border overflow-hidden rounded-xl border border-border bg-card'>
-        {current.fixtures.map((fixture) => (
-          <li key={fixture.id}>
-            <FixtureRow fixture={fixture} />
-          </li>
-        ))}
-      </ul>
+      {/* One block per matchday rather than one list of ten. A gameweek runs
+          Friday to Monday, and the day is how a fixture list is organised
+          everywhere else football is published. */}
+      {groupByDay(current.fixtures).map((matchday) => (
+        <section key={matchday.day} className='space-y-2'>
+          <h3 className='px-1 text-xs font-semibold tracking-wide text-white/60 uppercase'>
+            {matchday.day}
+          </h3>
+
+          <ul className='divide-y divide-border overflow-hidden rounded-xl border border-border bg-card'>
+            {matchday.fixtures.map((fixture) => (
+              <li key={fixture.id}>
+                <FixtureRow fixture={fixture} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }
@@ -140,31 +152,30 @@ function Scoreline({
 
   return (
     <div className='flex w-20 shrink-0 flex-col items-center sm:w-24'>
+      {/* The day is the matchday heading above, so only the time belongs
+          here — printing "Sat" under every row of a Saturday block is the
+          heading repeated ten times. */}
       <span className='text-xs font-medium text-white/60 tabular-nums'>
         {kickoffTime(fixture)}
       </span>
-      <span className='text-[10px] text-white/35'>{kickoffDay(fixture)}</span>
     </div>
   );
 }
 
 /**
- * Both halves come out of Pulse's own `"Sat 22 Aug 2026, 12:30 BST"`, split on
- * the comma, rather than from a `Date` — formatting the epoch here would render
- * the server's timezone on the first paint and the reader's after hydration,
- * which is a visible flip and a hydration warning. Pulse has already localised
- * it to UK time, which is the right zone for a Premier League kick-off anyway.
+ * The time half of Pulse's own `"Sat 22 Aug 2026, 12:30 BST"`, split on the
+ * comma, rather than a `Date` — formatting the epoch here would render the
+ * server's timezone on the first paint and the reader's after hydration, which
+ * is a visible flip and a hydration warning. Pulse has already localised it to
+ * UK time, which is the right zone for a Premier League kick-off anyway.
+ *
+ * The date half is the matchday heading, and `groupByDay` takes it from the
+ * same string by the same split, so the two cannot disagree.
  */
 function kickoffTime(fixture: PlFixture): string {
   const time = fixture.kickoffLabel?.split(', ')[1];
 
   return time ?? 'TBC';
-}
-
-function kickoffDay(fixture: PlFixture): string {
-  const day = fixture.kickoffLabel?.split(', ')[0];
-
-  return day ?? '';
 }
 
 /** The winning side is the one in white; the loser dims. */
