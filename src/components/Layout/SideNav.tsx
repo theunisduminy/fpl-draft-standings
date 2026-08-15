@@ -2,15 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, BarChart3, Beer, Users, User } from 'lucide-react';
+import { Trophy, BarChart3, Beer, Users, Shield, User } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * Six here against `MobileNav`'s five: this rail has vertical room, so it
+ * carries Profile as well and spells "Premier League" out in full where the
+ * bottom bar has to say "Prem".
+ */
 const navigation = [
   { name: 'Standings', href: '/', icon: Trophy },
   { name: 'Results', href: '/results', icon: BarChart3 },
   { name: 'Rumblers', href: '/rumblers', icon: Beer },
   { name: 'Squads', href: '/squads', icon: Users },
+  { name: 'Premier League', href: '/premier-league', icon: Shield },
   { name: 'Profile', href: '/profile', icon: User },
 ];
 
@@ -42,7 +48,9 @@ export function SideNav() {
   return (
     <nav
       aria-label='Main'
-      className='glass fixed top-4 bottom-4 left-4 z-40 hidden w-56 flex-col rounded-2xl border border-white/10 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.4)] lg:flex'
+      // `glass-panel` for the same reason as `MobileNav`: the blur goes behind
+      // the rail, not on it, so its contents stay out of the composited layer.
+      className='glass-panel fixed top-4 bottom-4 left-4 z-40 hidden w-56 flex-col rounded-2xl border border-white/10 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.4)] lg:flex'
     >
       <Link
         href='/'
@@ -78,10 +86,14 @@ export function SideNav() {
                     className='absolute top-2 bottom-2 -left-3 w-[3px] rounded-full bg-gradient-to-b from-[#00edfd] to-[#75fa95]'
                   />
                 )}
+                {/* Solid white when inactive, matching `MobileNav` — see the
+                    comment there for why an icon this small cannot carry its
+                    hierarchy in opacity. The two navigations are one design; a
+                    treatment that only holds on one of them is a drift. */}
                 <Icon
                   className={cn(
                     'h-4 w-4 shrink-0 transition-colors',
-                    isActive ? 'text-[#00edfd]' : 'text-white/40',
+                    isActive ? 'text-[#00edfd]' : 'text-white',
                   )}
                 />
                 {link.name}

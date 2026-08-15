@@ -62,7 +62,10 @@ export default function Footer() {
   return (
     <footer className='hidden md:block lg:pl-64'>
       <div className='mx-auto w-full max-w-7xl px-4 pb-4 sm:px-6 lg:px-8'>
-        <div className='glass rounded-xl border border-white/10 px-6 py-4'>
+        {/* `relative` is required beside `glass-panel`: the blur lives on a
+            `::before`, which needs a positioned ancestor. The two navigations
+            get it from being `fixed`; this block is in normal flow. */}
+        <div className='glass-panel relative rounded-xl border border-white/10 px-6 py-4'>
           <div className='flex flex-col items-center gap-4 md:flex-row md:justify-between'>
             <p className='text-center text-xs font-medium text-white/50'>
               &copy; {year} Theunis Duminy. For the lads. All rights reserved.

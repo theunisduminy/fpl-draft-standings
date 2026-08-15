@@ -16,6 +16,23 @@ const DRAFT_API = 'https://draft.premierleague.com/api';
 /** Classic FPL API. Powers the static dataset (teams, elements) and fixtures. */
 const FANTASY_API = 'https://fantasy.premierleague.com/api';
 
+/**
+ * The Pulse API behind premierleague.com. The real league table and the real
+ * fixture list — neither of which either FPL game can answer.
+ *
+ * It is here rather than in a module of its own because this file's job is to
+ * be the *one* place an upstream URL is written, and "upstream" is a boundary,
+ * not a vendor. Its own quirks are documented on the builders below.
+ */
+const PULSE_API = 'https://footballapi.pulselive.com/football';
+
+/**
+ * Pulse rejects a request with no `Origin` it recognises. Nothing else is
+ * needed — no key, no cookie — and the header is only meaningful server-side,
+ * which this module already is.
+ */
+const PULSE_HEADERS = { Origin: 'https://www.premierleague.com' } as const;
+
 const LEAGUE_ID_VAR = 'FPL_LEAGUE_ID';
 
 /**
@@ -58,14 +75,32 @@ export function getLeagueId(): number {
 export async function fetchUpstream<T>(
   url: string,
   revalidateSeconds: number,
+  headers?: Record<string, string>,
 ): Promise<T> {
-  const res = await fetch(url, { next: { revalidate: revalidateSeconds } });
+  const res = await fetch(url, {
+    headers,
+    next: { revalidate: revalidateSeconds },
+  });
 
   if (!res.ok) {
     throw new Error(`Request to ${url} failed with ${res.status}`);
   }
 
   return (await res.json()) as T;
+}
+
+/**
+ * The same read, with the `Origin` Pulse insists on.
+ *
+ * A separate function rather than a header argument at each call site, because
+ * a Pulse call that forgets the header does not fail loudly — it comes back
+ * `403` and reads as "the Premier League page is down".
+ */
+export async function fetchPulse<T>(
+  url: string,
+  revalidateSeconds: number,
+): Promise<T> {
+  return fetchUpstream<T>(url, revalidateSeconds, { ...PULSE_HEADERS });
 }
 
 export const fplApi = {
@@ -136,4 +171,43 @@ export const fplApi = {
    * The trailing slash is required — without it the API answers 301.
    */
   fixtures: () => `${FANTASY_API}/fixtures/`,
+} as const;
+
+/**
+ * The Pulse API — the real Premier League, as premierleague.com renders it.
+ *
+ * Every one of these needs the `Origin` header: go through `fetchPulse`.
+ *
+ * **`compSeasonId` is season-scoped, exactly like the draft league ID**, so it
+ * is never written down. `pulseApi.compSeasons()` lists them and
+ * `getCompSeasonId()` in `premier-league-data.ts` picks the newest. Do not be
+ * tempted to parse the labels to find it: they are not one format. The current
+ * season reads `"English Premier League Season 2026/2027"` while the one before
+ * it reads `"2025/26"`.
+ */
+export const pulseApi = {
+  /**
+   * Every Premier League season Pulse knows, newest first, as `{ id, label }`.
+   * Competition `1` is the Premier League.
+   */
+  compSeasons: () => `${PULSE_API}/competitions/1/compseasons?pageSize=50`,
+
+  /**
+   * The league table. `detail=2` is what adds `form`, `annotations` and the
+   * home/away splits; without it you get positions and totals only.
+   *
+   * Out of season this returns all 20 clubs on zero with `tables[0].gameWeek`
+   * of `0` — **not** an empty array. Guard on `gameWeek`, never on length.
+   */
+  standings: (compSeasonId: number) =>
+    `${PULSE_API}/standings?compSeasons=${compSeasonId}&altIds=true&detail=2`,
+
+  /**
+   * All 380 fixtures in one response — `pageSize` of 400 returns `numPages: 1`,
+   * so this never needs paging. `statuses=U,L,C` asks for upcoming, live and
+   * complete, which is everything.
+   */
+  fixtures: (compSeasonId: number) =>
+    `${PULSE_API}/fixtures?comps=1&compSeasons=${compSeasonId}` +
+    '&pageSize=400&page=0&sort=asc&statuses=U,L,C&altIds=true',
 } as const;

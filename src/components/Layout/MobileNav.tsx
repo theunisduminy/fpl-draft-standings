@@ -1,15 +1,32 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, BarChart3, Beer, Users } from 'lucide-react';
+import { Trophy, BarChart3, Beer, Users, Shield } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * **Five is the ceiling, and this is the fifth.** Do not add a sixth.
+ *
+ * At 375px the bar has ~339px of usable width, so five items are ~68px each —
+ * enough for a 20px icon and a 10px label, and nothing spare. A sixth drops
+ * each to ~56px, which is under the 44px tap target once the gaps are taken
+ * out and narrower than the word "Standings" at any legible size.
+ *
+ * So the next destination after Premier League is not a nav change, it is an
+ * information-architecture decision: either it belongs inside one of these
+ * five, or this becomes four items and a "More" sheet. Squeezing a sixth in is
+ * the one option that is already ruled out.
+ *
+ * "Prem" rather than "Premier League" for the same reason — it is the longest
+ * label the slot takes. `SideNav` has the room and spells it out.
+ */
 const navigation = [
   { name: 'Standings', href: '/', icon: Trophy },
   { name: 'Results', href: '/results', icon: BarChart3 },
   { name: 'Rumblers', href: '/rumblers', icon: Beer },
   { name: 'Squads', href: '/squads', icon: Users },
+  { name: 'Prem', href: '/premier-league', icon: Shield },
 ];
 
 /**
@@ -40,7 +57,10 @@ export default function MobileNav() {
   return (
     <nav
       aria-label='Main'
-      className='glass fixed right-3 bottom-1 left-3 z-50 rounded-2xl border border-white/10 shadow-[0_-8px_32px_rgba(0,0,0,0.4)] md:hidden'
+      // `glass-panel`, not `glass`: the blur is painted behind the bar rather
+      // than on it, so the icons are not inside a composited, resampled layer.
+      // See the comment on the utility in `globals.css`.
+      className='glass-panel fixed right-3 bottom-1 left-3 z-50 rounded-2xl border border-white/10 shadow-[0_-8px_32px_rgba(0,0,0,0.4)] md:hidden'
     >
       <ul className='mx-auto flex h-16 max-w-md items-stretch justify-around p-1.5'>
         {navigation.map((link) => {
@@ -65,10 +85,18 @@ export default function MobileNav() {
                     className='absolute inset-x-3 bottom-1 h-[3px] rounded-full bg-gradient-to-r from-[#00edfd] to-[#75fa95]'
                   />
                 )}
+                {/* Solid white when inactive, not a percentage of it.
+                    Two earlier attempts dimmed it — `white/40`, then inheriting
+                    the link's `white/60` — and both read as an out-of-focus
+                    icon rather than a quiet one: a 20px glyph drawn in 2px
+                    strokes has no weight to spare, so opacity eats the shape
+                    itself rather than just its emphasis. The hierarchy lives in
+                    the label, which stays at `white/60`, and in the active
+                    item's colour and rail. */}
                 <Icon
                   className={cn(
                     'h-5 w-5 transition-colors',
-                    isActive ? 'text-[#00edfd]' : 'text-white/40',
+                    isActive ? 'text-[#00edfd]' : 'text-white',
                   )}
                 />
                 <span className='text-[10px] font-semibold'>{link.name}</span>

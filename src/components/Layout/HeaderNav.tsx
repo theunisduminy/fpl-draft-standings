@@ -6,11 +6,16 @@ import { User } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * The same five as `MobileNav`, in the same order. This strip only shows at
+ * `md`, where there is room for the full name rather than the bar's "Prem".
+ */
 const navigation = [
   { name: 'Standings', href: '/' },
   { name: 'Results', href: '/results' },
   { name: 'Rumblers', href: '/rumblers' },
   { name: 'Squads', href: '/squads' },
+  { name: 'Premier League', href: '/premier-league' },
 ];
 
 /**
