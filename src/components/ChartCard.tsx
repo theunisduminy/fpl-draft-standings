@@ -21,23 +21,43 @@ import { cn } from '@/lib/utils';
 export function ChartCard({
   title,
   caption,
+  action,
   contentClassName,
   children,
 }: {
   title: string;
   /** One line under the title, saying what the chart is showing. */
   caption?: string;
+  /**
+   * A control that changes what the chart shows, sat beside the title.
+   *
+   * Only for something that rewrites the title and caption too — the bump
+   * chart's position-or-gap switch is the case this exists for. A control that
+   * merely filters belongs above the card with the rest of the page's
+   * furniture, not inside the heading of one chart.
+   */
+  action?: React.ReactNode;
   /** Body padding, where the real per-chart variation lives. */
   contentClassName?: string;
   children: React.ReactNode;
 }) {
   return (
     <Card className='w-full border-border bg-card'>
-      <CardHeader className='pb-2'>
-        <CardTitle className='text-base text-foreground md:text-lg'>
-          {title}
-        </CardTitle>
-        {caption && <p className='text-xs text-muted-foreground'>{caption}</p>}
+      <CardHeader
+        className={cn(
+          'pb-2',
+          action && 'gap-3 sm:flex-row sm:items-start sm:justify-between',
+        )}
+      >
+        <div>
+          <CardTitle className='text-base text-foreground md:text-lg'>
+            {title}
+          </CardTitle>
+          {caption && (
+            <p className='text-xs text-muted-foreground'>{caption}</p>
+          )}
+        </div>
+        {action}
       </CardHeader>
       <CardContent className={cn(contentClassName)}>{children}</CardContent>
     </Card>

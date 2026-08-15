@@ -1,9 +1,10 @@
 'use client';
-import { Trophy, LineChart } from 'lucide-react';
+import { Trophy, LineChart, Swords } from 'lucide-react';
 
 import { SectionTabs } from '@/components/SectionTabs';
 import StandingsTable from './StandingsTable';
 import SeasonInsights from './SeasonInsights';
+import RivalsInsights from './RivalsInsights';
 import { LeagueLedger } from './LeagueLedger';
 import type { StandingsContext } from './table-configs';
 import { GameweekDataResponse } from '@/interfaces/players';
@@ -61,6 +62,15 @@ export function StandingsTabs({
           label: 'Season',
           icon: LineChart,
           content: <SeasonInsights data={data} snapshots={snapshots} />,
+        },
+        // Season is the story over time; rivals is the season collapsed into
+        // comparisons. Splitting them keeps either tab to three cards, which is
+        // roughly a screen — six on one tab was a scroll nobody would finish.
+        {
+          value: 'rivals',
+          label: 'Rivals',
+          icon: Swords,
+          content: <RivalsInsights data={data} />,
         },
       ]}
     />

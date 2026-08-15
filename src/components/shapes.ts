@@ -59,3 +59,45 @@ export const STANDINGS_COLUMN_SHAPES: ColumnShape[] = [
 export const STANDINGS_HIDDEN_BELOW_MD = STANDINGS_COLUMN_SHAPES.flatMap(
   (column, index) => (column.hideBelow === 'md' ? [index] : []),
 );
+
+/**
+ * The row grammar the standings cards share.
+ *
+ * The season tab's heatmap and form guide sit side by side and are supposed to
+ * be level "by construction" — the claim only holds if their rows are literally
+ * the same height, which means the same gutter, the same gap and the same cell
+ * height. Three components were each spelling those classes out, and one of
+ * them had already drifted, which is precisely how a levelled pair stops being
+ * level a month later.
+ *
+ * `HeadToHeadGrid` deliberately does **not** use these: eight opponent columns
+ * need a tighter gutter and their own fixed widths, and that card sits alone on
+ * its own tab with nothing to line up against.
+ */
+
+/**
+ * The name gutter down the left of every row, headings included.
+ *
+ * Narrow on a phone on purpose. These are first names — "Ian", "Nick" — and at
+ * 80px the gutter was mostly empty while the cells beside it were squeezed to
+ * the point of being hard to read. The desktop width is unchanged; there is
+ * room there and a longer name benefits from it.
+ */
+export const CARD_ROW_GUTTER = 'w-16 md:w-24';
+
+/** One row: the gutter, then the cells. Tighter on a phone, for the same reason. */
+export const CARD_ROW = 'flex items-center gap-2 md:gap-3';
+
+/** The strip of cells filling the rest of a row. */
+export const CARD_ROW_CELLS = 'flex flex-1 gap-1.5';
+
+/** One cell. The height is what actually levels two cards against each other. */
+export const CARD_CELL = 'h-8 min-w-0 flex-1 md:h-9';
+
+/** A column heading above the cells. */
+export const CARD_COLUMN_HEADING =
+  'min-w-0 flex-1 text-center text-[10px] whitespace-nowrap text-muted-foreground md:text-xs';
+
+/** The manager's name in the gutter. */
+export const CARD_ROW_NAME =
+  'truncate text-xs font-medium text-muted-foreground md:text-sm';

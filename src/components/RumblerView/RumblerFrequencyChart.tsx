@@ -68,7 +68,13 @@ export function RumblerFrequencyChart({ data }: RumblerFrequencyChartProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className='p-3 pt-0 md:p-4 md:pt-0'>
-          <ChartContainer config={chartConfig}>
+          {/* Explicit, because `ChartContainer`'s default is now `aspect-video`
+              — right for a time series, wrong for a categorical bar list, where
+              a wide short box squeezes one row per manager into nothing. */}
+          <ChartContainer
+            config={chartConfig}
+            className='aspect-square w-full md:aspect-[2/1] md:min-h-[320px]'
+          >
             <BarChart
               layout='vertical'
               data={chartData}
