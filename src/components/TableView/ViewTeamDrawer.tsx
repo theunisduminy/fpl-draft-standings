@@ -10,7 +10,6 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -116,11 +115,17 @@ export function ViewTeamDrawer({ view }: { view: ViewTeam }) {
           </DrawerDescription>
         </DrawerHeader>
 
-        <ScrollArea className='custom-scrollbar flex-1 overflow-y-auto'>
+        {/* A plain scroll container, not a Radix `ScrollArea`. The primitive
+            mounts a scrollbar of its own and `custom-scrollbar` painted a
+            permanent 6px track behind it, so the sheet showed a grey rail down
+            its edge whether or not there was anything to scroll. Native
+            overflow gives the platform's overlay scrollbar instead: nothing
+            until you scroll, then it fades away again. */}
+        <div className='flex-1 overflow-y-auto'>
           <div className='space-y-6 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
             <Body view={view} />
           </div>
-        </ScrollArea>
+        </div>
       </DrawerContent>
     </Drawer>
   );

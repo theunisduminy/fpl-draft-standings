@@ -17,9 +17,12 @@ import {
 import {
   aggregatePlayers,
   assignRanks,
+  buildLeagueLedger,
   buildRumblerData,
   rankByPoints,
   scoreGameweek,
+  standingsByGameweek,
+  standingsMovement,
   type EntryPicks,
 } from './scoring';
 
@@ -366,5 +369,203 @@ describe('buildRumblerData', () => {
 
     expect(rumblers).toHaveLength(1);
     expect(rumblers[0].entry_names).not.toHaveLength(0);
+  });
+});
+
+describe('standingsByGameweek', () => {
+  const entries = makeEntries(3);
+  const [a, b, c] = entries.map((e) => e.id);
+
+  it('accumulates F1 points and ranks the running total', () => {
+    const snapshots = standingsByGameweek([
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(1, c, 3),
+      performance(2, a, 3),
+      performance(2, b, 1),
+      performance(2, c, 2),
+    ]);
+
+    expect(snapshots.map((s) => s.gameweek)).toEqual([1, 2]);
+    // GW1: 20/15/12. GW2 adds 12/20/15 → 32/35/27, so b takes the lead.
+    expect(
+      snapshots[1].places.map((p) => [p.league_entry, p.f1_score]),
+    ).toEqual([
+      [b, 35],
+      [a, 32],
+      [c, 27],
+    ]);
+  });
+
+  it('shares the higher rank on a tie, exactly like the season table', () => {
+    const snapshots = standingsByGameweek([
+      performance(1, a, 1),
+      performance(1, b, 1),
+      performance(1, c, 3),
+    ]);
+
+    expect(snapshots[0].places.map((p) => p.rank)).toEqual([1, 1, 3]);
+  });
+
+  it('keeps every manager in every snapshot, scoring 0 before they appear', () => {
+    const snapshots = standingsByGameweek([
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(2, c, 1),
+      performance(2, a, 2),
+      performance(2, b, 3),
+    ]);
+
+    expect(snapshots[0].places).toHaveLength(3);
+    expect(
+      snapshots[0].places.find((p) => p.league_entry === c)?.f1_score,
+    ).toBe(0);
+  });
+
+  it('takes its gameweeks from the data, never filling a gap with zeros', () => {
+    const snapshots = standingsByGameweek([
+      performance(1, a, 1),
+      performance(3, a, 1),
+    ]);
+
+    expect(snapshots.map((s) => s.gameweek)).toEqual([1, 3]);
+  });
+
+  it('returns nothing for a season with no performances', () => {
+    expect(standingsByGameweek([])).toEqual([]);
+  });
+});
+
+describe('standingsMovement', () => {
+  const entries = makeEntries(3);
+  const [a, b, c] = entries.map((e) => e.id);
+
+  it('reports a climb up the table as a positive number', () => {
+    const snapshots = standingsByGameweek([
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(1, c, 3),
+      performance(2, c, 1),
+      performance(2, b, 2),
+      performance(2, a, 3),
+    ]);
+
+    // c: 12 + 20 = 32, b: 15 + 15 = 30, a: 20 + 12 = 32. a and c tie on 32.
+    const movement = standingsMovement(snapshots);
+
+    expect(movement[c]).toBe(2);
+    expect(movement[a]).toBe(0);
+  });
+
+  it('is empty after a single gameweek, so nothing renders as a move', () => {
+    const snapshots = standingsByGameweek([
+      performance(1, a, 1),
+      performance(1, b, 2),
+    ]);
+
+    expect(standingsMovement(snapshots)).toEqual({});
+  });
+});
+
+describe('buildLeagueLedger', () => {
+  const entries = makeEntries(3);
+  const [a, b, c] = entries.map((e) => e.id);
+
+  /** Three managers, four gameweeks, with a shape each fact can be read off. */
+  const season = [
+    performance(1, a, 1, 70),
+    performance(1, b, 2, 60),
+    performance(1, c, 3, 50),
+    performance(2, a, 1, 80),
+    performance(2, b, 3, 55),
+    performance(2, c, 2, 65),
+    performance(3, a, 3, 40),
+    performance(3, b, 1, 90),
+    performance(3, c, 2, 45),
+    performance(4, a, 2, 52),
+    performance(4, b, 1, 75),
+    performance(4, c, 3, 30),
+  ];
+
+  it('counts wins and podiums off the finishing ranks', () => {
+    const ledger = buildLeagueLedger(season);
+
+    expect(ledger.mostWins).toMatchObject({ league_entry: a, value: 2 });
+    // Every manager made the podium every week in a three-manager league.
+    expect(ledger.mostPodiums?.value).toBe(4);
+  });
+
+  it('names the single best gameweek and which week it was', () => {
+    const ledger = buildLeagueLedger(season);
+
+    expect(ledger.bestWeek).toMatchObject({
+      league_entry: b,
+      value: 90,
+      gameweek: 3,
+    });
+  });
+
+  it('counts last places by the worst rank present, not by rank 8', () => {
+    // A two-manager week ends at rank 2, so a hard-coded last place finds none.
+    const ledger = buildLeagueLedger([
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(2, a, 1),
+      performance(2, b, 2),
+    ]);
+
+    expect(ledger.mostRumblers).toMatchObject({ league_entry: b, value: 2 });
+  });
+
+  it('measures the steadiest manager by the spread of their finishes', () => {
+    const ledger = buildLeagueLedger([
+      // a finishes 1, 3, 1, 3 — b finishes 2, 2, 2, 2.
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(2, a, 3),
+      performance(2, b, 2),
+      performance(3, a, 1),
+      performance(3, b, 2),
+      performance(4, a, 3),
+      performance(4, b, 2),
+    ]);
+
+    expect(ledger.steadiest?.league_entry).toBe(b);
+    expect(Math.abs(ledger.steadiest?.value ?? 0)).toBe(0);
+  });
+
+  it('withholds steadiest until there are enough gameweeks to mean anything', () => {
+    const ledger = buildLeagueLedger([
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(2, a, 1),
+      performance(2, b, 2),
+    ]);
+
+    expect(ledger.steadiest).toBeNull();
+  });
+
+  it('reports the longest podium run, not the current one', () => {
+    const ledger = buildLeagueLedger([
+      // a: podium, podium, podium, off — the run ends but still counts 3.
+      performance(1, a, 1),
+      performance(2, a, 2),
+      performance(3, a, 3),
+      performance(4, a, 5),
+      performance(5, a, 1),
+    ]);
+
+    expect(ledger.hotStreak).toMatchObject({ league_entry: a, value: 3 });
+  });
+
+  it('has nothing to say about a season that has not started', () => {
+    expect(buildLeagueLedger([])).toEqual({
+      mostWins: null,
+      mostPodiums: null,
+      bestWeek: null,
+      steadiest: null,
+      hotStreak: null,
+      mostRumblers: null,
+    });
   });
 });

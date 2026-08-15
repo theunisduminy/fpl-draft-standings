@@ -46,18 +46,18 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
     .sort((a, b) => a.avgRank - b.avgRank);
 
   return (
-    <Card className='w-full border-white/10 bg-[#2a0d33]'>
+    <Card className='w-full border-border bg-card'>
       <CardHeader className='pb-2'>
-        <CardTitle className='text-base text-white md:text-lg'>
-          Form Guide
+        <CardTitle className='text-base text-foreground md:text-lg'>
+          Form guide
         </CardTitle>
-        <p className='text-xs text-white/50'>Last 5 gameweeks</p>
+        <p className='text-xs text-muted-foreground'>Last 5 gameweeks</p>
       </CardHeader>
       <CardContent>
         <div className='space-y-2.5'>
           {players.map((player) => (
             <div key={player.playerId} className='flex items-center gap-3'>
-              <span className='w-20 truncate text-xs font-medium text-white/70 md:w-24 md:text-sm'>
+              <span className='w-20 truncate text-xs font-medium text-muted-foreground md:w-24 md:text-sm'>
                 {player.playerName}
               </span>
               <div className='flex flex-1 gap-1.5'>

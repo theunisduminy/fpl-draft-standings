@@ -8,7 +8,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
   Card,
@@ -48,6 +47,55 @@ export const TABLE_HEAD_CLASS =
   'px-3 py-3 text-xs font-semibold tracking-wider whitespace-nowrap text-white/60 uppercase md:px-4';
 export const TABLE_CELL_CLASS =
   'px-3 py-3 text-sm text-white/90 md:px-4 md:py-3.5';
+
+/**
+ * The shape of a body row: how tall it is, and the fact that it draws no line.
+ *
+ * **Height.** The results table set it first, because its rows are the tallest
+ * thing we ask a row to hold: a medium rank badge beside a two-line player
+ * cell. Left to content, a table whose cells happen to be one line short would
+ * draw itself tighter, and two tables on the same page would have different
+ * rhythms — which is exactly what the standings and results tables used to do.
+ * So it is a floor, not a fixed height: `height` on a `<tr>` is a minimum, and
+ * a row that genuinely needs more still grows.
+ *
+ * **No divider.** `border-0` undoes the `border-b` the shadcn `TableRow`
+ * primitive carries, and it is not a stylistic preference — a full-bleed rule
+ * and a rounded hover fill are two contradictory claims about where a row
+ * ends, and the eye reads the disagreement as the lines being too loud. Rows
+ * are separated by height and by the hover highlight instead; the only rule
+ * left in the table is the one under the header, which separates two genuinely
+ * different kinds of thing. Bring the dividers back and the hover has to lose
+ * its corners in the same change.
+ *
+ * `TableSkeleton` imports this rather than restating it, so the loading shape
+ * cannot drift from the real one.
+ */
+export const TABLE_ROW_CLASS = 'h-14 border-0 md:h-15';
+
+/**
+ * The hover highlight, rounded at its ends.
+ *
+ * It has to be painted on the **cells**, not on the `<tr>`: a table row
+ * ignores `border-radius` in every browser, so a background set there is a
+ * hard-edged block whatever radius you ask for. Rounding the first and last
+ * cell of the row gives the highlight two rounded ends and leaves the middle
+ * flush, which is the shape you actually want.
+ *
+ * `rounded-sm` is the smallest step in the theme scale (`--radius` minus 4px),
+ * deliberately: the row is a strip of a card that is already rounded, and
+ * anything larger starts to read as a pill floating inside the table.
+ */
+export const TABLE_ROW_HOVER_CLASS = [
+  // The primitive paints its own `hover:bg-muted/50` on the `<tr>`, and that
+  // one *is* a hard-edged block — it would sit in the four corners the cells
+  // round away. Off, so the cell fill below is the only hover paint.
+  'hover:bg-transparent',
+  'hover:[&>td]:bg-white/5',
+  '[&>td]:transition-colors',
+  '[&>td:first-child]:rounded-l-sm',
+  '[&>td:last-child]:rounded-r-sm',
+].join(' ');
 
 /** `hidden` plus the matching `table-cell` at the breakpoint, or nothing. */
 function hiddenClasses(hideBelow: TableColumn<unknown>['hideBelow']): string {
@@ -128,59 +176,62 @@ export function BaseTable<T extends Record<string, any>>({
       <Card
         className={`overflow-hidden border-white/10 bg-[#2a0d33] ${tableClassName || ''}`}
       >
+        {/* No scroll container. The table is `table-fixed` and every column
+            width is a percentage, so it cannot be wider than the card — and a
+            Radix `ScrollArea` wrapped round something that never overflows
+            still mounts its scrollbars, which is where the grey bar under the
+            board came from. */}
         <CardContent className='p-0'>
-          <ScrollArea className='custom-scrollbar w-full'>
-            <Table className='w-full table-fixed'>
-              <TableHeader>
-                <TableRow className='border-white/10 hover:bg-transparent'>
-                  {columns.map((column, index) => (
-                    <TableHead
-                      key={index}
+          <Table className='w-full table-fixed'>
+            <TableHeader>
+              <TableRow className='border-white/10 hover:bg-transparent'>
+                {columns.map((column, index) => (
+                  <TableHead
+                    key={index}
+                    className={cn(
+                      TABLE_HEAD_CLASS,
+                      alignClass(column.align),
+                      column.width,
+                      hiddenClasses(column.hideBelow),
+                      column.className,
+                    )}
+                  >
+                    {column.header}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((item, index) => (
+                <TableRow
+                  key={getRowKey ? getRowKey(item, index) : index}
+                  className={cn(
+                    TABLE_ROW_CLASS,
+                    TABLE_ROW_HOVER_CLASS,
+                    onRowClick && 'cursor-pointer',
+                    rowClassName?.(item, index),
+                  )}
+                  onClick={() => onRowClick?.(item)}
+                >
+                  {columns.map((column, colIndex) => (
+                    <TableCell
+                      key={colIndex}
                       className={cn(
-                        TABLE_HEAD_CLASS,
+                        TABLE_CELL_CLASS,
                         alignClass(column.align),
-                        column.width,
                         hiddenClasses(column.hideBelow),
-                        column.className,
+                        column.cellClassName?.(item, index),
                       )}
                     >
-                      {column.header}
-                    </TableHead>
+                      {typeof column.key === 'function'
+                        ? column.key(item)
+                        : item[column.key as keyof T]}
+                    </TableCell>
                   ))}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((item, index) => (
-                  <TableRow
-                    key={getRowKey ? getRowKey(item, index) : index}
-                    className={`border-white/5 transition-colors ${
-                      onRowClick
-                        ? 'cursor-pointer hover:bg-white/5'
-                        : 'hover:bg-white/5'
-                    } ${rowClassName ? rowClassName(item, index) : ''}`}
-                    onClick={() => onRowClick?.(item)}
-                  >
-                    {columns.map((column, colIndex) => (
-                      <TableCell
-                        key={colIndex}
-                        className={cn(
-                          TABLE_CELL_CLASS,
-                          alignClass(column.align),
-                          hiddenClasses(column.hideBelow),
-                          column.cellClassName?.(item, index),
-                        )}
-                      >
-                        {typeof column.key === 'function'
-                          ? column.key(item)
-                          : item[column.key as keyof T]}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <ScrollBar orientation='horizontal' />
-          </ScrollArea>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

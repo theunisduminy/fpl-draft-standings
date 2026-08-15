@@ -77,7 +77,18 @@ function SkeletonText({
 }) {
   return (
     <Skeleton
-      className={cn(TEXT_HEIGHTS[size], TEXT_WIDTHS[width], className)}
+      className={cn(
+        TEXT_HEIGHTS[size],
+        TEXT_WIDTHS[width],
+        // A `ch` width is a guess about the type, not about the slot, so in a
+        // narrow cell it can be wider than the cell itself. Real text wraps or
+        // truncates; a bar does neither, so it pushes the table's scroll width
+        // out and the container grows a horizontal scrollbar the real table
+        // never has. This is the clamp that stops a placeholder outgrowing the
+        // content it stands in for.
+        'max-w-full',
+        className,
+      )}
     />
   );
 }

@@ -41,7 +41,14 @@ const navigation = [
 /**
  * The footer bar.
  *
- * The landmark spans the page; the coloured bar inside it does not. The bar
+ * It wears the sidebar's surface — the `glass` utility and the same hairline
+ * border — rather than the brand gradient it used to. A gradient that bright
+ * at the bottom of every page pulled the eye down to a copyright line, which
+ * is the last thing on the page worth looking at. Sharing the sidebar's
+ * treatment makes it read as chrome, and the type and icons drop to muted
+ * white to sit legibly on the dark ground.
+ *
+ * The landmark spans the page; the bar inside it does not. The bar
  * sits in the **same container as the page content** — `lg:pl-64` for the fixed
  * sidebar, then `max-w-7xl` and the same padding scale as `AppChrome` — so its
  * left and right edges land exactly on the card edges above it. Change the
@@ -55,9 +62,9 @@ export default function Footer() {
   return (
     <footer className='hidden md:block lg:pl-64'>
       <div className='mx-auto w-full max-w-7xl px-4 pb-4 sm:px-6 lg:px-8'>
-        <div className='rounded-xl border border-white/10 bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] px-6 py-5'>
+        <div className='glass rounded-xl border border-white/10 px-6 py-4'>
           <div className='flex flex-col items-center gap-4 md:flex-row md:justify-between'>
-            <p className='text-center text-xs font-semibold text-[#310639]'>
+            <p className='text-center text-xs font-medium text-white/50'>
               &copy; {year} Theunis Duminy. For the lads. All rights reserved.
             </p>
             <div className='flex items-center gap-4'>
@@ -67,7 +74,7 @@ export default function Footer() {
                   href={item.href}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='text-[#310639]/70 transition-colors hover:text-[#310639]'
+                  className='text-white/45 transition-colors hover:text-white'
                 >
                   <span className='sr-only'>{item.name}</span>
                   <item.icon aria-hidden='true' className='h-5 w-5' />

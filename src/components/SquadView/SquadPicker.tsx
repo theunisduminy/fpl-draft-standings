@@ -107,9 +107,14 @@ function ManagerSelect({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
+      {/* The trigger renders the chosen item's own children, and a squad item
+          is two stacked lines. The primitive clamps its value span to one line
+          and forbids wrapping, which cut the manager's name off the moment you
+          picked anyone — so both are lifted here rather than in the primitive,
+          where every other single-line select still wants them. */}
       <SelectTrigger
         aria-label={label}
-        className='h-auto w-full rounded-md border-white/15 bg-card px-3 py-2.5 text-base text-white md:text-sm'
+        className='h-auto w-full rounded-md border-white/15 bg-card px-3 py-2.5 text-left text-base whitespace-normal text-white md:text-sm [&>span]:line-clamp-none'
       >
         <SelectValue placeholder={label} />
       </SelectTrigger>
@@ -128,9 +133,11 @@ function ManagerSelect({
             value={String(squad.leagueEntry)}
             className='text-white focus:bg-white/10 focus:text-white'
           >
-            <span className='flex min-w-0 flex-col items-start'>
-              <span className='truncate'>{squad.teamName}</span>
-              <span className='text-xs text-white/40'>{squad.managerName}</span>
+            <span className='flex w-full min-w-0 flex-col items-start'>
+              <span className='w-full truncate'>{squad.teamName}</span>
+              <span className='w-full truncate text-xs text-white/40'>
+                {squad.managerName}
+              </span>
             </span>
           </SelectItem>
         ))}

@@ -43,9 +43,9 @@ export type SignedInUser = {
   /** Which manager they are, from the curated `league_members` mapping. */
   leagueEntry: LeagueEntryId;
   /**
-   * Both a display name and a bio are on record. Onboarding is compulsory —
-   * `src/app/(app)/(onboarded)/layout.tsx` sends anyone without these to
-   * `/profile` and keeps them there.
+   * A display name, a bio and a favourite club are all on record. Onboarding
+   * is compulsory — `src/app/(app)/(onboarded)/layout.tsx` sends anyone
+   * without these to `/profile` and keeps them there.
    */
   profileComplete: boolean;
 };
@@ -91,10 +91,24 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
 }
 
 /**
- * Both fields, both non-blank. Whitespace does not count as a bio, so the check
- * trims — otherwise a single space would satisfy the gate and the compulsory
- * part of compulsory onboarding would be one keystroke deep.
+ * All three fields, none blank. Whitespace does not count as a bio, so the
+ * check trims — otherwise a single space would satisfy the gate and the
+ * compulsory part of compulsory onboarding would be one keystroke deep.
+ *
+ * The favourite club is the third because a profile without one says nothing
+ * about the person, and picking it is one tap from a list of twenty. The
+ * standings board deliberately does *not* show it — a table of finishing
+ * positions is not the place for allegiance — so the requirement stands on the
+ * profile alone. The column stays **nullable**,
+ * because completeness is decided here rather than by the database — a `NOT
+ * NULL` migration would have to invent a club for every member who signed up
+ * before this rule, and there is no right answer to invent. Existing members
+ * are sent to `/profile` once, to pick one.
  */
 function isProfileComplete(profile: ProfileRow | null): boolean {
-  return Boolean(profile?.displayName?.trim() && profile?.bio?.trim());
+  return Boolean(
+    profile?.displayName?.trim() &&
+    profile?.bio?.trim() &&
+    profile?.favouriteTeam,
+  );
 }

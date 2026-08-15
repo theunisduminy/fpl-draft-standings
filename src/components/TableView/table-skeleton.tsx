@@ -1,4 +1,8 @@
-import { TABLE_CELL_CLASS, TABLE_HEAD_CLASS } from './base-table';
+import {
+  TABLE_CELL_CLASS,
+  TABLE_HEAD_CLASS,
+  TABLE_ROW_CLASS,
+} from './base-table';
 import {
   Table,
   TableBody,
@@ -8,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { Skeleton, SkeletonText, cellWidth } from '@/components/ui/skeleton';
 
 /**
@@ -27,11 +32,21 @@ export function TableSkeleton({
   rows = 8,
   /** The first column of both real tables leads with a rank badge. */
   leadingBadge = true,
+  hideBelowMd = [],
 }: {
   columns?: number;
   rows?: number;
   leadingBadge?: boolean;
+  /**
+   * Column indexes the real table hides below `md`, so the placeholder hides
+   * the same ones. Without it a four-column skeleton hands over to a
+   * three-column table on a phone, which is a layout shift by construction.
+   */
+  hideBelowMd?: number[];
 }) {
+  const hidden = (col: number) =>
+    hideBelowMd.includes(col) ? 'hidden md:table-cell' : '';
+
   return (
     <div className='w-full space-y-4'>
       <Card className='overflow-hidden border-white/10 bg-[#2a0d33]'>
@@ -42,7 +57,7 @@ export function TableSkeleton({
                 {Array.from({ length: columns }).map((_, col) => (
                   <TableHead
                     key={col}
-                    className={TABLE_HEAD_CLASS}
+                    className={cn(TABLE_HEAD_CLASS, hidden(col))}
                     style={{ width: col === 0 ? '50%' : undefined }}
                   >
                     <SkeletonText size='label' width='sm' />
@@ -52,13 +67,20 @@ export function TableSkeleton({
             </TableHeader>
             <TableBody>
               {Array.from({ length: rows }).map((_, row) => (
-                <TableRow key={row} className='border-white/5'>
+                <TableRow key={row} className={TABLE_ROW_CLASS}>
                   {Array.from({ length: columns }).map((_, col) => (
-                    <TableCell key={col} className={TABLE_CELL_CLASS}>
+                    <TableCell
+                      key={col}
+                      className={cn(TABLE_CELL_CLASS, hidden(col))}
+                    >
                       {col === 0 && leadingBadge ? (
-                        <div className='flex items-center gap-3'>
-                          <Skeleton className='h-6 w-6 shrink-0 rounded-full' />
-                          <div className='space-y-1.5'>
+                        // `min-w-0` for the same reason the real cell has it:
+                        // without it the text block is sized by its widest
+                        // child and the row refuses to shrink, which in a
+                        // scrollable container means a scrollbar.
+                        <div className='flex min-w-0 items-center gap-3'>
+                          <Skeleton className='h-8 w-8 shrink-0 rounded-full' />
+                          <div className='min-w-0 space-y-1.5'>
                             <SkeletonText size='body' width='md' />
                             <SkeletonText size='label' width='sm' />
                           </div>

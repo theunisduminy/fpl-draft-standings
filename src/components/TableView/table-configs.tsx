@@ -6,10 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowUp, ArrowDown, Eye, Minus } from 'lucide-react';
 
-// Truncate text helper
-const truncate = (str: string, maxLen: number) =>
-  str.length > maxLen ? str.slice(0, maxLen) + '…' : str;
-
 // Utility function for rank badge styling
 export const getRankBadgeClasses = (rank: number): string => {
   if (rank === 1)
@@ -20,8 +16,12 @@ export const getRankBadgeClasses = (rank: number): string => {
   return 'bg-white/10 text-white/70 border-white/20';
 };
 
-// Utility function for rendering rank badges
-export const renderRankBadge = (rank: number, size: 'sm' | 'md' = 'sm') => {
+/**
+ * A rank badge. `md` is the default because the results table set the row
+ * height for the whole app (see `TABLE_ROW_CLASS`), and a smaller badge in a
+ * row of that height reads as a different table rather than the same one.
+ */
+export const renderRankBadge = (rank: number, size: 'sm' | 'md' = 'md') => {
   const sizeClasses = size === 'md' ? 'h-8 w-8 text-sm' : 'h-6 w-6 text-xs';
 
   return (
@@ -34,122 +34,84 @@ export const renderRankBadge = (rank: number, size: 'sm' | 'md' = 'sm') => {
   );
 };
 
-// Standings Table Configuration
-export const standingsTableConfig: TableColumn<PlayerDetails>[] = [
-  {
-    header: 'Player',
-    key: (player: PlayerDetails) => (
-      <div className='flex min-w-0 items-center gap-3'>
-        {renderRankBadge(player.f1_ranking)}
-        <div className='min-w-0'>
-          <div className='truncate font-medium text-white'>
-            {player.player_name}
-          </div>
-          <div className='truncate text-xs text-white/50'>
-            {player.team_name}
+/** What the standings board needs beyond the season itself. */
+export interface StandingsContext {
+  /** Places gained since the previous gameweek. Absent means no previous. */
+  movement: Record<number, number>;
+}
+
+/**
+ * The standings board.
+ *
+ * A factory rather than a constant because the board carries one thing the
+ * season object does not know: the week-on-week move, which is a question
+ * about the previous gameweek rather than about this one. Columns stay data
+ * and stay in this file, exactly as `draftResultsColumns` does.
+ *
+ * Team name is its own column from `md` up and a sub-line under the manager
+ * below it — the same split, and the same complementary `md:hidden` on the
+ * sub-line, that the results table uses. Two boards on the same site that
+ * differ only in where they put the team name is drift, not design.
+ */
+export function standingsColumns({
+  movement,
+}: StandingsContext): TableColumn<PlayerDetails>[] {
+  return [
+    {
+      header: 'Manager',
+      key: (player: PlayerDetails) => (
+        <div className='flex min-w-0 items-center gap-3'>
+          {renderRankBadge(player.f1_ranking)}
+          <div className='min-w-0'>
+            <div className='truncate font-medium text-foreground'>
+              {player.player_name}
+            </div>
+            <div className='truncate text-xs text-muted-foreground md:hidden'>
+              {player.team_name}
+            </div>
           </div>
         </div>
-      </div>
-    ),
-    width: 'w-[50%]',
-  },
-  {
-    header: 'F1 score',
-    key: (player: PlayerDetails) => (
-      <span className='text-base font-bold text-[#00edfd]'>
-        {player.f1_score}
-      </span>
-    ),
-    align: 'center',
-    width: 'w-[25%]',
-  },
-  {
-    // The league ranks on finishes, so "2nd on points" beside a first place is
-    // the disagreement the standings page is built around.
-    header: 'Points',
-    key: (player: PlayerDetails) => (
-      <div>
-        <span className='text-base font-bold text-[#75fa95]'>
+      ),
+      width: 'w-[46%] md:w-[30%]',
+    },
+    {
+      header: 'Team',
+      key: (player: PlayerDetails) => (
+        <div className='truncate text-muted-foreground'>{player.team_name}</div>
+      ),
+      width: 'md:w-[20%]',
+      hideBelow: 'md',
+    },
+    {
+      header: 'Move',
+      key: (player: PlayerDetails) =>
+        renderPositionMovement(movement[player.id]),
+      align: 'center',
+      width: 'md:w-[14%]',
+      hideBelow: 'md',
+    },
+    {
+      header: 'F1',
+      key: (player: PlayerDetails) => (
+        <span className='text-base font-bold text-primary'>
+          {player.f1_score}
+        </span>
+      ),
+      align: 'center',
+      width: 'w-[26%] md:w-[18%]',
+    },
+    {
+      header: 'Points',
+      key: (player: PlayerDetails) => (
+        <span className='text-base font-bold text-positive'>
           {player.total_points || 0}
         </span>
-        <div className='text-xs text-white/40'>
-          {ordinal(player.points_ranking)} on points
-        </div>
-      </div>
-    ),
-    align: 'center',
-    width: 'w-[25%]',
-  },
-];
-
-// Position Placed Table Configuration
-export const positionPlacedTableConfig: TableColumn<PlayerDetails>[] = [
-  {
-    header: 'Player',
-    key: (player: PlayerDetails) => (
-      <span className='font-medium text-white'>
-        {truncate(player.player_name, 12)}
-      </span>
-    ),
-    width: 'w-[20%]',
-  },
-  {
-    header: '1st',
-    key: (player) => (
-      <span className='font-semibold text-yellow-400'>
-        {player.position_placed['first'] || 0}
-      </span>
-    ),
-    align: 'center' as const,
-  },
-  {
-    header: '2nd',
-    key: (player) => (
-      <span className='font-semibold text-gray-300'>
-        {player.position_placed['second'] || 0}
-      </span>
-    ),
-    align: 'center' as const,
-  },
-  {
-    header: '3rd',
-    key: (player) => (
-      <span className='font-semibold text-amber-500'>
-        {player.position_placed['third'] || 0}
-      </span>
-    ),
-    align: 'center' as const,
-  },
-  {
-    header: '4th',
-    key: (player) => player.position_placed['fourth'] || 0,
-    align: 'center' as const,
-  },
-  {
-    header: '5th',
-    key: (player) => player.position_placed['fifth'] || 0,
-    align: 'center' as const,
-  },
-  {
-    header: '6th',
-    key: (player) => player.position_placed['sixth'] || 0,
-    align: 'center' as const,
-  },
-  {
-    header: '7th',
-    key: (player) => player.position_placed['seventh'] || 0,
-    align: 'center' as const,
-  },
-  {
-    header: '8th',
-    key: (player) => (
-      <span className='font-semibold text-red-400'>
-        {player.position_placed['eighth'] || 0}
-      </span>
-    ),
-    align: 'center' as const,
-  },
-];
+      ),
+      align: 'center',
+      width: 'w-[28%] md:w-[18%]',
+    },
+  ];
+}
 
 // Draft Results Table Configuration
 export interface GameweekResult {
@@ -162,33 +124,39 @@ export interface GameweekResult {
   position_movement?: number;
 }
 
-// Utility function for position movement display
+/**
+ * Places gained or lost, as a glyph and a number.
+ *
+ * `undefined` is "no previous position to compare against" — a first gameweek,
+ * or a manager who was not in the last one. It reads as "new" rather than as no
+ * movement, because those are different facts.
+ */
 export const renderPositionMovement = (movement?: number) => {
   if (movement === undefined)
-    return (
-      <span className='inline-flex items-center gap-1 text-xs text-white/40'>
-        <Minus className='h-3 w-3' />
-        NEW
-      </span>
-    );
+    return <span className='text-xs text-muted-foreground'>New</span>;
+
   if (movement === 0)
     return (
-      <span className='inline-flex items-center gap-1 text-xs text-white/40'>
-        <Minus className='h-3 w-3' />
-        SAME
+      <span className='inline-flex items-center text-muted-foreground'>
+        <Minus className='h-3.5 w-3.5' />
+        <span className='sr-only'>No change</span>
       </span>
     );
+
   if (movement > 0)
     return (
-      <span className='inline-flex items-center gap-1 text-xs font-medium text-[#75fa95]'>
+      <span className='inline-flex items-center gap-1 text-xs font-medium text-positive'>
         <ArrowUp className='h-3 w-3' />
         {movement}
+        <span className='sr-only'>places gained</span>
       </span>
     );
+
   return (
-    <span className='inline-flex items-center gap-1 text-xs font-medium text-red-400'>
+    <span className='inline-flex items-center gap-1 text-xs font-medium text-negative'>
       <ArrowDown className='h-3 w-3' />
       {Math.abs(movement)}
+      <span className='sr-only'>places lost</span>
     </span>
   );
 };
@@ -196,9 +164,9 @@ export const renderPositionMovement = (movement?: number) => {
 /**
  * The results columns, given what "view team" should do.
  *
- * A factory because the last column needs a callback the component owns — the
- * same reason the standings columns would take a parameter if they needed one.
- * Columns stay data and stay in this file either way.
+ * A factory because the last column needs a callback the component owns, the
+ * same reason `standingsColumns` takes its context. Columns stay data and stay
+ * in this file either way.
  *
  * Team name is its own column from `md` up (`hideBelow`) and a sub-line under
  * the player below it, which is why the sub-line carries the complementary
@@ -280,11 +248,6 @@ export function draftResultsColumns(
   ];
 }
 
-/** 1 → 1st, 2 → 2nd. The league is eight managers, so this need not be clever. */
-function ordinal(rank: number): string {
-  return `${rank}${['th', 'st', 'nd', 'rd'][rank] ?? 'th'}`;
-}
-
 // Table wrapper configurations
 export interface TableConfig {
   title: string;
@@ -295,20 +258,8 @@ export interface TableConfig {
 }
 
 export const tableConfigs: Record<string, TableConfig> = {
-  standings: {
-    title: '🏆 F1 Draft Standings',
-    subtitle:
-      'Rankings based on F1-style points system: 20-15-12-10-8-6-4-2 points for positions 1st-8th each gameweek.',
-  },
-  positionPlaced: {
-    title: '🎖️ Position Placed',
-    subtitle:
-      'Frequency of position placed, based on total points, for the previous gameweeks.',
-    className: '',
-    tableClassName: '',
-  },
   draftResults: {
-    title: '📊 Gameweek Results',
+    title: 'Gameweek results',
     subtitle: 'Previous gameweek rankings and points for the Draft league.',
     emptyMessage: 'No gameweek results available yet.',
   },

@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { getGameweekData } from '@/utils/gameweek-data';
-import { SeasonLead } from '@/components/TableView/SeasonLead';
+import { standingsByGameweek, standingsMovement } from '@/utils/scoring';
 import { StandingsTabs } from '@/components/TableView/StandingsTabs';
 import { StandingsSkeleton } from '@/components/TableView/StandingsSkeleton';
 import { SkeletonRegion } from '@/components/SkeletonRegion';
@@ -14,9 +14,9 @@ export const metadata: Metadata = { title: 'Standings' };
 export const dynamic = 'force-dynamic';
 
 /**
- * The season is read once, on the server. Both the standings table and the
- * position charts render from the same object — previously they were two
- * separate browser fetches of overlapping data.
+ * The season is read once, on the server. The board and every chart below
+ * render from the same object — previously they were two separate browser
+ * fetches of overlapping data.
  *
  * `PageShell` paints the heading before the boundary is reached, so the
  * skeleton below stands in only for what is genuinely still loading.
@@ -45,10 +45,15 @@ export default function Home() {
 async function Standings() {
   const data = await getGameweekData();
 
+  // One derivation, two surfaces: the move column and the bump chart are both
+  // questions about this same series. See `scoring.ts`.
+  const snapshots = standingsByGameweek(data.gameweekPerformances);
+
   return (
-    <div className='space-y-6'>
-      <SeasonLead players={data.players} />
-      <StandingsTabs data={data} />
-    </div>
+    <StandingsTabs
+      data={data}
+      snapshots={snapshots}
+      movement={standingsMovement(snapshots)}
+    />
   );
 }
