@@ -1,7 +1,7 @@
 import { GameweekSelectorSkeleton } from '@/components/GameweekSelectorSkeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { SECTION_TABS_STRIP_CLASS } from '@/components/SectionTabs';
+import { SECTION_TABS_STRIP_CLASS } from '@/components/shapes';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 
 /**

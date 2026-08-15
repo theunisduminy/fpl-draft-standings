@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/server/auth/server';
 import { upsertProfile } from '@/server/data/profiles';
 import { isKnownTeamCode } from '@/utils/pl-teams';
 import { parseTeamCode, type TeamCode } from '@/interfaces/fpl';
+import { isProfileComplete } from '@/utils/profile-completeness';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -72,6 +73,15 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
 
   if (!favouriteTeam || !(await isKnownTeamCode(favouriteTeam))) {
     return { ok: false, error: 'That is not a Premier League club.' };
+  }
+
+  // The gate's own rule, asked of the values about to be stored. The three
+  // checks above are the ones that can explain themselves to a person; this is
+  // the one that guarantees a save cannot produce a row the onboarding gate
+  // then calls incomplete — which would bounce the member back to this form
+  // from every page, forever, having just been told it saved.
+  if (!isProfileComplete({ displayName, bio, favouriteTeam })) {
+    return { ok: false, error: 'That profile is missing something.' };
   }
 
   await upsertProfile({ userId: user.id, displayName, bio, favouriteTeam });

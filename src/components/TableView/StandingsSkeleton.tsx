@@ -1,5 +1,10 @@
 import { TableSkeleton } from '@/components/TableView/table-skeleton';
-import { SECTION_TABS_STRIP_CLASS } from '@/components/SectionTabs';
+import {
+  SECTION_TABS_STRIP_CLASS,
+  STANDINGS_COLUMN_SHAPES,
+  STANDINGS_HIDDEN_BELOW_MD,
+} from '@/components/shapes';
+import { LEDGER_GRID_CLASS } from '@/components/TableView/LeagueLedger';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 
 /**
@@ -22,7 +27,14 @@ export function StandingsSkeleton() {
     <div className='space-y-4'>
       <Skeleton className={SECTION_TABS_STRIP_CLASS} />
 
-      <TableSkeleton columns={5} rows={8} hideBelowMd={[1, 2]} />
+      {/* The board's own widths and hidden columns, from the module both this
+          server-rendered shell and the client table config read. */}
+      <TableSkeleton
+        columns={STANDINGS_COLUMN_SHAPES.length}
+        rows={8}
+        hideBelowMd={STANDINGS_HIDDEN_BELOW_MD}
+        widths={STANDINGS_COLUMN_SHAPES.map((column) => column.width)}
+      />
 
       <LedgerSkeleton />
     </div>
@@ -32,12 +44,12 @@ export function StandingsSkeleton() {
 /**
  * Six cells in one bordered block, at the height the real strip lands at.
  *
- * Built from the real wrapper — same grid, same hairline gaps — so nothing
- * here is a measured guess.
+ * The wrapper class is imported from `LeagueLedger` rather than restated, so
+ * the loading block cannot drift a breakpoint away from the real one.
  */
 function LedgerSkeleton() {
   return (
-    <div className='grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 lg:grid-cols-6'>
+    <div className={LEDGER_GRID_CLASS}>
       {Array.from({ length: 6 }).map((_, cell) => (
         <div key={cell} className='space-y-1.5 bg-card p-3 md:p-3.5'>
           <div className='flex items-center gap-1.5'>

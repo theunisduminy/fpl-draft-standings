@@ -1,7 +1,7 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartCard } from '@/components/ChartCard';
 import {
   ChartConfig,
   ChartContainer,
@@ -52,73 +52,66 @@ export function PositionDistributionChart({
   ) satisfies ChartConfig;
 
   return (
-    <Card className='w-full border-border bg-card'>
-      <CardHeader className='pb-2'>
-        <CardTitle className='text-base text-foreground md:text-lg'>
-          Position distribution
-        </CardTitle>
-      </CardHeader>
-      <CardContent className='p-2 md:p-4'>
-        <ChartContainer config={chartConfig}>
-          <BarChart
-            layout='vertical'
-            data={chartData}
-            margin={{ top: 0, right: 10, left: -10, bottom: 0 }}
-            height={chartData.length * 50}
-          >
-            <CartesianGrid horizontal={false} stroke='rgba(255,255,255,0.05)' />
-            <XAxis
-              type='number'
-              tickLine={false}
-              axisLine={false}
-              tick={{
-                fill: 'rgba(255,255,255,0.5)',
-                fontSize: 11,
-              }}
+    <ChartCard title='Position distribution' contentClassName='p-2 md:p-4'>
+      <ChartContainer config={chartConfig}>
+        <BarChart
+          layout='vertical'
+          data={chartData}
+          margin={{ top: 0, right: 10, left: -10, bottom: 0 }}
+          height={chartData.length * 50}
+        >
+          <CartesianGrid horizontal={false} stroke='rgba(255,255,255,0.05)' />
+          <XAxis
+            type='number'
+            tickLine={false}
+            axisLine={false}
+            tick={{
+              fill: 'rgba(255,255,255,0.5)',
+              fontSize: 11,
+            }}
+          />
+          <YAxis
+            type='category'
+            dataKey='name'
+            tickLine={false}
+            axisLine={false}
+            width={70}
+            tick={{
+              fill: 'rgba(255,255,255,0.7)',
+              fontSize: 12,
+            }}
+          />
+          <Tooltip
+            cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+            content={<ChartTooltipContent hideLabel />}
+          />
+          {Object.keys(POSITION_COLORS).map((posKey) => (
+            <Bar
+              key={posKey}
+              dataKey={posKey}
+              stackId='positions'
+              fill={POSITION_COLORS[posKey]}
+              radius={posKey === 'eighth' ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+              barSize={28}
             />
-            <YAxis
-              type='category'
-              dataKey='name'
-              tickLine={false}
-              axisLine={false}
-              width={70}
-              tick={{
-                fill: 'rgba(255,255,255,0.7)',
-                fontSize: 12,
-              }}
-            />
-            <Tooltip
-              cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-              content={<ChartTooltipContent hideLabel />}
-            />
-            {Object.keys(POSITION_COLORS).map((posKey) => (
-              <Bar
-                key={posKey}
-                dataKey={posKey}
-                stackId='positions'
-                fill={POSITION_COLORS[posKey]}
-                radius={posKey === 'eighth' ? [0, 4, 4, 0] : [0, 0, 0, 0]}
-                barSize={28}
-              />
-            ))}
-          </BarChart>
-        </ChartContainer>
-
-        {/* Legend */}
-        <div className='mt-4 grid grid-cols-4 gap-2 border-t border-border pt-3'>
-          {Object.entries(POSITION_COLORS).map(([key, color]) => (
-            <div key={key} className='flex items-center justify-center gap-1.5'>
-              <div
-                className='h-3 w-3 rounded-sm'
-                style={{ backgroundColor: color }}
-              />
-              <span className='text-xs text-muted-foreground'>
-                {POSITION_LABELS[key]}
-              </span>
-            </div>
           ))}
-        </div>
-      </CardContent>
-    </Card>
+        </BarChart>
+      </ChartContainer>
+
+      {/* Legend */}
+      <div className='mt-4 grid grid-cols-4 gap-2 border-t border-border pt-3'>
+        {Object.entries(POSITION_COLORS).map(([key, color]) => (
+          <div key={key} className='flex items-center justify-center gap-1.5'>
+            <div
+              className='h-3 w-3 rounded-sm'
+              style={{ backgroundColor: color }}
+            />
+            <span className='text-xs text-muted-foreground'>
+              {POSITION_LABELS[key]}
+            </span>
+          </div>
+        ))}
+      </div>
+    </ChartCard>
   );
 }

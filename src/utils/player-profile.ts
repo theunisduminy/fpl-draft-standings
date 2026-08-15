@@ -1,4 +1,5 @@
 import type { LeagueEntryId } from '@/interfaces/fpl';
+import { countRumblers } from './scoring';
 import {
   emptyPositionTally,
   POSITION_KEYS,
@@ -59,7 +60,15 @@ export function buildPlayerProfile(
     team_name: player.team_name,
     f1_score: player.f1_score,
     f1_ranking: player.f1_ranking,
-    stats: summarise(gameweeks),
+    // Through the scoring layer's counter, which reads the worst rank *present*
+    // each week. This used to be `rank === 8` here, which silently returns zero
+    // for a week where two managers tie mid-table and nobody finishes 8th — so
+    // the player page and `/profile` would under-count a season the rumblers
+    // page and the league ledger counted correctly.
+    stats: summarise(
+      gameweeks,
+      countRumblers(data.gameweekPerformances).get(leagueEntry) ?? 0,
+    ),
     performance: gameweeks
       .map(toHighlight)
       .sort((a, b) => a.gameweek - b.gameweek),
@@ -74,7 +83,15 @@ function toHighlight(gameweek: GameweekPerformance): GameweekHighlight {
   };
 }
 
-function summarise(gameweeks: GameweekPerformance[]): PlayerStats {
+/**
+ * `rumblerCount` is passed in rather than derived here, because last place is
+ * not a property of one manager's own gameweeks: it is the worst rank present
+ * in each week, which only the full season can answer.
+ */
+function summarise(
+  gameweeks: GameweekPerformance[],
+  rumblerCount: number,
+): PlayerStats {
   const totalGameweeks = gameweeks.length;
 
   if (totalGameweeks === 0) return EMPTY_STATS;
@@ -106,9 +123,7 @@ function summarise(gameweeks: GameweekPerformance[]): PlayerStats {
     averageRank: round(averageRank),
     bestGameweek: toHighlight(byPoints[0]),
     worstGameweek: toHighlight(byPoints[byPoints.length - 1]),
-    // The rumbler is whoever finishes last, which in an eight-manager league
-    // is rank 8.
-    rumblerCount: gameweeks.filter((gw) => gw.rank === 8).length,
+    rumblerCount,
     consistency: round(Math.sqrt(variance)),
     positionStats,
   };

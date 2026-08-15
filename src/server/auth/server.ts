@@ -3,8 +3,9 @@ import 'server-only';
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 
 import { getLeagueMemberByEmail } from '@/server/data/league-members';
-import { getProfileByUserId, type ProfileRow } from '@/server/data/profiles';
+import { getProfileByUserId } from '@/server/data/profiles';
 import { asLeagueEntryId, type LeagueEntryId } from '@/interfaces/fpl';
+import { isProfileComplete } from '@/utils/profile-completeness';
 
 /**
  * Neon Auth (managed Better Auth). Identity lives in this project's own
@@ -88,27 +89,4 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
     leagueEntry: asLeagueEntryId(member.leagueEntry),
     profileComplete: isProfileComplete(profile),
   };
-}
-
-/**
- * All three fields, none blank. Whitespace does not count as a bio, so the
- * check trims — otherwise a single space would satisfy the gate and the
- * compulsory part of compulsory onboarding would be one keystroke deep.
- *
- * The favourite club is the third because a profile without one says nothing
- * about the person, and picking it is one tap from a list of twenty. The
- * standings board deliberately does *not* show it — a table of finishing
- * positions is not the place for allegiance — so the requirement stands on the
- * profile alone. The column stays **nullable**,
- * because completeness is decided here rather than by the database — a `NOT
- * NULL` migration would have to invent a club for every member who signed up
- * before this rule, and there is no right answer to invent. Existing members
- * are sent to `/profile` once, to pick one.
- */
-function isProfileComplete(profile: ProfileRow | null): boolean {
-  return Boolean(
-    profile?.displayName?.trim() &&
-    profile?.bio?.trim() &&
-    profile?.favouriteTeam,
-  );
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { TableColumn } from './base-table';
 import { PlayerDetails } from '@/interfaces/players';
 import type { LeagueEntryId } from '@/interfaces/fpl';
+import { STANDINGS_COLUMN_SHAPES } from '@/components/shapes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowUp, ArrowDown, Eye, Minus } from 'lucide-react';
@@ -17,27 +18,35 @@ export const getRankBadgeClasses = (rank: number): string => {
 };
 
 /**
- * A rank badge. `md` is the default because the results table set the row
- * height for the whole app (see `TABLE_ROW_CLASS`), and a smaller badge in a
- * row of that height reads as a different table rather than the same one.
+ * A rank badge.
+ *
+ * One size, because the results table set the row height for the whole app
+ * (see `TABLE_ROW_CLASS`) and a smaller badge in a row of that height reads as
+ * a different table rather than the same one. There used to be an `'sm'`
+ * variant; when the standings board adopted the shared row height its last
+ * caller went with it, so the parameter is gone rather than kept as an option
+ * nobody should take.
  */
-export const renderRankBadge = (rank: number, size: 'sm' | 'md' = 'md') => {
-  const sizeClasses = size === 'md' ? 'h-8 w-8 text-sm' : 'h-6 w-6 text-xs';
-
-  return (
-    <Badge
-      variant='outline'
-      className={`inline-flex ${sizeClasses} flex-shrink-0 items-center justify-center rounded-full border p-0 font-bold ${getRankBadgeClasses(rank)}`}
-    >
-      {rank}
-    </Badge>
-  );
-};
+export const renderRankBadge = (rank: number) => (
+  <Badge
+    variant='outline'
+    className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border p-0 text-sm font-bold ${getRankBadgeClasses(rank)}`}
+  >
+    {rank}
+  </Badge>
+);
 
 /** What the standings board needs beyond the season itself. */
 export interface StandingsContext {
-  /** Places gained since the previous gameweek. Absent means no previous. */
-  movement: Record<number, number>;
+  /**
+   * Places gained since the previous gameweek. A manager absent from the map
+   * has no previous gameweek to compare against, and renders as "new".
+   *
+   * A `Map` keyed by `LeagueEntryId`, not an object: an index signature erases
+   * the brand to `number`, and the point of the brand is that the three FPL
+   * identifiers cannot be swapped silently. See `standingsMovement`.
+   */
+  movement: Map<LeagueEntryId, number>;
 }
 
 /**
@@ -52,6 +61,12 @@ export interface StandingsContext {
  * below it — the same split, and the same complementary `md:hidden` on the
  * sub-line, that the results table uses. Two boards on the same site that
  * differ only in where they put the team name is drift, not design.
+ *
+ * Each column's width and breakpoint are spread in from
+ * `@/components/shapes`, because `StandingsSkeleton` has to draw the same five
+ * columns and this module is `'use client'` — a server-rendered `loading.tsx`
+ * cannot import it. The indexes below are the order declared there: manager,
+ * team, move, F1, points.
  */
 export function standingsColumns({
   movement,
@@ -72,23 +87,21 @@ export function standingsColumns({
           </div>
         </div>
       ),
-      width: 'w-[46%] md:w-[30%]',
+      ...STANDINGS_COLUMN_SHAPES[0],
     },
     {
       header: 'Team',
       key: (player: PlayerDetails) => (
         <div className='truncate text-muted-foreground'>{player.team_name}</div>
       ),
-      width: 'md:w-[20%]',
-      hideBelow: 'md',
+      ...STANDINGS_COLUMN_SHAPES[1],
     },
     {
       header: 'Move',
       key: (player: PlayerDetails) =>
-        renderPositionMovement(movement[player.id]),
+        renderPositionMovement(movement.get(player.id)),
       align: 'center',
-      width: 'md:w-[14%]',
-      hideBelow: 'md',
+      ...STANDINGS_COLUMN_SHAPES[2],
     },
     {
       header: 'F1',
@@ -98,7 +111,7 @@ export function standingsColumns({
         </span>
       ),
       align: 'center',
-      width: 'w-[26%] md:w-[18%]',
+      ...STANDINGS_COLUMN_SHAPES[3],
     },
     {
       header: 'Points',
@@ -108,7 +121,7 @@ export function standingsColumns({
         </span>
       ),
       align: 'center',
-      width: 'w-[28%] md:w-[18%]',
+      ...STANDINGS_COLUMN_SHAPES[4],
     },
   ];
 }
@@ -180,7 +193,7 @@ export function draftResultsColumns(
       header: 'Player',
       key: (result: GameweekResult) => (
         <div className='flex min-w-0 items-center gap-3'>
-          {renderRankBadge(result.rank, 'md')}
+          {renderRankBadge(result.rank)}
           <div className='min-w-0'>
             <div className='truncate font-medium text-white'>
               {result.player_name}
@@ -247,20 +260,3 @@ export function draftResultsColumns(
     },
   ];
 }
-
-// Table wrapper configurations
-export interface TableConfig {
-  title: string;
-  subtitle: string;
-  emptyMessage?: string;
-  className?: string;
-  tableClassName?: string;
-}
-
-export const tableConfigs: Record<string, TableConfig> = {
-  draftResults: {
-    title: 'Gameweek results',
-    subtitle: 'Previous gameweek rankings and points for the Draft league.',
-    emptyMessage: 'No gameweek results available yet.',
-  },
-};

@@ -22,6 +22,7 @@ import {
   rankByPoints,
   scoreGameweek,
   standingsByGameweek,
+  countRumblers,
   standingsMovement,
   type EntryPicks,
 } from './scoring';
@@ -203,6 +204,46 @@ describe('aggregatePlayers', () => {
       [a, 2],
       [b, 3],
     ]);
+  });
+
+  it('gives two managers tied on F1 score the same ranking', () => {
+    // The gap this test exists to close: `f1_ranking` used to be the sorted
+    // index, so a tie read 1st and 2nd while every other rank in the app —
+    // including the bump chart the same page draws — shared the higher one.
+    const players = aggregatePlayers(entries, [
+      performance(1, a, 1),
+      performance(1, b, 1),
+      performance(1, c, 3),
+    ]);
+
+    const byId = Object.fromEntries(players.map((p) => [p.id, p]));
+    expect(byId[a].f1_score).toBe(byId[b].f1_score);
+    expect(byId[a].f1_ranking).toBe(1);
+    expect(byId[b].f1_ranking).toBe(1);
+    expect(byId[c].f1_ranking).toBe(3);
+  });
+
+  it('agrees with the final gameweek snapshot about every ranking', () => {
+    // Two ways to rank the same season must not disagree: the board reads
+    // `f1_ranking`, the move column and the bump chart read the last snapshot.
+    const performances = [
+      performance(1, a, 1),
+      performance(1, b, 1),
+      performance(1, c, 3),
+      performance(2, c, 1),
+      performance(2, a, 2),
+      performance(2, b, 3),
+    ];
+
+    const players = aggregatePlayers(entries, performances);
+    const snapshots = standingsByGameweek(performances);
+    const final = snapshots[snapshots.length - 1];
+
+    players.forEach((player) => {
+      const place = final.places.find((p) => p.league_entry === player.id)!;
+      expect(place.rank).toBe(player.f1_ranking);
+      expect(place.f1_score).toBe(player.f1_score);
+    });
   });
 
   it('tallies finishing positions', () => {
@@ -453,8 +494,8 @@ describe('standingsMovement', () => {
     // c: 12 + 20 = 32, b: 15 + 15 = 30, a: 20 + 12 = 32. a and c tie on 32.
     const movement = standingsMovement(snapshots);
 
-    expect(movement[c]).toBe(2);
-    expect(movement[a]).toBe(0);
+    expect(movement.get(c)).toBe(2);
+    expect(movement.get(a)).toBe(0);
   });
 
   it('is empty after a single gameweek, so nothing renders as a move', () => {
@@ -463,7 +504,7 @@ describe('standingsMovement', () => {
       performance(1, b, 2),
     ]);
 
-    expect(standingsMovement(snapshots)).toEqual({});
+    expect(standingsMovement(snapshots).size).toBe(0);
   });
 });
 
@@ -531,7 +572,9 @@ describe('buildLeagueLedger', () => {
     ]);
 
     expect(ledger.steadiest?.league_entry).toBe(b);
-    expect(Math.abs(ledger.steadiest?.value ?? 0)).toBe(0);
+    // Positive, and the number of places it says it is — the fact used to
+    // travel negated so one comparator could serve every ledger fact.
+    expect(ledger.steadiest?.value).toBe(0);
   });
 
   it('withholds steadiest until there are enough gameweeks to mean anything', () => {
@@ -567,5 +610,46 @@ describe('buildLeagueLedger', () => {
       hotStreak: null,
       mostRumblers: null,
     });
+  });
+});
+
+describe('countRumblers', () => {
+  const entries = makeEntries(3);
+  const [a, b, c] = entries.map((e) => e.id);
+
+  it('counts the worst rank present, not a hard-coded last place', () => {
+    // Nobody finishes 3rd here: the bottom two tie on rank 2, so rank 2 is
+    // last. A fixed comparison against the league size reports no rumbler at
+    // all, which is the bug this shared counter exists to prevent.
+    const counts = countRumblers([
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(1, c, 2),
+    ]);
+
+    expect(counts.get(b)).toBe(1);
+    expect(counts.get(c)).toBe(1);
+    expect(counts.get(a)).toBeUndefined();
+  });
+
+  it('agrees with buildRumblerData about who was rumbled', () => {
+    const performances = [
+      performance(1, a, 1),
+      performance(1, b, 2),
+      performance(1, c, 3),
+      performance(2, a, 3),
+      performance(2, b, 1),
+      performance(2, c, 2),
+    ];
+
+    const counts = countRumblers(performances);
+    const weeks = buildRumblerData(performances, entries);
+
+    weeks.forEach((week) => {
+      expect(week.player_names.length).toBeGreaterThan(0);
+    });
+    expect(counts.get(c)).toBe(1);
+    expect(counts.get(a)).toBe(1);
+    expect(counts.get(b)).toBeUndefined();
   });
 });

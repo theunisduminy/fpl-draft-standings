@@ -5,14 +5,6 @@ import type { LucideIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
-/**
- * The strip's own footprint, exported so the loading skeletons draw a
- * placeholder of exactly the right size rather than each guessing a width.
- * `RumblerSkeleton` and `StandingsSkeleton` had 400px and 384px respectively,
- * which is the kind of drift a shared constant exists to stop.
- */
-export const SECTION_TABS_STRIP_CLASS = 'h-9 w-full rounded-lg md:max-w-md';
-
 /** One tab: what it is called, what marks it, and what it shows. */
 export interface SectionTab {
   value: string;
@@ -22,6 +14,20 @@ export interface SectionTab {
   /** Extra classes for this panel, e.g. `space-y-4` for a stacked one. */
   className?: string;
 }
+
+/**
+ * Column counts as literal classes, because Tailwind reads the source and a
+ * `grid-cols-${n}` template produces a class it has never generated. An inline
+ * style would work and is what the house rules forbid, so this is the lookup
+ * instead. Two, three or four; a strip longer than that is navigation, not
+ * tabs, and falls back to two columns rather than silently generating a class
+ * Tailwind never built.
+ */
+const COLUMNS: Record<number, string> = {
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+  4: 'grid-cols-4',
+};
 
 /**
  * The tab strip, in one place.
@@ -42,19 +48,6 @@ export interface SectionTab {
  * rendered nodes, so anything inside them keeps whatever boundary it already
  * had.
  */
-/**
- * Column counts as literal classes, because Tailwind reads the source and a
- * `grid-cols-${n}` template produces a class it has never generated. An inline
- * style would work and is what the house rules forbid, so this is the lookup
- * instead — and it doubles as the statement that a strip of more than four is
- * navigation, not tabs.
- */
-const COLUMNS: Record<number, string> = {
-  2: 'grid-cols-2',
-  3: 'grid-cols-3',
-  4: 'grid-cols-4',
-};
-
 export function SectionTabs({
   tabs,
   defaultValue,
@@ -82,8 +75,14 @@ export function SectionTabs({
             // The active tab wears the brand gradient the footer used to. It
             // was the only place on the site that colour appeared at any size,
             // and a footer is the wrong thing to make the brightest object on
-            // the page; the tab someone is reading is the right one. Dark
-            // purple type on it, because white on cyan-to-green is unreadable.
+            // the page; the tab someone is reading is the right one.
+            //
+            // Through the tokens, not the hex the footer spelled out: `--primary`
+            // already *is* that cyan and `--positive` that green, and
+            // `--primary-foreground` is the dark purple the type needs to stay
+            // readable on them. Written as hex, a change to the palette would
+            // repaint the whole app except this one control.
+            //
             // `py-0` because the primitive's own numbers do not close once a
             // border is added: the strip is `h-9` (36px, border-box), so our
             // 1px border and its `p-1` leave 26px, while the trigger's `py-1`
@@ -98,7 +97,7 @@ export function SectionTabs({
             // padding from its radius or its corners bulge against the
             // parent's: the strip is `rounded-lg` (12px) with `p-1` (4px), so
             // 12 − 4 = 8 is the only radius that traces it exactly.
-            className='h-full w-full gap-2 rounded-sm py-0 text-muted-foreground data-[state=active]:bg-gradient-to-t data-[state=active]:from-[#00edfd] data-[state=active]:from-10% data-[state=active]:to-[#75fa95] data-[state=active]:font-semibold data-[state=active]:text-[#310639]'
+            className='h-full w-full gap-2 rounded-sm py-0 text-muted-foreground data-[state=active]:bg-gradient-to-t data-[state=active]:from-primary data-[state=active]:from-10% data-[state=active]:to-positive data-[state=active]:font-semibold data-[state=active]:text-primary-foreground'
           >
             <tab.icon className='h-4 w-4' />
             {tab.label}

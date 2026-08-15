@@ -5,6 +5,15 @@ import type { GameweekPerformance, PlayerDetails } from '@/interfaces/players';
 import type { LeagueEntryId } from '@/interfaces/fpl';
 
 /**
+ * The strip's own grid: six cells, hairline-divided by a 1px gap over the
+ * border colour. Exported because `StandingsSkeleton` draws the same block and
+ * a restated copy is how a loading shape drifts a breakpoint away from the real
+ * one — the same reason `SECTION_TABS_STRIP_CLASS` exists.
+ */
+export const LEDGER_GRID_CLASS =
+  'grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 lg:grid-cols-6';
+
+/**
  * Six facts about the season, in one row.
  *
  * This was four cards in a two-by-two block above the position chart, and the
@@ -59,10 +68,7 @@ export function LeagueLedger({
       label: 'Steadiest',
       icon: <Ruler className='h-3.5 w-3.5 text-positive' />,
       fact: ledger.steadiest,
-      // Held negative in the scoring layer so one comparison serves all six
-      // facts; the sign is an implementation detail, not something to render.
-      detail: (fact: LedgerFact) =>
-        `±${Math.abs(fact.value).toFixed(1)} places`,
+      detail: (fact: LedgerFact) => `±${fact.value.toFixed(1)} places`,
     },
     {
       label: 'Hot streak',
@@ -79,7 +85,7 @@ export function LeagueLedger({
   ];
 
   return (
-    <div className='grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 lg:grid-cols-6'>
+    <div className={LEDGER_GRID_CLASS}>
       {cells.map((cell) => (
         <div key={cell.label} className='bg-card p-3 md:p-3.5'>
           <div className='flex items-center gap-1.5'>

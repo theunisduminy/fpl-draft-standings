@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartCard } from '@/components/ChartCard';
 import { GameweekPerformance } from '@/interfaces/players';
 
 interface FormGuideProps {
@@ -46,46 +46,38 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
     .sort((a, b) => a.avgRank - b.avgRank);
 
   return (
-    <Card className='w-full border-border bg-card'>
-      <CardHeader className='pb-2'>
-        <CardTitle className='text-base text-foreground md:text-lg'>
-          Form guide
-        </CardTitle>
-        <p className='text-xs text-muted-foreground'>Last 5 gameweeks</p>
-      </CardHeader>
-      <CardContent>
-        <div className='space-y-2.5'>
-          {players.map((player) => (
-            <div key={player.playerId} className='flex items-center gap-3'>
-              <span className='w-20 truncate text-xs font-medium text-muted-foreground md:w-24 md:text-sm'>
-                {player.playerName}
-              </span>
-              <div className='flex flex-1 gap-1.5'>
-                {player.last5.map((perf, i) => (
-                  <div
-                    key={i}
-                    className={`flex h-8 flex-1 items-center justify-center rounded-md text-xs font-bold md:h-9 md:text-sm ${
-                      RANK_COLORS[perf.rank] || 'bg-white/10 text-white'
-                    }`}
-                    title={`GW${perf.event}: Rank ${perf.rank} (${perf.event_total} pts)`}
-                  >
-                    {perf.rank}
-                  </div>
-                ))}
-                {/* Pad with empty slots if less than 5 */}
-                {Array.from({ length: 5 - player.last5.length }).map((_, i) => (
-                  <div
-                    key={`empty-${i}`}
-                    className='flex h-8 flex-1 items-center justify-center rounded-md bg-white/5 text-xs text-white/20 md:h-9'
-                  >
-                    -
-                  </div>
-                ))}
-              </div>
+    <ChartCard title='Form guide' caption='Last 5 gameweeks'>
+      <div className='space-y-2.5'>
+        {players.map((player) => (
+          <div key={player.playerId} className='flex items-center gap-3'>
+            <span className='w-20 truncate text-xs font-medium text-muted-foreground md:w-24 md:text-sm'>
+              {player.playerName}
+            </span>
+            <div className='flex flex-1 gap-1.5'>
+              {player.last5.map((perf, i) => (
+                <div
+                  key={i}
+                  className={`flex h-8 flex-1 items-center justify-center rounded-md text-xs font-bold md:h-9 md:text-sm ${
+                    RANK_COLORS[perf.rank] || 'bg-white/10 text-white'
+                  }`}
+                  title={`GW${perf.event}: Rank ${perf.rank} (${perf.event_total} pts)`}
+                >
+                  {perf.rank}
+                </div>
+              ))}
+              {/* Pad with empty slots if less than 5 */}
+              {Array.from({ length: 5 - player.last5.length }).map((_, i) => (
+                <div
+                  key={`empty-${i}`}
+                  className='flex h-8 flex-1 items-center justify-center rounded-md bg-white/5 text-xs text-white/20 md:h-9'
+                >
+                  -
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        ))}
+      </div>
+    </ChartCard>
   );
 }
