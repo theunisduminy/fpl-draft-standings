@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { initials } from '@/utils/player-names';
 
 import { playerPhotoUrl } from '@/utils/pl-assets';
 import type { ElementCode } from '@/interfaces/fpl';
@@ -61,14 +62,4 @@ export function PlayerPhoto({
       className={shape}
     />
   );
-}
-
-/** Up to two letters, from a `web_name` that may be one word or three. */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? '')
-    .join('');
 }

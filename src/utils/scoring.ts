@@ -603,8 +603,6 @@ export interface HeadToHeadRecord {
   won: number;
   drawn: number;
   lost: number;
-  /** Gameweeks both played. `won + drawn + lost`, carried so callers need not add. */
-  played: number;
 }
 
 /** One row of the head-to-head grid: a manager, and how they fare against each other. */
@@ -638,8 +636,10 @@ export interface HeadToHeadRow {
  * which the season data leaves absent rather than zeroed.
  *
  * Rows come back in the order the managers first appear in `performances`, and
- * every row's `against` list is in that same order minus itself — so the grid
- * is square and the caller can lay it out without re-deriving the axis.
+ * every row's `against` list is in that same order minus itself. That makes the
+ * grid square, but it is **not** a layout contract: a caller wanting league
+ * order has to sort, and sorting the rows breaks the positional correspondence
+ * with `against`. Look records up by `opponent`, never by index.
  */
 export function buildHeadToHead(
   performances: GameweekPerformance[],
@@ -676,15 +676,24 @@ export function buildHeadToHead(
           else drawn += 1;
         });
 
-        return { opponent, won, drawn, lost, played: won + drawn + lost };
+        return { opponent, won, drawn, lost };
       });
+
+    const totals = against.reduce(
+      (running, record) => ({
+        won: running.won + record.won,
+        drawn: running.drawn + record.drawn,
+        lost: running.lost + record.lost,
+      }),
+      { won: 0, drawn: 0, lost: 0 },
+    );
 
     return {
       league_entry: entry,
       against,
-      totalWon: against.reduce((sum, record) => sum + record.won, 0),
-      totalDrawn: against.reduce((sum, record) => sum + record.drawn, 0),
-      totalLost: against.reduce((sum, record) => sum + record.lost, 0),
+      totalWon: totals.won,
+      totalDrawn: totals.drawn,
+      totalLost: totals.lost,
     };
   });
 }
@@ -721,18 +730,12 @@ export interface PointsSpread {
 export function buildPointsSpread(
   performances: GameweekPerformance[],
 ): PointsSpread[] {
-  const byEntry = new Map<LeagueEntryId, number[]>();
-
-  performances.forEach((performance) => {
-    const scores = byEntry.get(performance.league_entry) ?? [];
-    scores.push(performance.event_total);
-    byEntry.set(performance.league_entry, scores);
-  });
-
-  return Array.from(byEntry.entries())
-    .filter(([, scores]) => scores.length > 0)
-    .map(([entry, unsorted]) => {
-      const scores = [...unsorted].sort((a, b) => a - b);
+  return Array.from(groupByEntry(performances).entries())
+    .filter(([, runs]) => runs.length > 0)
+    .map(([entry, runs]) => {
+      const scores = runs
+        .map((performance) => performance.event_total)
+        .sort((a, b) => a - b);
 
       return {
         league_entry: entry,

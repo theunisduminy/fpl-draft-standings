@@ -18,6 +18,26 @@ export const POSITION_KEYS = [
   'eighth',
 ] as const;
 
+/**
+ * The same eight positions, as the labels a reader sees.
+ *
+ * Beside `POSITION_KEYS` and indexed the same way, so a rank is
+ * `POSITION_LABELS[rank - 1]`. It lives here for the reason the keys do: three
+ * components were each spelling out "1st" to "8th", one of them via a general
+ * ordinal-suffix algorithm complete with a teens branch, for numbers that can
+ * only ever be one to eight.
+ */
+export const POSITION_LABELS = [
+  '1st',
+  '2nd',
+  '3rd',
+  '4th',
+  '5th',
+  '6th',
+  '7th',
+  '8th',
+] as const;
+
 export type PositionKey = (typeof POSITION_KEYS)[number];
 
 /** A count per finishing position. */

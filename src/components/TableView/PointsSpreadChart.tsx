@@ -2,9 +2,11 @@
 
 import { ChartCard } from '@/components/ChartCard';
 import { CellTooltip, CellTooltipProvider } from '@/components/CellTooltip';
+import { CARD_ROW, CARD_ROW_GUTTER, CARD_ROW_NAME } from '@/components/shapes';
 import { buildPointsSpread } from '@/utils/scoring';
+import { nameFor, nameLookup } from '@/utils/player-names';
 import type { GameweekPerformance, PlayerDetails } from '@/interfaces/players';
-import type { LeagueEntryId } from '@/interfaces/fpl';
+import { cn } from '@/lib/utils';
 
 /**
  * Every manager's weekly scores, as a spread rather than an average.
@@ -46,9 +48,7 @@ export function PointsSpreadChart({
 
   if (spreads.length === 0) return null;
 
-  const names = new Map<LeagueEntryId, string>(
-    players.map((player) => [player.id, player.player_name]),
-  );
+  const names = nameLookup(players);
 
   // One scale for every row, padded so the extremes are not flush to the edge.
   const lowest = Math.min(...spreads.map((spread) => spread.lowest));
@@ -70,14 +70,11 @@ export function PointsSpreadChart({
       <CellTooltipProvider>
         <div className='space-y-2.5'>
           {ordered.map((spread) => {
-            const name = names.get(spread.league_entry) ?? '';
+            const name = nameFor(names, spread.league_entry);
 
             return (
-              <div
-                key={spread.league_entry}
-                className='flex items-center gap-3'
-              >
-                <span className='w-20 truncate text-xs font-medium text-muted-foreground md:w-24 md:text-sm'>
+              <div key={spread.league_entry} className={CARD_ROW}>
+                <span className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}>
                   {name}
                 </span>
                 <CellTooltip
@@ -129,8 +126,8 @@ export function PointsSpreadChart({
         </div>
       </CellTooltipProvider>
 
-      <div className='mt-4 flex items-center gap-3 border-t border-border pt-3'>
-        <span className='w-20 md:w-24' />
+      <div className={cn(CARD_ROW, 'mt-4 border-t border-border pt-3')}>
+        <span className={CARD_ROW_GUTTER} />
         <div className='relative h-4 flex-1'>
           {scaleTicks(floor, ceiling).map((tick) => (
             <span

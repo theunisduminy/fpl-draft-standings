@@ -2,7 +2,18 @@
 
 import { ChartCard } from '@/components/ChartCard';
 import { CellTooltip, CellTooltipProvider } from '@/components/CellTooltip';
-import { GameweekPerformance } from '@/interfaces/players';
+import {
+  CARD_CELL,
+  CARD_COLUMN_HEADING,
+  CARD_ROW,
+  CARD_ROW_CELLS,
+  CARD_ROW_GUTTER,
+  CARD_ROW_NAME,
+} from '@/components/shapes';
+import { POSITION_LABELS, GameweekPerformance } from '@/interfaces/players';
+import { asLeagueEntryId } from '@/interfaces/fpl';
+import { nameFor } from '@/utils/player-names';
+import { cn } from '@/lib/utils';
 
 interface FormGuideProps {
   performances: GameweekPerformance[];
@@ -49,7 +60,7 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
 
       return {
         playerId: parseInt(id),
-        playerName: playerNames[parseInt(id)] || `Player ${id}`,
+        playerName: nameFor(playerNames, asLeagueEntryId(parseInt(id))),
         last5,
         avgRank,
       };
@@ -64,14 +75,11 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
               same flex-1 columns — so a chip sits under its gameweek. This row
               is also what levels the card against the heatmap beside it, which
               carries a heading row of its own. */}
-          <div className='flex items-center gap-3'>
-            <span className='w-20 md:w-24' />
-            <div className='flex flex-1 gap-1.5'>
+          <div className={CARD_ROW}>
+            <span className={CARD_ROW_GUTTER} />
+            <div className={CARD_ROW_CELLS}>
               {events.map((event) => (
-                <span
-                  key={event}
-                  className='min-w-0 flex-1 text-center text-[10px] whitespace-nowrap text-muted-foreground md:text-xs'
-                >
+                <span key={event} className={CARD_COLUMN_HEADING}>
                   GW{event}
                 </span>
               ))}
@@ -79,38 +87,35 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
           </div>
 
           {players.map((player) => (
-            <div key={player.playerId} className='flex items-center gap-3'>
-              <span className='w-20 truncate text-xs font-medium text-muted-foreground md:w-24 md:text-sm'>
+            <div key={player.playerId} className={CARD_ROW}>
+              <span className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}>
                 {player.playerName}
               </span>
-              <div className='flex flex-1 gap-1.5'>
-                {player.last5.map((perf, i) =>
-                  perf ? (
-                    <CellTooltip
-                      key={events[i]}
-                      label={`${player.playerName}, GW${perf.event}: finished ${ordinal(
-                        perf.rank,
-                      )} on ${perf.event_total} points`}
+              <div className={CARD_ROW_CELLS}>
+                {player.last5.map((perf, i) => (
+                  <CellTooltip
+                    key={events[i]}
+                    label={
+                      perf
+                        ? `${player.playerName}, GW${perf.event}: finished ${
+                            POSITION_LABELS[perf.rank - 1] ?? perf.rank
+                          } on ${perf.event_total} points`
+                        : `${player.playerName}, GW${events[i]}: no result`
+                    }
+                  >
+                    <div
+                      className={cn(
+                        CARD_CELL,
+                        'flex items-center justify-center rounded-md text-xs font-bold md:text-sm',
+                        perf
+                          ? (RANK_COLORS[perf.rank] ?? 'bg-white/10 text-white')
+                          : 'bg-white/5 font-normal text-white/20',
+                      )}
                     >
-                      <div
-                        className={`flex h-8 min-w-0 flex-1 items-center justify-center rounded-md text-xs font-bold md:h-9 md:text-sm ${
-                          RANK_COLORS[perf.rank] || 'bg-white/10 text-white'
-                        }`}
-                      >
-                        {perf.rank}
-                      </div>
-                    </CellTooltip>
-                  ) : (
-                    <CellTooltip
-                      key={events[i]}
-                      label={`${player.playerName}, GW${events[i]}: no result`}
-                    >
-                      <div className='flex h-8 min-w-0 flex-1 items-center justify-center rounded-md bg-white/5 text-xs text-white/20 md:h-9'>
-                        -
-                      </div>
-                    </CellTooltip>
-                  ),
-                )}
+                      {perf ? perf.rank : '-'}
+                    </div>
+                  </CellTooltip>
+                ))}
               </div>
             </div>
           ))}
@@ -118,12 +123,4 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
       </CellTooltipProvider>
     </ChartCard>
   );
-}
-
-/** "1st", "2nd", "3rd", … for tooltip prose. The league is eight managers. */
-function ordinal(rank: number): string {
-  const suffixes = ['th', 'st', 'nd', 'rd'];
-  const value = rank % 100;
-
-  return `${rank}${suffixes[(value - 20) % 10] ?? suffixes[value] ?? suffixes[0]}`;
 }

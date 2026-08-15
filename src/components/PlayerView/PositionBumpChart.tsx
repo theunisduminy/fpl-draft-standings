@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   CartesianGrid,
   LabelList,
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import type { SeasonSnapshot } from '@/utils/scoring';
+import { nameFor as nameForEntry } from '@/utils/player-names';
 import type { LeagueEntryId } from '@/interfaces/fpl';
 
 /**
@@ -93,10 +94,10 @@ const MODES: { value: Mode; label: string }[] = [
  * axis. That is not true in gap mode — two managers level on F1 share a y — so
  * that mode drops the labels and leans on the key.
  *
- * **The aspect ratio is set here on purpose.** `ChartContainer` defaults to
- * `aspect-square`, which at full page width made this a chart as tall as it is
- * wide. Time series want to be wide; a squared-up one flattens every crossing,
- * which is the only thing this chart exists to show.
+ * **The aspect ratio is set here on purpose.** `ChartContainer`'s default is
+ * now `aspect-video`, which is a reasonable chart and a poor bump chart: 38
+ * gameweeks across eight rank steps wants to be wider and shorter than 16:9, or
+ * the crossings pile up. The override is a preference, no longer a correction.
  */
 export function PositionBumpChart({
   snapshots,
@@ -115,28 +116,44 @@ export function PositionBumpChart({
     name: nameFor(playerNames, place.league_entry),
   }));
 
-  const chartData = snapshots.map((snapshot) => {
-    const point: Record<string, string | number> = {
-      event: `GW${snapshot.gameweek}`,
-    };
+  // Memoised because `focused` changes on every legend hover, and a fresh
+  // `chartData` identity makes recharts re-derive every axis, series and label
+  // slot for what is only a change of stroke opacity.
+  const chartData = useMemo(
+    () =>
+      snapshots.map((snapshot) => {
+        const point: Record<string, string | number> = {
+          event: `GW${snapshot.gameweek}`,
+        };
 
-    // `places` is sorted best first, so the leader's total is the first one.
-    const leaderScore = snapshot.places[0]?.f1_score ?? 0;
+        // `places` is sorted best first, so the leader's total is the first one.
+        const leaderScore = snapshot.places[0]?.f1_score ?? 0;
 
-    snapshot.places.forEach((place) => {
-      point[nameFor(playerNames, place.league_entry)] = gap
-        ? place.f1_score - leaderScore
-        : place.rank;
-    });
+        snapshot.places.forEach((place) => {
+          point[nameFor(playerNames, place.league_entry)] = gap
+            ? place.f1_score - leaderScore
+            : place.rank;
+        });
 
-    return point;
-  });
+        return point;
+      }),
+    [snapshots, playerNames, gap],
+  );
 
-  const deepest = Math.min(
-    0,
-    ...chartData.flatMap((point) =>
-      managers.map((manager) => Number(point[manager.name] ?? 0)),
-    ),
+  // The furthest anyone has fallen behind, which is the bottom of the gap axis.
+  // `places` is sorted, so it is the last manager against the first — no need
+  // to walk all eight, let alone re-walk the points just built.
+  const deepest = useMemo(
+    () =>
+      Math.min(
+        0,
+        ...snapshots.map(
+          (snapshot) =>
+            (snapshot.places.at(-1)?.f1_score ?? 0) -
+            (snapshot.places[0]?.f1_score ?? 0),
+        ),
+      ),
+    [snapshots],
   );
 
   const chartConfig = Object.fromEntries(
@@ -203,7 +220,7 @@ export function PositionBumpChart({
               top without reversing anything. */}
           {gap ? (
             <YAxis
-              domain={[Math.floor(deepest), 0]}
+              domain={[deepest, 0]}
               tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
               width={38}
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
@@ -327,7 +344,11 @@ function EndLabel({
       y={Number(y)}
       dominantBaseline='middle'
       fontSize={11}
-      fill={dimmed ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.75)'}
+      fill={
+        dimmed
+          ? 'hsl(var(--foreground) / 0.15)'
+          : 'hsl(var(--foreground) / 0.75)'
+      }
     >
       {name.length > 9 ? `${name.slice(0, 8)}…` : name}
     </text>
@@ -338,5 +359,5 @@ function nameFor(
   playerNames: Record<number, string>,
   entry: LeagueEntryId,
 ): string {
-  return playerNames[entry] || `Player ${entry}`;
+  return nameForEntry(playerNames, entry);
 }

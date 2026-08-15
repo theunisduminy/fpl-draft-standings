@@ -686,7 +686,7 @@ describe('buildHeadToHead', () => {
 
     const aVsB = rows.find((row) => row.league_entry === a)?.against[0];
 
-    expect(aVsB).toMatchObject({ won: 0, drawn: 1, lost: 0, played: 1 });
+    expect(aVsB).toMatchObject({ won: 0, drawn: 1, lost: 0 });
   });
 
   it("is symmetric: one manager's win is the other's loss", () => {
@@ -717,7 +717,7 @@ describe('buildHeadToHead', () => {
 
     const aVsB = rows.find((row) => row.league_entry === a)?.against[0];
 
-    expect(aVsB).toMatchObject({ won: 1, drawn: 0, lost: 0, played: 1 });
+    expect(aVsB).toMatchObject({ won: 1, drawn: 0, lost: 0 });
   });
 
   it('never lists a manager against themselves', () => {

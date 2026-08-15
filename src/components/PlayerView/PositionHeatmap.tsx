@@ -2,7 +2,19 @@
 
 import { ChartCard } from '@/components/ChartCard';
 import { CellTooltip, CellTooltipProvider } from '@/components/CellTooltip';
-import { POSITION_KEYS, type PlayerDetails } from '@/interfaces/players';
+import {
+  CARD_CELL,
+  CARD_COLUMN_HEADING,
+  CARD_ROW,
+  CARD_ROW_CELLS,
+  CARD_ROW_GUTTER,
+  CARD_ROW_NAME,
+} from '@/components/shapes';
+import {
+  POSITION_KEYS,
+  POSITION_LABELS,
+  type PlayerDetails,
+} from '@/interfaces/players';
 import { cn } from '@/lib/utils';
 
 /**
@@ -33,17 +45,6 @@ import { cn } from '@/lib/utils';
  * is someone whose season does not match their position.
  */
 
-const POSITION_LABELS = [
-  '1st',
-  '2nd',
-  '3rd',
-  '4th',
-  '5th',
-  '6th',
-  '7th',
-  '8th',
-];
-
 /** Ramp step 0 is "never", 1 to 5 climb to the busiest cell in the grid. */
 const HEAT_STEPS = [
   'bg-heat-0',
@@ -73,14 +74,11 @@ export function PositionHeatmap({ players }: { players: PlayerDetails[] }) {
         <div className='space-y-2.5'>
           {/* Column headings share the row grammar below so the cells line up:
               same name gutter, same gap, same flex-1 columns. */}
-          <div className='flex items-center gap-3'>
-            <span className='w-20 md:w-24' />
-            <div className='flex flex-1 gap-1.5'>
+          <div className={CARD_ROW}>
+            <span className={CARD_ROW_GUTTER} />
+            <div className={CARD_ROW_CELLS}>
               {POSITION_LABELS.map((label) => (
-                <span
-                  key={label}
-                  className='flex-1 text-center text-[10px] text-muted-foreground md:text-xs'
-                >
+                <span key={label} className={CARD_COLUMN_HEADING}>
                   {label}
                 </span>
               ))}
@@ -88,11 +86,11 @@ export function PositionHeatmap({ players }: { players: PlayerDetails[] }) {
           </div>
 
           {rows.map((player) => (
-            <div key={player.id} className='flex items-center gap-3'>
-              <span className='w-20 truncate text-xs font-medium text-muted-foreground md:w-24 md:text-sm'>
+            <div key={player.id} className={CARD_ROW}>
+              <span className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}>
                 {player.player_name}
               </span>
-              <div className='flex flex-1 gap-1.5'>
+              <div className={CARD_ROW_CELLS}>
                 {POSITION_KEYS.map((key, index) => {
                   const count = player.position_placed[key];
                   const step = heatStep(count, busiest);
@@ -106,16 +104,17 @@ export function PositionHeatmap({ players }: { players: PlayerDetails[] }) {
                     >
                       <div
                         className={cn(
-                          'flex h-8 min-w-0 flex-1 items-center justify-center rounded-md text-xs font-bold tabular-nums md:h-9 md:text-sm',
+                          CARD_CELL,
+                          'flex items-center justify-center rounded-md text-xs font-bold tabular-nums md:text-sm',
                           HEAT_STEPS[step],
-                          count === 0
+                          step === 0
                             ? 'text-muted-foreground/40'
                             : step >= DARK_INK_FROM
                               ? 'text-primary-foreground'
                               : 'text-foreground',
                         )}
                       >
-                        {count === 0 ? '·' : count}
+                        {step === 0 ? '·' : count}
                       </div>
                     </CellTooltip>
                   );

@@ -2,9 +2,9 @@
 
 import { ChartCard } from '@/components/ChartCard';
 import { CellTooltip, CellTooltipProvider } from '@/components/CellTooltip';
-import { buildHeadToHead } from '@/utils/scoring';
+import { buildHeadToHead, type HeadToHeadRecord } from '@/utils/scoring';
+import { initials, nameFor, nameLookup } from '@/utils/player-names';
 import type { GameweekPerformance, PlayerDetails } from '@/interfaces/players';
-import type { LeagueEntryId } from '@/interfaces/fpl';
 import { cn } from '@/lib/utils';
 
 /**
@@ -35,22 +35,19 @@ export function HeadToHeadGrid({
   players: PlayerDetails[];
   performances: GameweekPerformance[];
 }) {
-  const rows = buildHeadToHead(performances);
+  const names = nameLookup(players);
 
-  const names = new Map<LeagueEntryId, string>(
-    players.map((player) => [player.id, player.player_name]),
+  // `players` already carries league order, so walking it is the axis. Sorting
+  // the rows from `buildHeadToHead` instead would mean a second ranking lookup
+  // to sort by — and its `against` lists are positional, so re-sorting the rows
+  // would silently break the correspondence anyway. Records are found by
+  // opponent throughout.
+  const byEntry = new Map(
+    buildHeadToHead(performances).map((row) => [row.league_entry, row]),
   );
-  const nameFor = (entry: LeagueEntryId) => names.get(entry) ?? `#${entry}`;
-
-  // League order, so the grid agrees with the board rather than with whatever
-  // order the performances happened to arrive in.
-  const order = new Map<LeagueEntryId, number>(
-    players.map((player) => [player.id, player.f1_ranking]),
-  );
-  const ordered = [...rows].sort(
-    (a, b) =>
-      (order.get(a.league_entry) ?? 0) - (order.get(b.league_entry) ?? 0),
-  );
+  const ordered = [...players]
+    .sort((a, b) => a.f1_ranking - b.f1_ranking)
+    .flatMap((player) => byEntry.get(player.id) ?? []);
   const columns = ordered.map((row) => row.league_entry);
 
   return (
@@ -68,12 +65,14 @@ export function HeadToHeadGrid({
                   column shrink below its longest name and the row breaks instead
                   of truncating. */}
               {columns.map((entry) => (
-                <CellTooltip key={entry} label={nameFor(entry)}>
+                <CellTooltip key={entry} label={nameFor(names, entry)}>
                   <span className='min-w-0 flex-1 truncate text-center text-[10px] whitespace-nowrap text-muted-foreground lg:text-xs'>
                     <span className='lg:hidden'>
-                      {initials(nameFor(entry))}
+                      {initials(nameFor(names, entry))}
                     </span>
-                    <span className='hidden lg:inline'>{nameFor(entry)}</span>
+                    <span className='hidden lg:inline'>
+                      {nameFor(names, entry)}
+                    </span>
                   </span>
                 </CellTooltip>
               ))}
@@ -91,7 +90,7 @@ export function HeadToHeadGrid({
             return (
               <div key={row.league_entry} className='flex items-center gap-2'>
                 <span className='w-16 truncate text-xs font-medium text-muted-foreground md:w-24 md:text-sm'>
-                  {nameFor(row.league_entry)}
+                  {nameFor(names, row.league_entry)}
                 </span>
                 <div className='flex flex-1 gap-1'>
                   {columns.map((opponent) => {
@@ -111,7 +110,8 @@ export function HeadToHeadGrid({
                     return (
                       <CellTooltip
                         key={opponent}
-                        label={`${nameFor(row.league_entry)} v ${nameFor(
+                        label={`${nameFor(names, row.league_entry)} v ${nameFor(
+                          names,
                           opponent,
                         )}: ${record.won} won, ${record.drawn} drawn, ${
                           record.lost
@@ -120,7 +120,7 @@ export function HeadToHeadGrid({
                         <span
                           className={cn(
                             'flex h-8 min-w-0 flex-1 items-center justify-center rounded-md text-[10px] font-semibold whitespace-nowrap text-foreground tabular-nums md:h-9 md:text-xs',
-                            versusShade(record.won, record.lost, record.played),
+                            versusShade(record),
                           )}
                         >
                           {record.won}–{record.drawn}–{record.lost}
@@ -130,7 +130,7 @@ export function HeadToHeadGrid({
                   })}
                 </div>
                 <CellTooltip
-                  label={`${nameFor(row.league_entry)} across the whole league: ${
+                  label={`${nameFor(names, row.league_entry)} across the whole league: ${
                     row.totalWon
                   } won, ${row.totalDrawn} drawn, ${row.totalLost} lost`}
                 >
@@ -158,8 +158,10 @@ export function HeadToHeadGrid({
  * people to read a pattern that is not there. A pair who have never met is
  * neutral rather than even, which is the same shade for a different reason.
  */
-function versusShade(won: number, lost: number, played: number): string {
-  if (played === 0) return 'bg-versus-even';
+function versusShade(record: HeadToHeadRecord): string {
+  const { won, drawn, lost } = record;
+
+  if (won + drawn + lost === 0) return 'bg-versus-even';
 
   const share = won / (won + lost || 1);
 
@@ -169,14 +171,4 @@ function versusShade(won: number, lost: number, played: number): string {
   if (share > 0.3) return 'bg-versus-poor';
 
   return 'bg-versus-weak';
-}
-
-/** First letters, for a column heading too narrow to hold a name. */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((part) => part[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
 }
