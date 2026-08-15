@@ -596,3 +596,161 @@ export function buildRumblerData(
     })
     .sort((a, b) => b.gameweek - a.gameweek);
 }
+
+/** One manager's record against one other, over the gameweeks both played. */
+export interface HeadToHeadRecord {
+  opponent: LeagueEntryId;
+  won: number;
+  drawn: number;
+  lost: number;
+}
+
+/** One row of the head-to-head grid: a manager, and how they fare against each other. */
+export interface HeadToHeadRow {
+  league_entry: LeagueEntryId;
+  /** One entry per opponent, in the same order as the grid's rows. Never self. */
+  against: HeadToHeadRecord[];
+}
+
+/*
+ * There were `totalWon` / `totalDrawn` / `totalLost` fields here, summing a
+ * manager's record across the whole league. They backed a totals column on the
+ * grid that was cut: it was a third ranking of eight people beside two the site
+ * already shows, and a reader comparing three orders of the same league is
+ * being given an argument, not an answer. Trivial to restore from `against` if
+ * a surface ever genuinely needs it.
+ */
+
+/**
+ * Who has outscored whom, gameweek by gameweek.
+ *
+ * The league ranks on finishing positions, so a manager can lose a week to
+ * seven people and to one of them by a single point; neither the F1 table nor
+ * the position heatmap can tell those apart. This can: it compares raw
+ * `event_total`, pair by pair, week by week.
+ *
+ * **A tie is a draw, and is counted separately.** It is not half a win and it
+ * is not dropped. Equal weekly totals genuinely happen in an eight-manager
+ * league, and both alternatives lie about the record: halves invent a result
+ * that did not occur, and dropping ties leaves the two totals failing to sum to
+ * the gameweeks played, which reads as a bug to anyone who checks.
+ *
+ * **Only gameweeks both managers played are counted.** A week present for one
+ * and absent for the other is not a win by walkover; it is not a fixture. This
+ * matters at the start of a season and for any gameweek upstream never scored,
+ * which the season data leaves absent rather than zeroed.
+ *
+ * Rows come back in the order the managers first appear in `performances`, and
+ * every row's `against` list is in that same order minus itself. That makes the
+ * grid square, but it is **not** a layout contract: a caller wanting league
+ * order has to sort, and sorting the rows breaks the positional correspondence
+ * with `against`. Look records up by `opponent`, never by index.
+ */
+export function buildHeadToHead(
+  performances: GameweekPerformance[],
+): HeadToHeadRow[] {
+  const entries = Array.from(
+    new Set(performances.map((performance) => performance.league_entry)),
+  );
+
+  // Points scored by each manager in each gameweek. A manager missing from a
+  // gameweek is missing from its map, which is what makes "both played" cheap.
+  const byEvent = new Map<number, Map<LeagueEntryId, number>>();
+  performances.forEach((performance) => {
+    const event = byEvent.get(performance.event) ?? new Map();
+    event.set(performance.league_entry, performance.event_total);
+    byEvent.set(performance.event, event);
+  });
+
+  return entries.map((entry) => {
+    const against = entries
+      .filter((opponent) => opponent !== entry)
+      .map((opponent) => {
+        let won = 0;
+        let drawn = 0;
+        let lost = 0;
+
+        byEvent.forEach((scores) => {
+          const mine = scores.get(entry);
+          const theirs = scores.get(opponent);
+
+          if (mine === undefined || theirs === undefined) return;
+
+          if (mine > theirs) won += 1;
+          else if (mine < theirs) lost += 1;
+          else drawn += 1;
+        });
+
+        return { opponent, won, drawn, lost };
+      });
+
+    return { league_entry: entry, against };
+  });
+}
+
+/** The five-number summary of one manager's weekly scores, plus the scores. */
+export interface PointsSpread {
+  league_entry: LeagueEntryId;
+  lowest: number;
+  q1: number;
+  median: number;
+  q3: number;
+  highest: number;
+  /** Every weekly total, ascending. The dots on the strip.  */
+  scores: number[];
+}
+
+/**
+ * How each manager's weekly scores are spread, not just where they average.
+ *
+ * The league ledger already names the steadiest manager and the single best
+ * week. This is the shape those two facts are drawn from, and it answers what
+ * neither can: whether a healthy average is a floor someone rarely drops below
+ * or two enormous weeks propping up a run of bad ones. Two managers with the
+ * same mean can have entirely different seasons, and only the spread shows it.
+ *
+ * Quartiles use linear interpolation between the surrounding scores, which is
+ * the same method a spreadsheet's `QUARTILE` uses — so a number checked by hand
+ * against the raw scores agrees with what is drawn.
+ *
+ * A manager with no scored gameweeks is absent from the result rather than
+ * present as a row of zeros: an unplayed season is not a season of nothing,
+ * and zeros here would draw a box at the bottom of the scale.
+ */
+export function buildPointsSpread(
+  performances: GameweekPerformance[],
+): PointsSpread[] {
+  return Array.from(groupByEntry(performances).entries())
+    .filter(([, runs]) => runs.length > 0)
+    .map(([entry, runs]) => {
+      const scores = runs
+        .map((performance) => performance.event_total)
+        .sort((a, b) => a - b);
+
+      return {
+        league_entry: entry,
+        lowest: scores[0],
+        q1: quantile(scores, 0.25),
+        median: quantile(scores, 0.5),
+        q3: quantile(scores, 0.75),
+        highest: scores[scores.length - 1],
+        scores,
+      };
+    });
+}
+
+/**
+ * The value at `fraction` through an ascending list, interpolating between
+ * neighbours. Assumes a non-empty, already sorted array.
+ */
+function quantile(sorted: number[], fraction: number): number {
+  if (sorted.length === 1) return sorted[0];
+
+  const position = (sorted.length - 1) * fraction;
+  const below = Math.floor(position);
+  const above = Math.ceil(position);
+
+  if (below === above) return sorted[below];
+
+  return sorted[below] + (sorted[above] - sorted[below]) * (position - below);
+}

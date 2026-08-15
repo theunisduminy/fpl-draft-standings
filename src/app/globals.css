@@ -100,6 +100,65 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  /* A sequential ramp for magnitude, one hue, light to dark inverted for a
+     dark surface: step 0 is the empty cell, step 5 is the busiest. Derived
+     from `--primary` rather than fixed hex, so a change of brand accent moves
+     the heatmap with everything else.
+
+     One hue on purpose. The eight-colour rainbow this replaced was encoding an
+     *ordinal* thing with categorical hues, which is why yellow-400, amber-500
+     and orange-400 all sat next to each other meaning different places. A
+     single-hue ramp needs no colourblind separation check, because nothing on
+     it is distinguished by hue.
+
+     Steps 4 and 5 are bright enough that text on them wants dark ink; see
+     `PositionHeatmap`, which switches at that boundary. */
+  --color-heat-0: hsl(var(--muted) / 0.35);
+  --color-heat-1: hsl(var(--primary) / 0.14);
+  --color-heat-2: hsl(var(--primary) / 0.28);
+  --color-heat-3: hsl(var(--primary) / 0.45);
+  --color-heat-4: hsl(var(--primary) / 0.68);
+  --color-heat-5: hsl(var(--primary) / 0.92);
+
+  /* A diverging ramp for a two-sided comparison, built from the two accents
+     that already mean good news and bad news. Two hues and a neutral middle,
+     never a hue at the midpoint: an even record has to read as *even*, and a
+     third colour there would read as a third outcome.
+
+     Green and red are the pair colourblind readers separate worst, so anything
+     using this ramp must also print the number — see `HeadToHeadGrid`, where
+     every cell carries its record. Colour is the scan layer, never the answer. */
+  /* One colour per finishing position, for the chips that show a rank as a
+     rank rather than as a name. These were eight raw Tailwind utilities and a
+     literal `#1a0520` ink inside `FormGuide`, which is the one thing the
+     styling rule forbids: a redesign had to find them, and nothing stopped a
+     second surface inventing a ninth shade for the same eight positions.
+
+     The values are carried over unchanged, so this moves where the palette
+     lives without moving what it looks like. `--color-rank-ink` is the dark
+     ink the light chips need; it is close to `--background` but not equal to
+     it, and matching it exactly is what keeps the chips identical.
+
+     Distinct from `--color-heat-*` and `--color-versus-*` on purpose: those
+     two encode a magnitude and a balance, and are ramps. This is an identity
+     palette — eight positions a reader tells apart, not eight degrees of one
+     thing. */
+  --color-rank-1: #facc15;
+  --color-rank-2: #d1d5db;
+  --color-rank-3: #f59e0b;
+  --color-rank-4: #60a5fa;
+  --color-rank-5: #4ade80;
+  --color-rank-6: #fb923c;
+  --color-rank-7: #c084fc;
+  --color-rank-8: #f87171;
+  --color-rank-ink: #1a0520;
+
+  --color-versus-strong: hsl(var(--positive) / 0.8);
+  --color-versus-good: hsl(var(--positive) / 0.38);
+  --color-versus-even: hsl(var(--muted) / 0.5);
+  --color-versus-poor: hsl(var(--negative) / 0.38);
+  --color-versus-weak: hsl(var(--negative) / 0.8);
+
   /* `layout.tsx` loads Inter and puts it on `--font-inter`, but nothing mapped
      it into the theme, so the app quietly rendered in the default stack. This
      entry is what connects them: it makes Inter the sans face everywhere,
