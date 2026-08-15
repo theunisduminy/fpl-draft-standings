@@ -15,6 +15,9 @@
  * `className` from that answer stays in the component.
  */
 
+import type { LeagueEntryId } from '@/interfaces/fpl';
+import type { SeasonSnapshot } from '@/utils/scoring';
+
 /** Steps on the heatmap ramp, 0 (never) through 5 (busiest cell). */
 export const HEAT_LEVELS = 5;
 
@@ -132,4 +135,75 @@ export function scaleTicks(floor: number, ceiling: number): number[] {
   }
 
   return [Math.ceil(floor), Math.floor(ceiling)];
+}
+
+/** Which question the bump chart is answering: the order, or the distance. */
+export type BumpMode = 'position' | 'gap';
+
+/** The bump chart's series, plus the bottom of its axis in gap mode. */
+export interface BumpSeries {
+  /** One point per gameweek. Manager values are keyed by {@link seriesKey}. */
+  points: Record<string, string | number>[];
+  /** The furthest anyone has fallen behind the leader. Zero or negative. */
+  deepest: number;
+}
+
+/**
+ * The key one manager's line is stored and looked up under.
+ *
+ * **Both sides must call this.** The chart once built its points keyed by
+ * display name and read them back by league entry, so every series queried a
+ * key that did not exist and the chart rendered with no lines at all — while
+ * typecheck, lint, the tests and the production build all passed, because
+ * nothing in that stack can see a string that fails to match another string.
+ * One function is what makes the two sides unable to disagree.
+ *
+ * League entry rather than name, because two managers sharing a first name
+ * would otherwise collapse into a single line.
+ */
+export function seriesKey(entry: LeagueEntryId): string {
+  return String(entry);
+}
+
+/**
+ * Turn the season's standings snapshots into the chart's series.
+ *
+ * Position mode plots the rank, which is an order and hides every margin. Gap
+ * mode plots each manager's F1 deficit to that week's leader, which shows the
+ * margin and loses the order — the leader sits at zero and everyone else is
+ * negative, so the axis needs no reversing.
+ *
+ * `deepest` comes off the sorted `places` (last manager against first) rather
+ * than by re-walking the points, and is returned alongside because it is the
+ * same traversal.
+ */
+export function bumpSeries(
+  snapshots: SeasonSnapshot[],
+  mode: BumpMode,
+): BumpSeries {
+  const gap = mode === 'gap';
+  let deepest = 0;
+
+  const points = snapshots.map((snapshot) => {
+    const point: Record<string, string | number> = {
+      event: `GW${snapshot.gameweek}`,
+    };
+
+    // `places` is sorted best first, so the leader's total is the first one and
+    // the trailer's is the last.
+    const leaderScore = snapshot.places[0]?.f1_score ?? 0;
+    const trailerScore = snapshot.places.at(-1)?.f1_score ?? 0;
+
+    deepest = Math.min(deepest, trailerScore - leaderScore);
+
+    snapshot.places.forEach((place) => {
+      point[seriesKey(place.league_entry)] = gap
+        ? place.f1_score - leaderScore
+        : place.rank;
+    });
+
+    return point;
+  });
+
+  return { points, deepest };
 }

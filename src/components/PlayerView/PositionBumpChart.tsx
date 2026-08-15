@@ -19,6 +19,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import type { SeasonSnapshot } from '@/utils/scoring';
+import { bumpSeries, seriesKey } from '@/utils/chart-scales';
 import { nameFor as nameForEntry } from '@/utils/player-names';
 import type { LeagueEntryId } from '@/interfaces/fpl';
 
@@ -116,48 +117,22 @@ export function PositionBumpChart({
   // row — the chart quietly drawing seven people and calling it eight.
   const managers = (snapshots[0]?.places ?? []).map((place) => ({
     id: place.league_entry,
-    key: String(place.league_entry),
+    key: seriesKey(place.league_entry),
     name: nameFor(playerNames, place.league_entry),
   }));
 
   // Memoised because `focused` changes on every legend hover, and a fresh
   // `chartData` identity makes recharts re-derive every axis, series and label
   // slot for what is only a change of stroke opacity.
-  const chartData = useMemo(
-    () =>
-      snapshots.map((snapshot) => {
-        const point: Record<string, string | number> = {
-          event: `GW${snapshot.gameweek}`,
-        };
-
-        // `places` is sorted best first, so the leader's total is the first one.
-        const leaderScore = snapshot.places[0]?.f1_score ?? 0;
-
-        snapshot.places.forEach((place) => {
-          point[nameFor(playerNames, place.league_entry)] = gap
-            ? place.f1_score - leaderScore
-            : place.rank;
-        });
-
-        return point;
-      }),
-    [snapshots, playerNames, gap],
-  );
-
-  // The furthest anyone has fallen behind, which is the bottom of the gap axis.
-  // `places` is sorted, so it is the last manager against the first — no need
-  // to walk all eight, let alone re-walk the points just built.
-  const deepest = useMemo(
-    () =>
-      Math.min(
-        0,
-        ...snapshots.map(
-          (snapshot) =>
-            (snapshot.places.at(-1)?.f1_score ?? 0) -
-            (snapshot.places[0]?.f1_score ?? 0),
-        ),
-      ),
-    [snapshots],
+  //
+  // Built by `bumpSeries` rather than inline, so the key a point is written
+  // under and the key a `<Line>` reads back come from the same function. When
+  // they were written here by hand the two drifted apart, every series looked
+  // up a key that did not exist, and the chart rendered with no lines while
+  // typecheck, lint, the tests and the build all passed.
+  const { points: chartData, deepest } = useMemo(
+    () => bumpSeries(snapshots, mode),
+    [snapshots, mode],
   );
 
   // The config carries the label, so the tooltip still shows a name even

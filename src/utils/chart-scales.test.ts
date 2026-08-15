@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { asLeagueEntryId } from '@/interfaces/fpl';
+import type { SeasonSnapshot } from '@/utils/scoring';
 import {
+  bumpSeries,
   heatStep,
   HEAT_LEVELS,
   MIN_DECISIVE_MEETINGS,
   scaleTicks,
+  seriesKey,
   versusBand,
 } from './chart-scales';
 
@@ -134,5 +138,77 @@ describe('scaleTicks', () => {
 
   it('does not invent a scale for a degenerate range', () => {
     expect(scaleTicks(50, 50)).toEqual([50]);
+  });
+});
+
+describe('bumpSeries', () => {
+  const [a, b, c] = [
+    asLeagueEntryId(100),
+    asLeagueEntryId(101),
+    asLeagueEntryId(102),
+  ];
+
+  const snapshots: SeasonSnapshot[] = [
+    {
+      gameweek: 1,
+      places: [
+        { league_entry: a, f1_score: 20, rank: 1 },
+        { league_entry: b, f1_score: 15, rank: 2 },
+        { league_entry: c, f1_score: 12, rank: 3 },
+      ],
+    },
+    {
+      gameweek: 2,
+      places: [
+        { league_entry: b, f1_score: 35, rank: 1 },
+        { league_entry: a, f1_score: 32, rank: 2 },
+        { league_entry: c, f1_score: 20, rank: 3 },
+      ],
+    },
+  ];
+
+  it('keys every manager under seriesKey, so a chart can find its own lines', () => {
+    // This is the regression that made the chart render with no lines at all:
+    // the points were written keyed by display name and read back by league
+    // entry. Nothing in typecheck, lint or the build can see a string that
+    // fails to match another string, so only this assertion can.
+    const { points } = bumpSeries(snapshots, 'position');
+
+    for (const entry of [a, b, c]) {
+      for (const point of points) {
+        expect(point[seriesKey(entry)]).toBeDefined();
+      }
+    }
+  });
+
+  it('plots the rank in position mode', () => {
+    const { points } = bumpSeries(snapshots, 'position');
+
+    expect(points[0][seriesKey(a)]).toBe(1);
+    expect(points[1][seriesKey(a)]).toBe(2);
+    expect(points[1][seriesKey(b)]).toBe(1);
+  });
+
+  it('pins the leader at zero and puts everyone else below in gap mode', () => {
+    const { points } = bumpSeries(snapshots, 'gap');
+
+    expect(points[1][seriesKey(b)]).toBe(0);
+    expect(points[1][seriesKey(a)]).toBe(-3);
+    expect(points[1][seriesKey(c)]).toBe(-15);
+  });
+
+  it('reports the furthest anyone has fallen behind', () => {
+    expect(bumpSeries(snapshots, 'gap').deepest).toBe(-15);
+  });
+
+  it('never reports a positive deepest, so the axis cannot invert', () => {
+    expect(bumpSeries([], 'gap').deepest).toBe(0);
+    expect(bumpSeries(snapshots, 'position').deepest).toBeLessThanOrEqual(0);
+  });
+
+  it('labels each point with its gameweek', () => {
+    expect(
+      bumpSeries(snapshots, 'position').points.map((p) => p.event),
+    ).toEqual(['GW1', 'GW2']);
   });
 });
