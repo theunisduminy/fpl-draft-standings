@@ -17,7 +17,9 @@ import {
 import {
   aggregatePlayers,
   assignRanks,
+  buildHeadToHead,
   buildLeagueLedger,
+  buildPointsSpread,
   buildRumblerData,
   rankByPoints,
   scoreGameweek,
@@ -651,5 +653,166 @@ describe('countRumblers', () => {
     expect(counts.get(c)).toBe(1);
     expect(counts.get(a)).toBe(1);
     expect(counts.get(b)).toBeUndefined();
+  });
+});
+
+describe('buildHeadToHead', () => {
+  const [a, b, c] = [
+    asLeagueEntryId(100),
+    asLeagueEntryId(101),
+    asLeagueEntryId(102),
+  ];
+
+  it('counts a win for whoever scored more that gameweek', () => {
+    const rows = buildHeadToHead([
+      performance(1, a, 1, 60),
+      performance(1, b, 2, 40),
+      performance(2, a, 2, 30),
+      performance(2, b, 1, 55),
+      performance(3, a, 1, 70),
+      performance(3, b, 2, 20),
+    ]);
+
+    const aVsB = rows.find((row) => row.league_entry === a)?.against[0];
+
+    expect(aVsB).toMatchObject({ opponent: b, won: 2, drawn: 0, lost: 1 });
+  });
+
+  it('records a tie as a draw, not half a win and not nothing', () => {
+    const rows = buildHeadToHead([
+      performance(1, a, 1, 50),
+      performance(1, b, 1, 50),
+    ]);
+
+    const aVsB = rows.find((row) => row.league_entry === a)?.against[0];
+
+    expect(aVsB).toMatchObject({ won: 0, drawn: 1, lost: 0, played: 1 });
+  });
+
+  it("is symmetric: one manager's win is the other's loss", () => {
+    const rows = buildHeadToHead([
+      performance(1, a, 1, 60),
+      performance(1, b, 2, 40),
+      performance(2, a, 2, 40),
+      performance(2, b, 1, 60),
+      performance(3, a, 1, 50),
+      performance(3, b, 1, 50),
+    ]);
+
+    const aVsB = rows.find((row) => row.league_entry === a)?.against[0];
+    const bVsA = rows.find((row) => row.league_entry === b)?.against[0];
+
+    expect(aVsB?.won).toBe(bVsA?.lost);
+    expect(aVsB?.lost).toBe(bVsA?.won);
+    expect(aVsB?.drawn).toBe(bVsA?.drawn);
+  });
+
+  it('skips a gameweek only one of the pair played, rather than awarding a walkover', () => {
+    const rows = buildHeadToHead([
+      performance(1, a, 1, 60),
+      performance(1, b, 2, 40),
+      // GW2 has no result for b at all.
+      performance(2, a, 1, 60),
+    ]);
+
+    const aVsB = rows.find((row) => row.league_entry === a)?.against[0];
+
+    expect(aVsB).toMatchObject({ won: 1, drawn: 0, lost: 0, played: 1 });
+  });
+
+  it('never lists a manager against themselves', () => {
+    const rows = buildHeadToHead([
+      performance(1, a, 1, 60),
+      performance(1, b, 2, 50),
+      performance(1, c, 3, 40),
+    ]);
+
+    rows.forEach((row) => {
+      expect(row.against.map((record) => record.opponent)).not.toContain(
+        row.league_entry,
+      );
+      expect(row.against).toHaveLength(2);
+    });
+  });
+
+  it('totals wins across every opponent', () => {
+    const rows = buildHeadToHead([
+      performance(1, a, 1, 60),
+      performance(1, b, 2, 50),
+      performance(1, c, 3, 40),
+      performance(2, a, 3, 10),
+      performance(2, b, 1, 50),
+      performance(2, c, 2, 40),
+    ]);
+
+    const rowA = rows.find((row) => row.league_entry === a);
+
+    // Beat both in GW1, lost to both in GW2.
+    expect(rowA).toMatchObject({ totalWon: 2, totalDrawn: 0, totalLost: 2 });
+  });
+});
+
+describe('buildPointsSpread', () => {
+  const a = asLeagueEntryId(100);
+
+  it("summarises a manager's weekly scores", () => {
+    const spread = buildPointsSpread([
+      performance(1, a, 1, 40),
+      performance(2, a, 1, 50),
+      performance(3, a, 1, 60),
+      performance(4, a, 1, 70),
+      performance(5, a, 1, 80),
+    ]);
+
+    expect(spread[0]).toMatchObject({
+      league_entry: a,
+      lowest: 40,
+      q1: 50,
+      median: 60,
+      q3: 70,
+      highest: 80,
+      scores: [40, 50, 60, 70, 80],
+    });
+  });
+
+  it('interpolates a quartile that falls between two scores', () => {
+    const spread = buildPointsSpread([
+      performance(1, a, 1, 10),
+      performance(2, a, 1, 20),
+      performance(3, a, 1, 30),
+      performance(4, a, 1, 40),
+    ]);
+
+    // Positions 0.75 and 2.25 of [10,20,30,40].
+    expect(spread[0].q1).toBeCloseTo(17.5);
+    expect(spread[0].median).toBeCloseTo(25);
+    expect(spread[0].q3).toBeCloseTo(32.5);
+  });
+
+  it('handles a manager with a single gameweek', () => {
+    const spread = buildPointsSpread([performance(1, a, 1, 55)]);
+
+    expect(spread[0]).toMatchObject({
+      lowest: 55,
+      q1: 55,
+      median: 55,
+      q3: 55,
+      highest: 55,
+    });
+  });
+
+  it('sorts the scores even when the gameweeks arrive out of order', () => {
+    const spread = buildPointsSpread([
+      performance(3, a, 1, 30),
+      performance(1, a, 1, 70),
+      performance(2, a, 1, 50),
+    ]);
+
+    expect(spread[0].scores).toEqual([30, 50, 70]);
+    expect(spread[0].median).toBe(50);
+  });
+
+  it('omits a manager with no scored gameweeks rather than showing zeros', () => {
+    expect(buildPointsSpread([])).toEqual([]);
   });
 });

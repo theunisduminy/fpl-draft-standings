@@ -100,6 +100,40 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  /* A sequential ramp for magnitude, one hue, light to dark inverted for a
+     dark surface: step 0 is the empty cell, step 5 is the busiest. Derived
+     from `--primary` rather than fixed hex, so a change of brand accent moves
+     the heatmap with everything else.
+
+     One hue on purpose. The eight-colour rainbow this replaced was encoding an
+     *ordinal* thing with categorical hues, which is why yellow-400, amber-500
+     and orange-400 all sat next to each other meaning different places. A
+     single-hue ramp needs no colourblind separation check, because nothing on
+     it is distinguished by hue.
+
+     Steps 4 and 5 are bright enough that text on them wants dark ink; see
+     `PositionHeatmap`, which switches at that boundary. */
+  --color-heat-0: hsl(var(--muted) / 0.35);
+  --color-heat-1: hsl(var(--primary) / 0.14);
+  --color-heat-2: hsl(var(--primary) / 0.28);
+  --color-heat-3: hsl(var(--primary) / 0.45);
+  --color-heat-4: hsl(var(--primary) / 0.68);
+  --color-heat-5: hsl(var(--primary) / 0.92);
+
+  /* A diverging ramp for a two-sided comparison, built from the two accents
+     that already mean good news and bad news. Two hues and a neutral middle,
+     never a hue at the midpoint: an even record has to read as *even*, and a
+     third colour there would read as a third outcome.
+
+     Green and red are the pair colourblind readers separate worst, so anything
+     using this ramp must also print the number — see `HeadToHeadGrid`, where
+     every cell carries its record. Colour is the scan layer, never the answer. */
+  --color-versus-strong: hsl(var(--positive) / 0.8);
+  --color-versus-good: hsl(var(--positive) / 0.38);
+  --color-versus-even: hsl(var(--muted) / 0.5);
+  --color-versus-poor: hsl(var(--negative) / 0.38);
+  --color-versus-weak: hsl(var(--negative) / 0.8);
+
   /* `layout.tsx` loads Inter and puts it on `--font-inter`, but nothing mapped
      it into the theme, so the app quietly rendered in the default stack. This
      entry is what connects them: it makes Inter the sans face everywhere,
