@@ -71,15 +71,22 @@ export const STANDINGS_HIDDEN_BELOW_MD = STANDINGS_COLUMN_SHAPES.flatMap(
  * level a month later.
  *
  * `HeadToHeadGrid` deliberately does **not** use these: eight opponent columns
- * plus a totals column need a tighter gutter and gap than five gameweek chips
- * do, and it sits alone on its own tab with nothing to line up against.
+ * need a tighter gutter and their own fixed widths, and that card sits alone on
+ * its own tab with nothing to line up against.
  */
 
-/** The name gutter down the left of every row, headings included. */
-export const CARD_ROW_GUTTER = 'w-20 md:w-24';
+/**
+ * The name gutter down the left of every row, headings included.
+ *
+ * Narrow on a phone on purpose. These are first names — "Ian", "Nick" — and at
+ * 80px the gutter was mostly empty while the cells beside it were squeezed to
+ * the point of being hard to read. The desktop width is unchanged; there is
+ * room there and a longer name benefits from it.
+ */
+export const CARD_ROW_GUTTER = 'w-16 md:w-24';
 
-/** One row: the gutter, then the cells. */
-export const CARD_ROW = 'flex items-center gap-3';
+/** One row: the gutter, then the cells. Tighter on a phone, for the same reason. */
+export const CARD_ROW = 'flex items-center gap-2 md:gap-3';
 
 /** The strip of cells filling the rest of a row. */
 export const CARD_ROW_CELLS = 'flex flex-1 gap-1.5';

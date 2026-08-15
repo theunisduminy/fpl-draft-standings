@@ -610,11 +610,16 @@ export interface HeadToHeadRow {
   league_entry: LeagueEntryId;
   /** One entry per opponent, in the same order as the grid's rows. Never self. */
   against: HeadToHeadRecord[];
-  /** Wins across every opponent — a third way to rank the league. */
-  totalWon: number;
-  totalDrawn: number;
-  totalLost: number;
 }
+
+/*
+ * There were `totalWon` / `totalDrawn` / `totalLost` fields here, summing a
+ * manager's record across the whole league. They backed a totals column on the
+ * grid that was cut: it was a third ranking of eight people beside two the site
+ * already shows, and a reader comparing three orders of the same league is
+ * being given an argument, not an answer. Trivial to restore from `against` if
+ * a surface ever genuinely needs it.
+ */
 
 /**
  * Who has outscored whom, gameweek by gameweek.
@@ -679,22 +684,7 @@ export function buildHeadToHead(
         return { opponent, won, drawn, lost };
       });
 
-    const totals = against.reduce(
-      (running, record) => ({
-        won: running.won + record.won,
-        drawn: running.drawn + record.drawn,
-        lost: running.lost + record.lost,
-      }),
-      { won: 0, drawn: 0, lost: 0 },
-    );
-
-    return {
-      league_entry: entry,
-      against,
-      totalWon: totals.won,
-      totalDrawn: totals.drawn,
-      totalLost: totals.lost,
-    };
+    return { league_entry: entry, against };
   });
 }
 

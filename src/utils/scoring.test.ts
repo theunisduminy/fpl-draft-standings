@@ -745,27 +745,9 @@ describe('buildHeadToHead', () => {
       performance(2, b, 1, 61),
     ]);
 
-    expect(rows.find((row) => row.league_entry === a)).toMatchObject({
-      totalWon: 0,
-      totalDrawn: 2,
-      totalLost: 0,
-    });
-  });
-
-  it('totals wins across every opponent', () => {
-    const rows = buildHeadToHead([
-      performance(1, a, 1, 60),
-      performance(1, b, 2, 50),
-      performance(1, c, 3, 40),
-      performance(2, a, 3, 10),
-      performance(2, b, 1, 50),
-      performance(2, c, 2, 40),
-    ]);
-
-    const rowA = rows.find((row) => row.league_entry === a);
-
-    // Beat both in GW1, lost to both in GW2.
-    expect(rowA).toMatchObject({ totalWon: 2, totalDrawn: 0, totalLost: 2 });
+    expect(
+      rows.find((row) => row.league_entry === a)?.against[0],
+    ).toMatchObject({ opponent: b, won: 0, drawn: 2, lost: 0 });
   });
 });
 

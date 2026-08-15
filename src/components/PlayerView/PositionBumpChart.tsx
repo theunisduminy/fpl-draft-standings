@@ -163,7 +163,12 @@ export function PositionBumpChart({
           value={mode}
           onValueChange={(value) => value && setMode(value as Mode)}
           aria-label='Chart mode'
-          className='shrink-0 gap-0.5 rounded-md border border-border p-0.5'
+          // `w-fit`, because the card header stacks on a phone and the group
+          // would otherwise stretch the full width with its two words marooned
+          // in the middle. The rest mirrors `SectionTabs` deliberately: this is
+          // a second set of tabs on the same page, and two tab languages on one
+          // screen reads as two different apps.
+          className='w-fit shrink-0 gap-0.5 self-start justify-self-start rounded-lg border border-border bg-card p-1'
         >
           {MODES.map((option) => (
             <ToggleGroupItem
@@ -171,7 +176,7 @@ export function PositionBumpChart({
               value={option.value}
               size='sm'
               aria-label={option.label}
-              className='h-auto rounded px-2.5 py-1 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground'
+              className='h-7 rounded-sm px-3 text-xs text-muted-foreground data-[state=on]:bg-gradient-to-t data-[state=on]:from-primary data-[state=on]:from-10% data-[state=on]:to-positive data-[state=on]:font-semibold data-[state=on]:text-primary-foreground'
             >
               {option.label}
             </ToggleGroupItem>

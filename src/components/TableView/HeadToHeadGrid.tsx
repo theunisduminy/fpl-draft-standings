@@ -14,8 +14,7 @@ import { cn } from '@/lib/utils';
  * The league ranks on finishing positions, which means a manager can lose a
  * week to seven people and to one of them by a single point, and nothing else
  * on the site can tell those apart. Read a row across and it is one manager's
- * record against each of the others; read the totals column and it is a third
- * way to rank the league, after F1 score and after raw points.
+ * record against each of the others.
  *
  * **Diverging colour, because the comparison is two-sided.** A dominant record
  * and a dominated one are opposites, not two points on one scale, so the ramp
@@ -24,9 +23,9 @@ import { cn } from '@/lib/utils';
  * every cell prints its record: the colour is the scan layer and the number is
  * the answer. Never the other way round.
  *
- * **One layout, and it scrolls.** Eight opponent columns plus a name gutter and
- * a totals column need about 700px; a phone has half that, and squeezing them
- * to fit produced cells too narrow to hold `12-3-5` at all. Rather than a
+ * **One layout, and it scrolls.** Eight opponent columns plus a name gutter
+ * need more width than a phone has, and squeezing them to fit produced cells
+ * too narrow to hold `12-3-5` at all. Rather than a
  * second mobile layout to keep in step, the grid keeps its real width and
  * scrolls sideways inside the card, with the name column pinned so a row stays
  * identifiable however far across you swipe.
@@ -42,8 +41,22 @@ import { cn } from '@/lib/utils';
  * sizes itself to the space available, so the row always fitted, the cells were
  * crushed below legibility, and the scroll container had nothing to scroll.
  */
-/** The pinned name gutter, wide enough for a manager's name. */
-const H2H_GUTTER = 'w-24 shrink-0';
+/**
+ * The pinned name gutter.
+ *
+ * Three things here are load-bearing for the freeze, and the column looked
+ * broken without them even though `sticky left-0` was already set:
+ *
+ * - `self-stretch` — the background must be as tall as the row. A span sized to
+ *   its text painted a strip the height of the words, so the coloured cells
+ *   scrolled *under the name and out the top and bottom of it*.
+ * - `pr-2` instead of a gap on the row — a gap between the gutter and the cells
+ *   is a transparent seam, and cells slide visibly through it.
+ * - `bg-card` — the card's own colour, so the covered cells are hidden rather
+ *   than tinted. Anything translucent shows the traffic underneath.
+ */
+const H2H_GUTTER =
+  'sticky left-0 z-20 flex w-20 shrink-0 items-center md:w-24 self-stretch bg-card pr-2';
 
 /**
  * One data column.
@@ -60,9 +73,6 @@ const H2H_GUTTER = 'w-24 shrink-0';
  * overflowing again on the one screen that should never scroll.
  */
 const H2H_CELL = 'w-20 shrink-0 lg:w-auto lg:min-w-0 lg:flex-1';
-
-/** The totals column on the right. */
-const H2H_TOTAL = 'w-16 shrink-0';
 
 export function HeadToHeadGrid({
   players,
@@ -89,13 +99,7 @@ export function HeadToHeadGrid({
     .sort((a, b) => a.f1_ranking - b.f1_ranking)
     .map(
       (player) =>
-        byEntry.get(player.id) ?? {
-          league_entry: player.id,
-          against: [],
-          totalWon: 0,
-          totalDrawn: 0,
-          totalLost: 0,
-        },
+        byEntry.get(player.id) ?? { league_entry: player.id, against: [] },
     );
   const columns = ordered.map((row) => row.league_entry);
 
@@ -110,11 +114,8 @@ export function HeadToHeadGrid({
             through beside the frozen name. */}
         <div className='overflow-x-auto'>
           <div className='w-max space-y-1.5 lg:w-full'>
-            <div className='flex items-end gap-2'>
-              <span
-                className={cn(H2H_GUTTER, 'sticky left-0 z-20 bg-card')}
-                aria-hidden
-              />
+            <div className='flex items-end'>
+              <span className={H2H_GUTTER} aria-hidden />
               <div className='flex gap-1 lg:flex-1'>
                 {columns.map((entry) => (
                   <CellTooltip key={entry} label={nameFor(names, entry)}>
@@ -129,14 +130,6 @@ export function HeadToHeadGrid({
                   </CellTooltip>
                 ))}
               </div>
-              <span
-                className={cn(
-                  H2H_TOTAL,
-                  'text-center text-[10px] whitespace-nowrap text-muted-foreground md:text-xs',
-                )}
-              >
-                Total
-              </span>
             </div>
 
             {ordered.map((row) => {
@@ -145,15 +138,12 @@ export function HeadToHeadGrid({
               );
 
               return (
-                <div key={row.league_entry} className='flex items-center gap-2'>
+                <div key={row.league_entry} className='flex items-center'>
                   {/* Pinned, and opaque: the cells scroll underneath it. */}
-                  <span
-                    className={cn(
-                      H2H_GUTTER,
-                      'sticky left-0 z-20 truncate bg-card text-xs font-medium text-muted-foreground md:text-sm',
-                    )}
-                  >
-                    {nameFor(names, row.league_entry)}
+                  <span className={H2H_GUTTER}>
+                    <span className='truncate text-xs font-medium text-muted-foreground md:text-sm'>
+                      {nameFor(names, row.league_entry)}
+                    </span>
                   </span>
                   <div className='flex gap-1 lg:flex-1'>
                     {columns.map((opponent) => {
@@ -202,23 +192,6 @@ export function HeadToHeadGrid({
                       );
                     })}
                   </div>
-                  <CellTooltip
-                    label={`${nameFor(names, row.league_entry)} across the whole league: ${
-                      row.totalWon
-                    } won, ${row.totalDrawn} drawn, ${row.totalLost} lost`}
-                  >
-                    <span
-                      className={cn(
-                        H2H_TOTAL,
-                        'text-center text-xs font-semibold whitespace-nowrap text-foreground tabular-nums md:text-sm',
-                      )}
-                    >
-                      {row.totalWon}
-                      <span className='text-muted-foreground'>
-                        -{row.totalDrawn}-{row.totalLost}
-                      </span>
-                    </span>
-                  </CellTooltip>
                 </div>
               );
             })}
