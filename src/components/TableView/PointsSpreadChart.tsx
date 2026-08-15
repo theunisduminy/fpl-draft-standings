@@ -4,6 +4,7 @@ import { ChartCard } from '@/components/ChartCard';
 import { CellTooltip, CellTooltipProvider } from '@/components/CellTooltip';
 import { CARD_ROW, CARD_ROW_GUTTER, CARD_ROW_NAME } from '@/components/shapes';
 import { buildPointsSpread } from '@/utils/scoring';
+import { scaleTicks } from '@/utils/chart-scales';
 import { nameFor, nameLookup } from '@/utils/player-names';
 import type { GameweekPerformance, PlayerDetails } from '@/interfaces/players';
 import { cn } from '@/lib/utils';
@@ -142,21 +143,4 @@ export function PointsSpreadChart({
       </div>
     </ChartCard>
   );
-}
-
-/**
- * Four or five round numbers across the scale.
- *
- * Stepped to a multiple of ten so the labels read as scores rather than as
- * whatever the extremes happened to be, and clipped to the ends so a tick never
- * hangs off the edge of the row it is labelling.
- */
-function scaleTicks(floor: number, ceiling: number): number[] {
-  const step = Math.max(10, Math.ceil((ceiling - floor) / 4 / 10) * 10);
-  const first = Math.ceil(floor / step) * step;
-  const ticks: number[] = [];
-
-  for (let tick = first; tick <= ceiling; tick += step) ticks.push(tick);
-
-  return ticks;
 }

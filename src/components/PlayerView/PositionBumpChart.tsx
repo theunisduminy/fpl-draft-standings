@@ -12,12 +12,12 @@ import {
 } from 'recharts';
 
 import { ChartCard } from '@/components/ChartCard';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import { cn } from '@/lib/utils';
 import type { SeasonSnapshot } from '@/utils/scoring';
 import { nameFor as nameForEntry } from '@/utils/player-names';
 import type { LeagueEntryId } from '@/interfaces/fpl';
@@ -111,8 +111,12 @@ export function PositionBumpChart({
   const gap = mode === 'gap';
 
   // Every snapshot holds every manager, so the first one is the full cast.
+  // Keyed by league entry, never by display name. Two managers sharing a
+  // first name would collapse into one line, one legend entry and one tooltip
+  // row — the chart quietly drawing seven people and calling it eight.
   const managers = (snapshots[0]?.places ?? []).map((place) => ({
     id: place.league_entry,
+    key: String(place.league_entry),
     name: nameFor(playerNames, place.league_entry),
   }));
 
@@ -156,9 +160,11 @@ export function PositionBumpChart({
     [snapshots],
   );
 
+  // The config carries the label, so the tooltip still shows a name even
+  // though the series is keyed by id.
   const chartConfig = Object.fromEntries(
     managers.map((manager, index) => [
-      manager.name,
+      manager.key,
       { label: manager.name, color: playerColour(index) },
     ]),
   ) satisfies ChartConfig;
@@ -173,29 +179,29 @@ export function PositionBumpChart({
       }
       contentClassName='p-2 md:p-4'
       action={
-        <div
-          role='radiogroup'
+        // `value && setMode(...)` is load-bearing: a single-select ToggleGroup
+        // reports an empty string when the pressed item is pressed again, and
+        // this control has no "neither" state — the chart must always be
+        // showing one of the two.
+        <ToggleGroup
+          type='single'
+          value={mode}
+          onValueChange={(value) => value && setMode(value as Mode)}
           aria-label='Chart mode'
-          className='flex shrink-0 rounded-md border border-border p-0.5'
+          className='shrink-0 gap-0.5 rounded-md border border-border p-0.5'
         >
           {MODES.map((option) => (
-            <button
+            <ToggleGroupItem
               key={option.value}
-              type='button'
-              role='radio'
-              aria-checked={mode === option.value}
-              onClick={() => setMode(option.value)}
-              className={cn(
-                'rounded px-2.5 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                mode === option.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+              value={option.value}
+              size='sm'
+              aria-label={option.label}
+              className='h-auto rounded px-2.5 py-1 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground'
             >
               {option.label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       }
     >
       <ChartContainer
@@ -263,11 +269,11 @@ export function PositionBumpChart({
             <Line
               key={manager.id}
               type='monotone'
-              dataKey={manager.name}
+              dataKey={manager.key}
               stroke={playerColour(index)}
-              strokeWidth={focused === manager.name ? 3.5 : 2.5}
+              strokeWidth={focused === manager.key ? 3.5 : 2.5}
               strokeOpacity={
-                focused === null || focused === manager.name ? 1 : 0.15
+                focused === null || focused === manager.key ? 1 : 0.15
               }
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0 }}
@@ -275,13 +281,13 @@ export function PositionBumpChart({
             >
               {!gap && (
                 <LabelList
-                  dataKey={manager.name}
+                  dataKey={manager.key}
                   content={(props) => (
                     <EndLabel
                       {...props}
                       name={manager.name}
                       lastIndex={chartData.length - 1}
-                      dimmed={focused !== null && focused !== manager.name}
+                      dimmed={focused !== null && focused !== manager.key}
                     />
                   )}
                 />
@@ -296,9 +302,9 @@ export function PositionBumpChart({
           <button
             key={manager.id}
             type='button'
-            onMouseEnter={() => setFocused(manager.name)}
+            onMouseEnter={() => setFocused(manager.key)}
             onMouseLeave={() => setFocused(null)}
-            onFocus={() => setFocused(manager.name)}
+            onFocus={() => setFocused(manager.key)}
             onBlur={() => setFocused(null)}
             className='flex items-center gap-1.5 rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
           >

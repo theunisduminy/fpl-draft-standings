@@ -2,7 +2,8 @@
 
 import { ChartCard } from '@/components/ChartCard';
 import { CellTooltip, CellTooltipProvider } from '@/components/CellTooltip';
-import { buildHeadToHead, type HeadToHeadRecord } from '@/utils/scoring';
+import { buildHeadToHead } from '@/utils/scoring';
+import { versusBand, type VersusBand } from '@/utils/chart-scales';
 import { initials, nameFor, nameLookup } from '@/utils/player-names';
 import type { GameweekPerformance, PlayerDetails } from '@/interfaces/players';
 import { cn } from '@/lib/utils';
@@ -45,9 +46,22 @@ export function HeadToHeadGrid({
   const byEntry = new Map(
     buildHeadToHead(performances).map((row) => [row.league_entry, row]),
   );
+  // `map`, not `flatMap` with a drop. A manager present in `players` but not
+  // yet in `performances` — pre-season, or before their first scored gameweek —
+  // used to lose their row *and* their column, so the grid stayed square and
+  // looked correct while quietly showing a seven-manager league.
   const ordered = [...players]
     .sort((a, b) => a.f1_ranking - b.f1_ranking)
-    .flatMap((player) => byEntry.get(player.id) ?? []);
+    .map(
+      (player) =>
+        byEntry.get(player.id) ?? {
+          league_entry: player.id,
+          against: [],
+          totalWon: 0,
+          totalDrawn: 0,
+          totalLost: 0,
+        },
+    );
   const columns = ordered.map((row) => row.league_entry);
 
   return (
@@ -120,7 +134,9 @@ export function HeadToHeadGrid({
                         <span
                           className={cn(
                             'flex h-8 min-w-0 flex-1 items-center justify-center rounded-md text-[10px] font-semibold whitespace-nowrap text-foreground tabular-nums md:h-9 md:text-xs',
-                            versusShade(record),
+                            VERSUS_SHADE[
+                              versusBand(record.won, record.drawn, record.lost)
+                            ],
                           )}
                         >
                           {record.won}–{record.drawn}–{record.lost}
@@ -151,24 +167,17 @@ export function HeadToHeadGrid({
 }
 
 /**
- * Pick a step on the diverging ramp from a record's win share.
+ * The diverging ramp, one fill per band.
  *
- * The bands are deliberately wide around the middle: with a dozen or so
- * meetings, six-five is noise, and colouring it as an advantage would invite
- * people to read a pattern that is not there. A pair who have never met is
- * neutral rather than even, which is the same shade for a different reason.
+ * Which band a record falls in is decided by `versusBand` in the scoring
+ * utilities, where it is pure and tested; this map is the only part that is a
+ * presentation choice. That split is deliberate — the band rule had two defects
+ * while it lived in here as an untested helper.
  */
-function versusShade(record: HeadToHeadRecord): string {
-  const { won, drawn, lost } = record;
-
-  if (won + drawn + lost === 0) return 'bg-versus-even';
-
-  const share = won / (won + lost || 1);
-
-  if (share >= 0.7) return 'bg-versus-strong';
-  if (share >= 0.56) return 'bg-versus-good';
-  if (share > 0.44) return 'bg-versus-even';
-  if (share > 0.3) return 'bg-versus-poor';
-
-  return 'bg-versus-weak';
-}
+const VERSUS_SHADE: Record<VersusBand, string> = {
+  strong: 'bg-versus-strong',
+  good: 'bg-versus-good',
+  even: 'bg-versus-even',
+  poor: 'bg-versus-poor',
+  weak: 'bg-versus-weak',
+};

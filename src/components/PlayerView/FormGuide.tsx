@@ -20,15 +20,23 @@ interface FormGuideProps {
   playerNames: Record<number, string>;
 }
 
-const RANK_COLORS: Record<number, string> = {
-  1: 'bg-yellow-400 text-[#1a0520]',
-  2: 'bg-gray-300 text-[#1a0520]',
-  3: 'bg-amber-500 text-[#1a0520]',
-  4: 'bg-blue-400 text-white',
-  5: 'bg-green-400 text-[#1a0520]',
-  6: 'bg-orange-400 text-[#1a0520]',
-  7: 'bg-purple-400 text-white',
-  8: 'bg-red-400 text-white',
+/**
+ * One chip style per finishing position.
+ *
+ * The colours are theme tokens rather than raw utilities, so the rank palette
+ * is a one-file change; the ink flips to dark on the light chips only. The
+ * values are unchanged from the eight Tailwind shades this replaced — the
+ * point was to move where they live, not what they look like.
+ */
+const RANK_CLASSES: Record<number, string> = {
+  1: 'bg-rank-1 text-rank-ink',
+  2: 'bg-rank-2 text-rank-ink',
+  3: 'bg-rank-3 text-rank-ink',
+  4: 'bg-rank-4 text-foreground',
+  5: 'bg-rank-5 text-rank-ink',
+  6: 'bg-rank-6 text-rank-ink',
+  7: 'bg-rank-7 text-foreground',
+  8: 'bg-rank-8 text-foreground',
 };
 
 export function FormGuide({ performances, playerNames }: FormGuideProps) {
@@ -55,8 +63,14 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
       const byEvent = new Map(perf.map((p) => [p.event, p]));
       const last5 = events.map((event) => byEvent.get(event) ?? null);
       const played = last5.filter((p) => p !== null);
-      const avgRank =
-        played.reduce((sum, p) => sum + p.rank, 0) / (played.length || 1);
+
+      // Infinity, not zero. Dividing by `played.length || 1` gave a manager
+      // with no result in the shown window an average of 0, which is better
+      // than first place — so a row of five dashes sorted above the actual
+      // league leader on a card whose whole job is to say who is in form.
+      const avgRank = played.length
+        ? played.reduce((sum, p) => sum + p.rank, 0) / played.length
+        : Number.POSITIVE_INFINITY;
 
       return {
         playerId: parseInt(id),
@@ -108,8 +122,9 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
                         CARD_CELL,
                         'flex items-center justify-center rounded-md text-xs font-bold md:text-sm',
                         perf
-                          ? (RANK_COLORS[perf.rank] ?? 'bg-white/10 text-white')
-                          : 'bg-white/5 font-normal text-white/20',
+                          ? (RANK_CLASSES[perf.rank] ??
+                              'bg-muted text-foreground')
+                          : 'bg-muted/40 font-normal text-muted-foreground/40',
                       )}
                     >
                       {perf ? perf.rank : '-'}

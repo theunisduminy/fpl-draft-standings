@@ -735,6 +735,23 @@ describe('buildHeadToHead', () => {
     });
   });
 
+  it('counts a pair who only ever drew as all draws, no wins and no losses', () => {
+    // The input behind a rendering defect: the grid coloured this pair as the
+    // heaviest defeat. The derivation was right all along; the colour was not.
+    const rows = buildHeadToHead([
+      performance(1, a, 1, 50),
+      performance(1, b, 1, 50),
+      performance(2, a, 1, 61),
+      performance(2, b, 1, 61),
+    ]);
+
+    expect(rows.find((row) => row.league_entry === a)).toMatchObject({
+      totalWon: 0,
+      totalDrawn: 2,
+      totalLost: 0,
+    });
+  });
+
   it('totals wins across every opponent', () => {
     const rows = buildHeadToHead([
       performance(1, a, 1, 60),
@@ -810,6 +827,33 @@ describe('buildPointsSpread', () => {
 
     expect(spread[0].scores).toEqual([30, 50, 70]);
     expect(spread[0].median).toBe(50);
+  });
+
+  it('summarises every manager on the same set of gameweeks', () => {
+    // Every existing case here is a single manager, so nothing pinned that two
+    // managers come back independently summarised — which is what the shared
+    // scale in the chart above is derived from.
+    const b = asLeagueEntryId(101);
+    const spread = buildPointsSpread([
+      performance(1, a, 1, 80),
+      performance(1, b, 2, 30),
+      performance(2, a, 2, 60),
+      performance(2, b, 1, 40),
+      performance(3, a, 1, 70),
+      performance(3, b, 2, 20),
+    ]);
+
+    expect(spread).toHaveLength(2);
+    expect(spread.find((s) => s.league_entry === a)).toMatchObject({
+      lowest: 60,
+      median: 70,
+      highest: 80,
+    });
+    expect(spread.find((s) => s.league_entry === b)).toMatchObject({
+      lowest: 20,
+      median: 30,
+      highest: 40,
+    });
   });
 
   it('omits a manager with no scored gameweeks rather than showing zeros', () => {

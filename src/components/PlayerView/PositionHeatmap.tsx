@@ -15,6 +15,7 @@ import {
   POSITION_LABELS,
   type PlayerDetails,
 } from '@/interfaces/players';
+import { heatStep, MIN_DECISIVE_MEETINGS } from '@/utils/chart-scales';
 import { cn } from '@/lib/utils';
 
 /**
@@ -61,8 +62,11 @@ const DARK_INK_FROM = 4;
 export function PositionHeatmap({ players }: { players: PlayerDetails[] }) {
   const rows = [...players].sort((a, b) => a.f1_ranking - b.f1_ranking);
 
+  // The scale for the whole grid, so a cell's colour means the same thing in
+  // every row. `heatStep` floors it, which is what stops a one-gameweek season
+  // painting every played cell at full intensity.
   const busiest = Math.max(
-    1,
+    0,
     ...rows.flatMap((player) =>
       POSITION_KEYS.map((key) => player.position_placed[key]),
     ),
@@ -130,24 +134,13 @@ export function PositionHeatmap({ players }: { players: PlayerDetails[] }) {
         {HEAT_STEPS.map((step) => (
           <span key={step} className={cn('h-3 w-5 rounded-sm', step)} />
         ))}
+        {/* What the brightest step actually stands for, which is the floored
+            scale rather than the raw busiest cell — otherwise the legend
+            promises an intensity the grid never reaches early in a season. */}
         <span className='text-xs text-muted-foreground'>
-          {busiest}
-          {busiest === 1 ? ' time' : ' times'}
+          {Math.max(MIN_DECISIVE_MEETINGS, busiest)} times
         </span>
       </div>
     </ChartCard>
   );
-}
-
-/**
- * Map a count onto the ramp, scaled to the busiest cell present.
- *
- * Zero is its own step rather than the bottom of the ramp: "never finished
- * here" is a different statement from "finished here least often", and the
- * grid is much easier to scan when the empties recede completely.
- */
-function heatStep(count: number, busiest: number): number {
-  if (count === 0) return 0;
-
-  return Math.max(1, Math.ceil((count / busiest) * (HEAT_STEPS.length - 1)));
 }
