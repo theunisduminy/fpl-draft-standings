@@ -203,11 +203,18 @@ html {
  * page background, and `border-radius: inherit` keeps the blur inside the
  * panel's rounded corners.
  *
+ * **It deliberately does not set `position`, and must not.** This rule is
+ * unlayered, and unlayered declarations beat everything in `@layer utilities` —
+ * so a `position: relative` here silently overrode the `fixed` on both
+ * navigations and dropped them into the page flow. The caller owns positioning:
+ * apply this to something already `fixed`, `absolute` or `relative`, and add
+ * Tailwind's `relative` if it is none of those. The pseudo-element needs a
+ * positioned ancestor, so without one the blur escapes to the nearest one.
+ *
  * Use this for a glass panel with content on it. `.glass` is still right for a
  * purely decorative surface.
  */
 .glass-panel {
-  position: relative;
   isolation: isolate;
 }
 
