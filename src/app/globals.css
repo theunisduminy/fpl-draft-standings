@@ -185,6 +185,43 @@ html {
   -webkit-backdrop-filter: blur(12px);
 }
 
+/*
+ * The same glass, painted *behind* the panel instead of on it.
+ *
+ * `backdrop-filter` blurs what is behind an element, but it also forces that
+ * element and its whole subtree onto one composited layer. Anything in that
+ * subtree landing on a fractional pixel gets resampled along with it — and the
+ * navigation items do: the bar is `left-3 right-3` on a 375px screen, so five
+ * `flex-1` items are 67.8px each and every icon after the first sits on a
+ * fraction. The result is a 20px glyph with 2px strokes redrawn between pixels,
+ * which reads as an out-of-focus icon.
+ *
+ * Moving the filter to a pseudo-element fixes it at the cause: the blur still
+ * samples the page behind the bar, but the icons and labels are no longer
+ * inside the filtered layer, so they rasterise as ordinary text. `isolation`
+ * keeps the `z-index: -1` inside this element rather than sending it behind the
+ * page background, and `border-radius: inherit` keeps the blur inside the
+ * panel's rounded corners.
+ *
+ * Use this for a glass panel with content on it. `.glass` is still right for a
+ * purely decorative surface.
+ */
+.glass-panel {
+  position: relative;
+  isolation: isolate;
+}
+
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgba(26, 5, 32, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 .glass-light {
   background: rgba(49, 6, 57, 0.6);
   backdrop-filter: blur(8px);

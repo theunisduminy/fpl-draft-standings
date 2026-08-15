@@ -245,7 +245,13 @@ export function draftResultsColumns(
         <Button
           variant='outline'
           size='sm'
-          className='h-8 gap-1.5 border-white/10 bg-white/5 px-2 text-xs text-white/70 hover:border-[#00edfd]/50 hover:text-[#00edfd]'
+          // `hover:bg-white/10` is not decoration, it is the fix: the `outline`
+          // variant ships `hover:bg-accent hover:text-accent-foreground`, and
+          // `--accent` *is* this cyan. The `hover:text-[#00edfd]` beside it
+          // beats `accent-foreground`, so without a background of our own the
+          // label turned cyan on cyan and vanished under the cursor. Restating
+          // the background keeps the subtle-outline treatment that was meant.
+          className='h-8 gap-1.5 border-white/10 bg-white/5 px-2 text-xs text-white/70 hover:border-[#00edfd]/50 hover:bg-white/10 hover:text-[#00edfd]'
           onClick={() => onViewTeam(result)}
         >
           <Eye className='h-3.5 w-3.5' />

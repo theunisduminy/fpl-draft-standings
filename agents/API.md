@@ -1,11 +1,11 @@
 ---
 name: Better Draft — API reference
-last_updated: 2026-08-13
+last_updated: 2026-08-15
 ---
 
 # API.md — Every API We Call, and What Comes Back
 
-Supporting reference doc, read on demand. This is the contract sheet for the two
+Supporting reference doc, read on demand. This is the contract sheet for the three
 Premier League APIs this app reads and the few routes it still exposes. If you are about
 to `fetch()` anything, read the relevant section first — several of these endpoints
 behave in ways the field names do not suggest.
@@ -18,19 +18,20 @@ behave in ways the field names do not suggest.
 
 ---
 
-## The two upstream APIs
+## The three upstream APIs
 
-Both are public, unauthenticated, undocumented, and season-scoped. Neither is versioned,
+All three are public, unauthenticated, undocumented, and season-scoped. None is versioned,
 so treat every shape here as observed rather than guaranteed.
 
-| API                       | Base URL                                | What it gives us                                   |
-| ------------------------- | --------------------------------------- | -------------------------------------------------- |
-| **Draft** (`draft.*`)     | `https://draft.premierleague.com/api`   | The league, its entries, standings, picks, scoring |
-| **Classic** (`fantasy.*`) | `https://fantasy.premierleague.com/api` | Clubs, gameweek metadata, the 380 fixtures         |
+| API                       | Base URL                                     | What it gives us                                   |
+| ------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| **Draft** (`draft.*`)     | `https://draft.premierleague.com/api`        | The league, its entries, standings, picks, scoring |
+| **Classic** (`fantasy.*`) | `https://fantasy.premierleague.com/api`      | Clubs, gameweek metadata, the 380 fixtures         |
+| **Pulse**                 | `https://footballapi.pulselive.com/football` | The **real** league table, fixtures and results    |
 
-Every URL is built by `fplApi` in [`src/utils/fpl-api.ts`](../src/utils/fpl-api.ts).
-That module is the only place upstream URLs are allowed to be written. It is
-`server-only`, so none of this reaches the browser.
+Every URL is built in [`src/utils/fpl-api.ts`](../src/utils/fpl-api.ts) — `fplApi` for the
+two FPL games, `pulseApi` for Pulse. That module is the only place upstream URLs are
+allowed to be written. It is `server-only`, so none of this reaches the browser.
 
 ### The league ID is an environment variable
 
@@ -440,6 +441,177 @@ All 380 fixtures. No consumer in the app; `fplApi.fixtures()` builds the URL.
 ```
 
 `team_h` / `team_a` are `teams[].id` from bootstrap-static.
+
+---
+
+## Pulse API (`footballapi.pulselive.com/football`)
+
+The API behind premierleague.com itself. It answers the one question neither FPL game can:
+**what is the actual league table?**
+
+The classic bootstrap's `teams` objects carry `played`, `win`, `draw`, `loss`, `points` and
+`position` — and leave every one of them at `0`. Deriving a table from finished fixtures
+instead was considered and rejected: it cannot see a points deduction, so it would disagree
+with the official table by a few points in exactly the season where that matters, and it
+would do it silently. **There is deliberately no fallback.** If Pulse is unreachable,
+`/premier-league` says so.
+
+URLs are built by `pulseApi` in [`src/utils/fpl-api.ts`](../src/utils/fpl-api.ts), and read
+through `fetchPulse` — not `fetchUpstream`.
+
+### Every request needs an `Origin` header
+
+```
+Origin: https://www.premierleague.com
+```
+
+No key, no cookie, nothing else. Without it the response is a `403`, which reads as "the
+Premier League page is down" rather than as a missing header — hence `fetchPulse` existing
+at all, so no call site can forget.
+
+> **Unverified from a laptop:** whether Pulse serves Vercel's egress IPs. It works from a
+> development machine and from CI. Check the deployed page after the first production
+> release; if it 403s there and not locally, that is the cause, not the header.
+
+### `compSeasons` is season-scoped — never hard-code it
+
+Exactly like `FPL_LEAGUE_ID`. A new ID is minted every summer.
+
+### `GET /competitions/1/compseasons?pageSize=50`
+
+Competition `1` is the Premier League. Returns `{ pageInfo, content: [{ id, label }] }`.
+
+```json
+{ "id": 841, "label": "English Premier League Season 2026/2027" },
+{ "id": 777, "label": "2025/26" },
+{ "id": 719, "label": "2024/25" }
+```
+
+> **Pick the highest `id`; never parse the label.** Those three lines are one real response.
+> The labels are not one format, and `"2025/26"` sorts above `"English Premier League…"`
+> alphabetically. `newestCompSeasonId()` takes the max, and a test pins it.
+
+### `GET /standings?compSeasons={id}&altIds=true&detail=2`
+
+The league table. `detail=2` is what adds `form`, `annotations` and the home/away splits;
+without it you get positions and totals only.
+
+```json
+{
+  "compSeason": { "id": 841, "label": "…" },
+  "tables": [
+    {
+      "gameWeek": 0,
+      "entries": [
+        {
+          "team": {
+            "name": "Arsenal",
+            "id": 1,
+            "club": { "name": "Arsenal", "abbr": "ARS", "id": 1 },
+            "altIds": { "opta": "t3" }
+          },
+          "position": 1,
+          "startingPosition": 1,
+          "overall": {
+            "played": 0,
+            "won": 0,
+            "drawn": 0,
+            "lost": 0,
+            "goalsFor": 0,
+            "goalsAgainst": 0,
+            "goalsDifference": 0,
+            "points": 0
+          },
+          "home": { "…": "same shape" },
+          "away": { "…": "same shape" },
+          "form": [],
+          "annotations": [{ "type": "Q", "destination": "EU_CL" }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+> **Out of season this returns all 20 clubs on zero, not an empty array.** `entries.length`
+> is `20` in August, so a length or truthy check answers "we have a table" about a page of
+> noughts — the same trap as `elements: {}` on the draft live endpoint. The tell is
+> `tables[0].gameWeek`, which is `0` until the first match. Go through `hasSeasonStarted()`.
+
+- **`form`** is an array of past _fixtures_, not letters. Whether `outcome: "H"` is a win
+  depends on which side of `teams` the club was on — `formFrom()` derives it, and a test
+  pins the away case.
+- **`startingPosition`** is absent pre-season, which is why `movement` is `number | null`
+  rather than defaulting to `0`.
+- **`annotations[].destination`** — the four observed values are not the ones the branding
+  suggests. Verified against two seasons:
+
+  | Code    | Means             | Seen in          |
+  | ------- | ----------------- | ---------------- |
+  | `EU_CL` | Champions League  | 2024/25, 2026/27 |
+  | `EU_EL` | Europa League     | 2026/27          |
+  | `EU_UC` | Conference League | 2024/25          |
+  | `EN_CH` | Relegation        | 2026/27          |
+
+  **Relegation is `EN_CH`** — Pulse names the _destination competition_, the English
+  Championship, not a status. There is no `RELEGATED`, and the Conference League is `EU_UC`
+  rather than `EU_UECL`. `LeagueTable` looks each code up and renders no stripe for one it
+  does not know, so a fifth code appearing is a missing marker, never a wrong one.
+
+### `GET /fixtures?comps=1&compSeasons={id}&pageSize=400&page=0&sort=asc&statuses=U,L,C&altIds=true`
+
+All 380 fixtures in **one** response — at `pageSize=400` the reply is `numPages: 1`, so this
+never needs paging. `statuses=U,L,C` is upcoming, live and complete, which is everything.
+
+```json
+{
+  "gameweek": { "gameweek": 1, "compSeason": { "id": 841 } },
+  "kickoff": { "millis": 1787338800000, "label": "Fri 21 Aug 2026, 20:00 BST" },
+  "teams": [
+    { "team": { "name": "Arsenal", "altIds": { "opta": "t3" } }, "score": 2 },
+    {
+      "team": { "name": "Coventry City", "altIds": { "opta": "t9" } },
+      "score": 0
+    }
+  ],
+  "ground": { "name": "Emirates Stadium", "city": "London" },
+  "status": "C",
+  "outcome": "H",
+  "clock": { "secs": 5700, "label": "90+5'00" },
+  "goals": [
+    { "personId": 25474, "assistId": 67546, "clock": { "label": "74'00" } }
+  ],
+  "id": 128923,
+  "altIds": { "opta": "g2645195" }
+}
+```
+
+- **`teams` is `[home, away]` by position.** Pulse encodes the venue by index, not by a
+  field, so nothing may sort or filter that array in place.
+- **`status`** is `U` upcoming, `L` live, `C` complete — a real state machine, where the
+  classic API spreads the same information over `started`, `finished` and
+  `finished_provisional`.
+- **`score` is absent until kick-off, and `0` is a real score.** Test
+  `typeof score === 'number'`, never truthiness, or a completed goalless draw renders as a
+  fixture yet to be played.
+- **`clock` survives full time** (`90+5'00` on a finished match), so it is only shown while
+  `status` is `L`.
+- **`goals[]` carries `personId`, not a name.** Rendering scorers would need a further
+  lookup; the app does not currently do it.
+- **`altIds.opta`** is `"g" + the classic API's fixture `code``, if a Premier League result
+  ever needs joining to an FPL gameweek.
+
+### The crest join is free
+
+`team.altIds.opta` is `"t"` followed by **exactly** the `teams[].code` the classic bootstrap
+uses — verified across all 20 clubs of the 2026/27 season (`ARS → t3`, `BOU → t91`,
+`BRE → t94`). Since [`clubCrestUrl`](../src/utils/pl-assets.ts) builds
+`…/badges/t{code}.svg`, Pulse hands over the crest key directly.
+
+That is why `/premier-league` makes **no FPL call at all** and needs no club mapping table.
+`optaTeamCode()` recovers the number, and a club whose alt-ID does not parse is dropped
+rather than rendered with a guessed code — the asset host answers a wrong code with `403`,
+which is a broken image and nothing in the log.
 
 ---
 
