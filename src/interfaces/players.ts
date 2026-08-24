@@ -121,6 +121,14 @@ export interface GameweekPerformance {
   league_entry: LeagueEntryId;
   event_total: number;
   rank: number;
+  /**
+   * Whether this result is settled.
+   *
+   * `false` means the gameweek is still being played: the points and the rank
+   * are real and current, but they will move. Only a `true` performance may be
+   * written to the database — see `season-state.ts` for how that is decided,
+   * and `storeFinalisedGameweeks` for the guard that enforces it.
+   */
   finished: boolean;
 }
 
@@ -129,7 +137,21 @@ export interface GameweekDataResponse {
   players: PlayerDetails[];
   gameweekPerformances: GameweekPerformance[];
   currentGameweek: number;
-  completedGameweeks: number[];
+  /**
+   * Every gameweek with a result to show, newest first — **including one still
+   * being played**. Formerly `completedGameweeks`, which was a lie the moment
+   * the app started showing an in-flight week; check `provisionalGameweek` to
+   * tell them apart.
+   */
+  scoredGameweeks: number[];
+  /**
+   * The gameweek in `scoredGameweeks` that is still in progress, or `null`.
+   *
+   * Every surface that shows a rank drawn from it has to say so. A provisional
+   * F1 score presented as final is the difference between a live scoreboard and
+   * a wrong one.
+   */
+  provisionalGameweek: number | null;
   rumblerData: RumblerGameweekData[];
 }
 

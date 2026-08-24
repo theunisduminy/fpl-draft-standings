@@ -21,6 +21,7 @@ import {
   buildLeagueLedger,
   buildPointsSpread,
   buildRumblerData,
+  hasBeenPlayed,
   rankByPoints,
   scoreGameweek,
   standingsByGameweek,
@@ -47,11 +48,29 @@ function makeEntries(count: number): LeagueEntry[] {
   }));
 }
 
-/** A live feed where element `n` scored `n` points. */
+/** A live feed where element `n` scored `n` points, having played 90 minutes. */
 function makeLive(elementIds: ElementId[]): EventLive {
   return {
     elements: Object.fromEntries(
-      elementIds.map((id) => [String(id), { stats: { total_points: id } }]),
+      elementIds.map((id) => [
+        String(id),
+        { stats: { total_points: id, minutes: 90 } },
+      ]),
+    ),
+  };
+}
+
+/**
+ * The shape that broke GW1 of 2026/27: every element in the game listed, all of
+ * them on zero, hours before the first kick-off. Truthy, and 609 keys long.
+ */
+function makeUnplayedLive(elementIds: ElementId[]): EventLive {
+  return {
+    elements: Object.fromEntries(
+      elementIds.map((id) => [
+        String(id),
+        { stats: { total_points: 0, minutes: 0 } },
+      ]),
     ),
   };
 }
@@ -125,7 +144,7 @@ describe('scoreGameweek', () => {
 
   it('sums the starting XI only, ignoring the bench', () => {
     // Every pick is element 1, worth 1 point. 15 picks, 11 of them starters.
-    const scored = scoreGameweek(1, makeLive([asElementId(1)]), picks);
+    const scored = scoreGameweek(1, makeLive([asElementId(1)]), picks, true);
 
     expect(scored).toHaveLength(3);
     expect(scored.every((p) => p.event_total === 11)).toBe(true);
@@ -134,26 +153,98 @@ describe('scoreGameweek', () => {
   it('returns nothing when the live feed is an empty object', () => {
     // `{}` is truthy. Without the key count every manager scores 0, ties on
     // rank 1, and banks a win for a gameweek that has not been played.
-    expect(scoreGameweek(1, { elements: {} }, picks)).toEqual([]);
+    expect(scoreGameweek(1, { elements: {} }, picks, true)).toEqual([]);
   });
 
   it('returns nothing when the live request failed', () => {
-    expect(scoreGameweek(1, null, picks)).toEqual([]);
+    expect(scoreGameweek(1, null, picks, true)).toEqual([]);
   });
 
   it('returns nothing when no manager has picks', () => {
     const empty = entries.map((e) => ({ league_entry: e.id, picks: [] }));
-    expect(scoreGameweek(1, makeLive([asElementId(1)]), empty)).toEqual([]);
+    expect(scoreGameweek(1, makeLive([asElementId(1)]), empty, true)).toEqual(
+      [],
+    );
   });
 
   it('scores an element missing from the live feed as zero, not NaN', () => {
-    const scored = scoreGameweek(1, makeLive([asElementId(999)]), picks);
+    const scored = scoreGameweek(1, makeLive([asElementId(999)]), picks, true);
     expect(scored.every((p) => p.event_total === 0)).toBe(true);
   });
 
   it('stamps every performance with the gameweek it came from', () => {
-    const scored = scoreGameweek(7, makeLive([asElementId(1)]), picks);
+    const scored = scoreGameweek(7, makeLive([asElementId(1)]), picks, true);
     expect(scored.every((p) => p.event === 7)).toBe(true);
+  });
+
+  it('returns nothing when the live feed is full but nobody has played', () => {
+    // The GW1 2026/27 bug, exactly. `elements` has 609 keys, so the key count
+    // says "scored"; every manager sums to 0, ties on rank 1, banks a win and
+    // 20 F1 points — and the caller then wrote it to the database as final.
+    const unplayed = makeUnplayedLive([
+      asElementId(1),
+      asElementId(2),
+      asElementId(3),
+    ]);
+
+    expect(scoreGameweek(1, unplayed, picks, true)).toEqual([]);
+  });
+
+  it('scores a gameweek where one element has played and the rest have not', () => {
+    // The other half of the same rule: a gameweek two minutes old is a real
+    // gameweek. Only *nothing at all* means "not started".
+    const live: EventLive = {
+      elements: {
+        '1': { stats: { total_points: 0, minutes: 12 } },
+        '2': { stats: { total_points: 0, minutes: 0 } },
+      },
+    };
+
+    expect(scoreGameweek(1, live, picks, true)).toHaveLength(3);
+  });
+
+  it('carries the finished flag onto every performance', () => {
+    // What decides whether the caller may persist the gameweek.
+    const live = makeLive([asElementId(1)]);
+
+    expect(
+      scoreGameweek(1, live, picks, false).every((p) => p.finished === false),
+    ).toBe(true);
+    expect(
+      scoreGameweek(1, live, picks, true).every((p) => p.finished === true),
+    ).toBe(true);
+  });
+});
+
+describe('hasBeenPlayed', () => {
+  it('is false for an absent feed and an empty one', () => {
+    expect(hasBeenPlayed(null)).toBe(false);
+    expect(hasBeenPlayed({ elements: {} })).toBe(false);
+  });
+
+  it('is false for a full feed of untouched elements', () => {
+    expect(
+      hasBeenPlayed(makeUnplayedLive([asElementId(1), asElementId(2)])),
+    ).toBe(false);
+  });
+
+  it('is true as soon as one element has minutes, even on zero points', () => {
+    expect(
+      hasBeenPlayed({ elements: { '1': { stats: { minutes: 3 } } } }),
+    ).toBe(true);
+  });
+
+  it('is true on points alone, in case a feed omits minutes', () => {
+    expect(
+      hasBeenPlayed({ elements: { '1': { stats: { total_points: 6 } } } }),
+    ).toBe(true);
+  });
+
+  it('is true for a negative score, which is a real result', () => {
+    // A red card can put a manager's element below zero. `!== 0`, not `> 0`.
+    expect(
+      hasBeenPlayed({ elements: { '1': { stats: { total_points: -1 } } } }),
+    ).toBe(true);
   });
 });
 

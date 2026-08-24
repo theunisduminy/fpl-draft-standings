@@ -50,9 +50,12 @@ export function buildPlayerProfile(
 
   if (!player) return null;
 
+  // The gameweek in progress counts, exactly as it does in the standings and on
+  // the results table. It has to: `f1_score` on the player already includes it,
+  // so filtering it out here would show a manager 20 F1 points from a season of
+  // "0 gameweeks played". One season, one set of numbers.
   const gameweeks = data.gameweekPerformances.filter(
-    (performance) =>
-      performance.league_entry === leagueEntry && performance.finished,
+    (performance) => performance.league_entry === leagueEntry,
   );
 
   return {

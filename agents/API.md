@@ -1,6 +1,6 @@
 ---
 name: Better Draft — API reference
-last_updated: 2026-08-15
+last_updated: 2026-08-24
 ---
 
 # API.md — Every API We Call, and What Comes Back
@@ -97,8 +97,12 @@ A third trap is not season-related but caused the same symptom:
 ### `GET /api/game`
 
 Game-wide state. **Available year-round**, which makes it the dependable way to ask
-whether the season has started. Not currently called by the app; prefer it over
-`event-status` for any new "is the season live?" logic.
+whether the season has started — and the senior half of the "is this gameweek over?"
+decision, because `event-status` cannot answer it alone (see the warning below it).
+
+`current_event` is `null` pre-season. `current_event_finished` flips when the last
+whistle of the gameweek blows, which is _earlier_ than `leagues_updated` — that one waits
+for the draft league to be scored, bonus points included. The app requires both.
 
 ```json
 {
@@ -113,28 +117,68 @@ whether the season has started. Not currently called by the app; prefer it over
 
 ### `GET /api/pl/event-status`
 
-Per-gameweek processing status. Drives which gameweeks are considered complete.
+Processing status. Read the warning before using it — the name and the field names both
+describe a gameweek, and the payload is a gameweek's **match days**.
+
+Observed 2026-08-24, mid-GW1:
 
 ```json
 {
   "status": [
     {
-      "bonus_added": true,
-      "date": "2026-05-01",
-      "event": 35,
+      "bonus_added": false,
+      "date": "2026-08-21",
+      "event": 1,
       "leagues_updated": true,
-      "points": "r"
+      "points": "p"
+    },
+    {
+      "bonus_added": false,
+      "date": "2026-08-22",
+      "event": 1,
+      "leagues_updated": true,
+      "points": "p"
+    },
+    {
+      "bonus_added": false,
+      "date": "2026-08-23",
+      "event": 1,
+      "leagues_updated": true,
+      "points": "p"
+    },
+    {
+      "bonus_added": false,
+      "date": "2026-08-24",
+      "event": 1,
+      "leagues_updated": false,
+      "points": ""
     }
   ],
-  "leagues": "Updated"
+  "leagues": ""
 }
 ```
 
-- `leagues_updated: true` means that gameweek's league scoring is final. This is the
-  field `getGameweekData()` uses to decide `maxCompletedGameweek`.
+> [!WARNING]
+> **One row per date, not per gameweek.** `leagues_updated` means "the league table was
+> brought up to date after _that day's_ matches", so it goes true on the opening Friday
+> night with three days of football still to play. `status.some((s) => s.leagues_updated)`
+> — or `Math.max` over the filtered rows — therefore reports the gameweek complete while
+> it is still being played. That is exactly what happened to GW1 of 2026/27: combined
+> with the all-zero live feed below, the app wrote eight managers on 0 points and joint
+> first into `gameweek_scores` as final, paying every one of them a win and 20 F1 points.
+> A finalised gameweek is never refetched, so it stayed wrong until the rows were
+> deleted by hand.
+>
+> A gameweek is finished only when **every** row for that event says `leagues_updated`
+> **and** `/api/game` says `current_event_finished`. That rule lives in one place:
+> `deriveSeasonState()` in [`src/utils/season-state.ts`](../src/utils/season-state.ts).
+
+- Rows only cover the current gameweek's dates, so nothing in this payload can speak for
+  earlier gameweeks. `current_event` moving on is the evidence that those are done.
 - **404s pre-season** with the bare string `"Game not started"` — see the warning above.
 
-Consumed by: `fetchEventStatus()` in `gameweek-data.ts`.
+Consumed by: `fetchEventStatus()` in `gameweek-data.ts`, and only ever through
+`deriveSeasonState()`.
 
 ### `GET /api/league/{leagueId}/details`
 
@@ -257,10 +301,20 @@ Live per-player stats for one gameweek. Two keys: `elements` and `fixtures`.
 }
 ```
 
-The app reads exactly one field: `elements[id].stats.total_points`.
+The app reads two fields: `elements[id].stats.total_points` to score, and
+`elements[id].stats.minutes` to decide whether the gameweek has started at all.
 
-> _Unverified pre-season_ — `elements` is `{}` today, so the inner `stats` shape above
-> is from the code's usage, not an observed payload. Confirm after GW1.
+Verified 2026-08-24, mid-GW1: 609 elements, 279 of them with `minutes > 0`.
+
+> [!WARNING]
+> **A full `elements` map is not the same as a scored gameweek.** There are two "nothing
+> yet" shapes and they arrive in sequence: `{}` before the gameweek's fixtures exist, then
+> **every element in the game on `minutes: 0` and `total_points: 0`** from the moment they
+> do — hours before kick-off. `Object.keys(elements).length === 0` catches the first and
+> not the second, which is how eight managers summed to 0, tied on rank 1, and were
+> written to the database as final. Go through `hasBeenPlayed()` in
+> [`src/utils/scoring.ts`](../src/utils/scoring.ts), which asks whether anyone has
+> actually taken the field.
 
 ### `GET /api/entry/{entryId}/event/{gameweek}`
 
@@ -280,9 +334,20 @@ sheet in the results drawer — a historical question, which is why it uses pick
 than `element-status` the way the squads page does. It treats the 404 as "no team sheet",
 which is an empty state, not an error.
 
-> _Still 404 as of 2026-08-13_, the day after the draft — the endpoint stays unavailable
-> until GW1 is actually played, not merely until squads exist. **To read a squad before the
-> season starts, use `element-status` instead.** Confirm the full pick shape after GW1.
+Verified 2026-08-24: `picks[]` carries `element`, `position`, `is_captain`,
+`is_vice_captain` and `multiplier`. The draft game has no captaincy, so `multiplier` is
+`1` on all fifteen and the app ignores it.
+
+> _404 as of 2026-08-13_, the day after the draft — the endpoint stays unavailable until
+> the gameweek's deadline passes, not merely until squads exist. **To read a squad before
+> the season starts, use `element-status` instead.**
+
+> [!NOTE]
+> **The starting-XI sum can differ from `standings[].event_total` by a point or two
+> mid-gameweek**, because the standings table refreshes on its own schedule while the live
+> feed is immediate. Observed on 2026-08-24: one manager on 26 by our sum, 24 upstream.
+> The app prefers its own sum — it is fresher, and it is the same rule used for every
+> finalised gameweek, so a provisional rank does not change method when it settles.
 
 ### `GET /api/league/{leagueId}/element-status`
 
@@ -705,14 +770,20 @@ on zero, and results and rumblers show their empty-state copy.
 [`src/utils/gameweek-data.ts`](../src/utils/gameweek-data.ts) is the whole data layer.
 One call:
 
-1. Reads `FPL_LEAGUE_ID`, then fetches league details and event status in parallel.
-2. Derives `maxCompletedGameweek` from `status[].leagues_updated`.
-3. For every completed gameweek, fetches the live data **and all 8 entries' picks**,
-   in batches of 5 gameweeks.
+1. Reads `FPL_LEAGUE_ID`, then fetches league details, event status, `/api/game` and the
+   two database reads in parallel.
+2. Derives `{ currentGameweek, finalisedThrough }` through `deriveSeasonState()` — the
+   only place "is this gameweek over?" is decided.
+3. For every **finalised** gameweek not already stored, fetches the live data **and all 8
+   entries' picks**, in batches of 5, and writes the result to `gameweek_scores`.
 4. Sums `total_points` over each entry's starting XI (`position <= 11`).
 5. Ranks the 8 entries within the gameweek and awards F1 points —
    `[20, 15, 12, 10, 8, 6, 4, 2]`.
-6. Aggregates into `players`, `rumblerData`, `completedGameweeks`.
+6. **Scores the gameweek in flight the same way and never stores it**, marking it
+   `finished: false` and naming it in `provisionalGameweek`. A league table that ignores
+   the weekend being played is wrong on the one day everybody looks at it; a provisional
+   rank shown as settled is worse. Both are needed, which is what the flag is for.
+7. Aggregates into `players`, `rumblerData`, `scoredGameweeks`.
 
 **The cost is the problem.** Each gameweek costs `1 + 8 = 9` upstream calls, and the
 whole history is recomputed from scratch:
@@ -724,11 +795,17 @@ whole history is recomputed from scratch:
 | 20                  | 180            |
 | 38                  | 342            |
 
-Plus two fixed calls. Two caches sit in front of this — a 1-hour TTL `Map` in
-`src/utils/cache.ts` with promise deduplication, and Next's own `fetch` cache
+Plus three fixed calls, and nine more for the gameweek in flight, which is recomputed on
+every cache miss rather than stored. Two caches sit in front of this — a 5-minute TTL
+`Map` in `src/utils/cache.ts` with promise deduplication, and Next's own `fetch` cache
 (`revalidate: 300`) — but **the `Map` is module scope, so it dies with every
 serverless instance.** On Vercel, a cold request late in the season pays the full
 344-call bill.
+
+The TTL matches the `revalidate` on the calls beneath it. It was an hour, on the
+reasoning that FPL data changes once per gameweek; that stopped being true when the
+season started including the gameweek in progress, and caching an aggregate for longer
+than its own inputs froze a live score at whatever it was an hour ago.
 
 That cost, not upstream latency, is the argument for persisting finished gameweeks.
 See [ARCHITECTURE.md → Where to draw the persistence line](./ARCHITECTURE.md#where-to-draw-the-persistence-line).

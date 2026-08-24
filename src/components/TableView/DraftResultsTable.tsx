@@ -8,6 +8,7 @@ import { GameweekSelector } from '@/components/GameweekSelector';
 import { useViewTeam, ViewTeamDrawer } from './ViewTeamDrawer';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 import { TrendingUp, TrendingDown, BarChart3, Minus } from 'lucide-react';
 
 export default function DraftResultsTable({
@@ -21,10 +22,10 @@ export default function DraftResultsTable({
   // 19 flags.
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
 
-  const gameweeks = data.completedGameweeks;
+  const gameweeks = data.scoredGameweeks;
   const requestedGameweek = Number(useSearchParams().get('gw'));
 
-  // `completedGameweeks` arrives newest-first.
+  // `scoredGameweeks` arrives newest-first.
   const activeGameweek =
     selectedGameweek ??
     (gameweeks.includes(requestedGameweek)
@@ -49,8 +50,12 @@ export default function DraftResultsTable({
   const formattedResults: GameweekResult[] = useMemo(() => {
     if (!activeGameweek) return [];
 
+    // No `finished` filter. The gameweek in progress is the one worth looking
+    // at on a Sunday, and hiding it left this table showing last week while the
+    // standings above it had already moved on. `isProvisional` below is how the
+    // reader is told the difference.
     const gameweekResults = data.gameweekPerformances
-      .filter((gw) => gw.event === activeGameweek && gw.finished)
+      .filter((gw) => gw.event === activeGameweek)
       .sort((a, b) => a.rank - b.rank);
 
     return gameweekResults.map((gw) => {
@@ -62,8 +67,7 @@ export default function DraftResultsTable({
         const previousRank = data.gameweekPerformances.find(
           (prevGw) =>
             prevGw.event === previousGameweek &&
-            prevGw.league_entry === gw.league_entry &&
-            prevGw.finished,
+            prevGw.league_entry === gw.league_entry,
         )?.rank;
 
         if (previousRank !== undefined) {
@@ -81,6 +85,8 @@ export default function DraftResultsTable({
       };
     });
   }, [data, activeGameweek]);
+
+  const isProvisional = activeGameweek === data.provisionalGameweek;
 
   // One drawer for the whole table; the rows only name a target.
   const viewTeam = useViewTeam(activeGameweek);
@@ -137,6 +143,8 @@ export default function DraftResultsTable({
         onSelectGameweek={selectGameweek}
       />
 
+      {isProvisional && <LiveGameweekBadge gameweek={activeGameweek} />}
+
       <BaseTable
         title=''
         subtitle=''
@@ -150,8 +158,10 @@ export default function DraftResultsTable({
       {summaryStats && (
         <Card className='border-white/10 bg-[#2a0d33]'>
           <CardHeader className='pb-3'>
+            {/* Sentence case, per the UI display rules in AGENTS.md. */}
             <CardTitle className='text-base text-white md:text-lg'>
-              Gameweek {activeGameweek} Summary
+              Gameweek {activeGameweek} summary
+              {isProvisional && ' so far'}
             </CardTitle>
           </CardHeader>
           <CardContent>

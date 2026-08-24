@@ -332,7 +332,13 @@ async function finaliseGameweeks(): Promise<string> {
   // happened. Writing is the point, so it goes straight to the computation.
   const season = await computeSeasonUncached();
 
-  return `${season.completedGameweeks.length} completed gameweek(s)`;
+  const finalised = season.scoredGameweeks.filter(
+    (gameweek) => gameweek !== season.provisionalGameweek,
+  );
+
+  return season.provisionalGameweek
+    ? `${finalised.length} finalised gameweek(s), GW${season.provisionalGameweek} in flight`
+    : `${finalised.length} finalised gameweek(s)`;
 }
 
 async function step(
