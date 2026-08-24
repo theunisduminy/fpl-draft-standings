@@ -178,10 +178,32 @@ export interface EntryPick {
 /** `/api/event/{gw}/live` — per-element stats, keyed by element ID. */
 export interface EventLive {
   /**
-   * **Empty (`{}`) for a gameweek that has not been scored**, which is truthy.
-   * Always check `Object.keys(...).length` — see agents/AGENTS.md.
+   * **Empty (`{}`) for a gameweek that has not been scored**, which is truthy —
+   * and, once the gameweek's fixtures exist, **populated with every element on
+   * zero before a ball is kicked**, which is worse. Counting the keys catches
+   * the first and not the second. Go through `hasBeenPlayed` in `scoring.ts`,
+   * which asks whether anyone has actually taken the field.
    */
-  elements: Record<string, { stats?: { total_points?: number } }>;
+  elements: Record<
+    string,
+    { stats?: { total_points?: number; minutes?: number } }
+  >;
+}
+
+/**
+ * `/api/game` — the draft game's own state.
+ *
+ * The one endpoint that answers year-round, so it is the dependable source for
+ * "which gameweek is it, and is it over?". `current_event` is `null` before the
+ * season starts. See `season-state.ts` for why `event-status` cannot answer
+ * that second question on its own.
+ */
+export interface GameState {
+  current_event: number | null;
+  current_event_finished: boolean;
+  next_event: number | null;
+  processing_status: string;
+  waivers_processed: boolean;
 }
 
 /**

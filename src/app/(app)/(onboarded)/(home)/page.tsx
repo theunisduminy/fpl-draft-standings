@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { getGameweekData } from '@/utils/gameweek-data';
 import { standingsByGameweek, standingsMovement } from '@/utils/scoring';
 import { StandingsTabs } from '@/components/TableView/StandingsTabs';
+import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 import { StandingsSkeleton } from '@/components/TableView/StandingsSkeleton';
 import { SkeletonRegion } from '@/components/SkeletonRegion';
 import { PageShell } from '@/components/Layout/PageShell';
@@ -50,10 +51,18 @@ async function Standings() {
   const snapshots = standingsByGameweek(data.gameweekPerformances);
 
   return (
-    <StandingsTabs
-      data={data}
-      snapshots={snapshots}
-      movement={standingsMovement(snapshots)}
-    />
+    <div className='space-y-4'>
+      {/* Inside the boundary, not in `PageShell`'s `action` slot: whether a
+          gameweek is in flight is a fact about the data, and the heading is
+          painted before the data is read. */}
+      {data.provisionalGameweek !== null && (
+        <LiveGameweekBadge gameweek={data.provisionalGameweek} />
+      )}
+      <StandingsTabs
+        data={data}
+        snapshots={snapshots}
+        movement={standingsMovement(snapshots)}
+      />
+    </div>
   );
 }

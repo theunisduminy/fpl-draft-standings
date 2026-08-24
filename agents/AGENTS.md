@@ -201,13 +201,19 @@ tolerable because it happens once per server, behind a cache, not once per visit
 
 ## Read API.md before you fetch
 
-The FPL APIs are undocumented, unversioned, and change shape between seasons. Three
-specific behaviours have already caused real bugs in this repo:
+The FPL APIs are undocumented, unversioned, and change shape between seasons. Every one of
+these behaviours has already caused a real bug in this repo:
 
 - `/api/pl/event-status` **404s with the bare string `"Game not started"`** out of season —
   not an object. Destructuring it throws.
+- `/api/pl/event-status` returns **one row per date, not per gameweek**. `leagues_updated`
+  goes true on a gameweek's opening Friday night with three days still to play, so
+  `some(leagues_updated)` declares it complete. Ask `deriveSeasonState()`.
 - `/api/event/{gw}/live` returns `elements: {}` for unscored gameweeks, and **`{}` is
   truthy**. A naive guard lets every player score 0, tie on rank 1, and bank a win.
+- `/api/event/{gw}/live` then returns **all ~609 elements on zero** from the moment the
+  gameweek's fixtures exist, hours before kick-off. Counting keys does not catch that one.
+  Ask `hasBeenPlayed()`.
 - **`league_entries[].id` and `league_entries[].entry_id` are different numbers.** `id` is
   the league entry (what we use as the player ID everywhere); `entry_id` goes in
   `/api/entry/...` URLs.
@@ -254,6 +260,38 @@ awards points.
 **And `0` is a real value, not "not yet".** Test `typeof score === 'number'`, never
 truthiness, or a completed goalless draw renders as a fixture still to kick off. Any field
 where "none" and "not known yet" are both plausible needs the same care.
+
+**Nor is a full collection proof of data.** Both traps above are the same mistake at two
+scales: `{}` is the empty shape, and 609 elements on `minutes: 0` is the _populated_ shape
+of the same nothing. Counting the container answers a question about the container. Ask
+whether anything inside it actually happened.
+
+### A gameweek is over when two sources agree, and never before
+
+This is the most expensive rule in the codebase, because getting it wrong is
+**unrecoverable without a manual delete**. `gameweek_scores` is written
+`onConflictDoNothing` and a finalised gameweek is never refetched, so a gameweek stored
+early stays wrong for the season.
+
+It cost a real one. On 2026-08-21, before a ball was kicked in GW1, `event-status` said
+`leagues_updated` for that day and the live feed had 609 elements in it. The app wrote all
+eight managers on 0 points, tied on rank 1 — a win and 20 F1 points each — and served that
+for three days.
+
+- **`deriveSeasonState()` in `src/utils/season-state.ts` is the only place that decides.**
+  A gameweek below `current_event` is over; `current_event` itself is over only when
+  `/api/game` says `current_event_finished` **and** every `event-status` row for it says
+  `leagues_updated`.
+- **The gameweek in flight is shown, never stored.** It is scored by the same rule, marked
+  `finished: false`, named in `provisionalGameweek`, and recomputed on every cache miss.
+  Hiding it would make the site wrong on the one day everybody looks at it; showing it as
+  settled would be worse. Every surface that renders a rank drawn from it says so.
+- **`storeFinalisedGameweeks` refuses what it must not freeze** — anything provisional,
+  and any gameweek where every manager scored 0. It filters and logs rather than throwing,
+  because every page render goes through its caller and refusing the write is the whole
+  job.
+- **The escape hatch is `scripts/forget-gameweek.mjs`.** If a bad row is already stored,
+  no amount of correct code removes it.
 
 ---
 
@@ -351,6 +389,9 @@ where "none" and "not known yet" are both plausible needs the same care.
 - Never persist a row without `league_id`, or query one without filtering on it. A league id
   is a season id; both FPL identifiers are minted fresh each August.
 - Never store a gameweek that produced no performances; it must stay absent and be retried.
+- Never store a gameweek that is still being played, and never decide that anywhere other
+  than `deriveSeasonState()`.
+- Never render a provisional rank, F1 score or position without saying it is provisional.
 
 ---
 
@@ -439,6 +480,7 @@ into it.
 | `premier-league.ts`    | `premier-league-data.ts` | Pulse payload → table, fixtures, matchdays |
 | `chart-scales.ts`      | the chart components     | which band, which colour, which tick       |
 | `reference-mapping.ts` | the reference readers    | payload → row, row → domain, staleness     |
+| `season-state.ts`      | `gameweek-data.ts`       | which gameweek is in play, which are over  |
 
 **Keep that split.** A rule that only exists inside an `async` function wrapped around 344
 upstream calls cannot be tested, and every rule in `scoring.ts` has already been broken once

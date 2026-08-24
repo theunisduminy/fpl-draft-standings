@@ -15,6 +15,10 @@
  *   managers a joint first and 20 points each.
  * - **Upstream says "nothing yet" with `{}` and `[]`, both truthy.** Count keys,
  *   never test truthiness.
+ * - **A full `elements` map of zeros is also "nothing yet".** Counting keys is
+ *   not enough: once a gameweek's fixtures exist, the live feed lists all ~609
+ *   elements with `minutes: 0` and `total_points: 0` hours before kick-off.
+ *   That is the shape that actually shipped the joint-first bug in August 2026.
  * - **Ties share the higher rank and consume the lower ones.** Two managers tied
  *   at the top are both rank 1 and the next is rank 3, so both bank a win.
  */
@@ -67,27 +71,62 @@ export function assignRanks<T extends { event_total: number }>(
 }
 
 /**
+ * Has anyone actually taken the field in this gameweek?
+ *
+ * The question the old `Object.keys(elements).length === 0` guard was trying to
+ * ask, and the one it could not answer. Upstream has two distinct "nothing yet"
+ * shapes and they arrive in sequence:
+ *
+ * 1. Before the gameweek's fixtures exist, `elements` is `{}`.
+ * 2. Once they exist — hours before the first kick-off — `elements` lists every
+ *    element in the game with `minutes: 0` and `total_points: 0`.
+ *
+ * The second is indistinguishable from a scored gameweek by key count alone,
+ * and it is the one that corrupted GW1 of 2026/27: eight managers summed to 0,
+ * tied on rank 1, and were written to the database as final.
+ *
+ * `minutes` is the signal rather than `total_points`, because a footballer can
+ * legitimately score 0 while a footballer who has not played cannot have
+ * minutes. `total_points` is checked too, purely so a feed that omits `minutes`
+ * cannot make a genuinely played gameweek look empty.
+ */
+export function hasBeenPlayed(liveData: EventLive | null): boolean {
+  if (!liveData?.elements) return false;
+
+  return Object.values(liveData.elements).some(
+    (element) =>
+      (element?.stats?.minutes ?? 0) > 0 ||
+      (element?.stats?.total_points ?? 0) !== 0,
+  );
+}
+
+/**
  * Score one gameweek from its live feed and every manager's picks.
  *
  * Returns an **empty array** when the gameweek cannot be scored, and the caller
- * must treat that as "not played yet" and store nothing. Three ways that
+ * must treat that as "not played yet" and store nothing. Four ways that
  * happens, all of which look like a scored gameweek to a careless check:
  *
  * 1. `liveData` is null — the request failed.
- * 2. `liveData.elements` is `{}` — the gameweek exists but has not been scored.
- *    `{}` is truthy, so only the key count catches this.
- * 3. Nobody's picks loaded — scoring the survivors would rank a partial league.
+ * 2. `liveData.elements` is `{}` — the fixtures do not exist yet. `{}` is
+ *    truthy, so only the key count catches this.
+ * 3. `liveData.elements` is full but nobody has played a minute — see
+ *    {@link hasBeenPlayed}. The key count does **not** catch this.
+ * 4. Nobody's picks loaded — scoring the survivors would rank a partial league.
  *
- * Only positions 1–11 count; 12–15 are the bench.
+ * `finished` says whether the result is settled. It is the flag that decides
+ * whether the caller may persist the gameweek, so it is a required argument
+ * rather than a defaulted one: a caller that has not thought about it has to
+ * say so out loud. Only positions 1–11 count; 12–15 are the bench.
  */
 export function scoreGameweek(
   gameweek: number,
   liveData: EventLive | null,
   playerPicks: EntryPicks[],
+  finished: boolean,
 ): GameweekPerformance[] {
-  if (!liveData?.elements || Object.keys(liveData.elements).length === 0) {
-    return [];
-  }
+  // `liveData &&` first so the compiler narrows it for the closure below.
+  if (!liveData || !hasBeenPlayed(liveData)) return [];
 
   const scoredEntries = playerPicks.filter(
     (playerData) => playerData?.picks?.length,
@@ -118,7 +157,7 @@ export function scoreGameweek(
     league_entry: player.league_entry,
     event_total: player.event_total,
     rank: player.rank,
-    finished: true,
+    finished,
   }));
 }
 
