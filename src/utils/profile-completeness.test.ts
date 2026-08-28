@@ -4,12 +4,11 @@ import { isProfileComplete } from './profile-completeness';
 
 const complete = {
   displayName: 'Mossi',
-  bio: 'Perpetually one gameweek from greatness.',
   favouriteTeam: 6,
 };
 
 describe('isProfileComplete', () => {
-  it('accepts a profile with all three fields', () => {
+  it('accepts a profile with both fields', () => {
     expect(isProfileComplete(complete)).toBe(true);
   });
 
@@ -19,17 +18,13 @@ describe('isProfileComplete', () => {
 
   it.each([
     ['display name', { displayName: null }],
-    ['bio', { bio: null }],
     ['favourite club', { favouriteTeam: null }],
   ])('rejects a profile with no %s', (_field, missing) => {
     expect(isProfileComplete({ ...complete, ...missing })).toBe(false);
   });
 
-  it.each([
-    ['display name', { displayName: '   ' }],
-    ['bio', { bio: '\n\t ' }],
-  ])('does not accept whitespace as a %s', (_field, blank) => {
-    expect(isProfileComplete({ ...complete, ...blank })).toBe(false);
+  it('does not accept whitespace as a display name', () => {
+    expect(isProfileComplete({ ...complete, displayName: '   ' })).toBe(false);
   });
 
   it('treats an empty string club as absent', () => {

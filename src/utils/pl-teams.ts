@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { fplApi } from '@/utils/fpl-api';
+import { fplApi, upstreamSignal } from '@/utils/fpl-api';
 import { asTeamCode, type PlTeam, type TeamCode } from '@/interfaces/fpl';
 import { readTeams } from '@/server/data/pl-teams';
 import {
@@ -78,6 +78,7 @@ async function resolvePremierLeagueTeams(): Promise<PlTeam[]> {
  */
 export async function fetchFromBootstrap(): Promise<PlTeam[]> {
   const response = await fetch(fplApi.bootstrapStatic(), {
+    signal: upstreamSignal(),
     next: { revalidate: 86_400 },
   });
 

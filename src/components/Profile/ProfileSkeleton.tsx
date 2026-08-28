@@ -35,10 +35,9 @@ export function ProfileSkeleton() {
             <Skeleton className='h-9 w-24 rounded-md' />
           </CardHeader>
           <CardContent className='space-y-4'>
-            {/* Display name, club, bio: a label above a control each. */}
+            {/* Display name and club: a label above a control each. */}
             <Field control='h-10' />
             <Field control='h-10' />
-            <Field control='h-24' />
             <Skeleton className='h-10 w-32 rounded-md' />
           </CardContent>
         </Card>

@@ -10,15 +10,20 @@
  * saved. Stated here, in a pure module, they cannot disagree — and it can be
  * tested, which neither `server-only` module can.
  *
- * All three fields, none blank. Whitespace does not count as a bio, so the
- * check trims: otherwise a single space would satisfy the gate and the
+ * Both fields, neither blank. Whitespace does not count as a display name, so
+ * the check trims: otherwise a single space would satisfy the gate and the
  * compulsory part of compulsory onboarding would be one keystroke deep.
  *
- * The favourite club is the third because a profile without one says nothing
+ * The favourite club is the second because a profile without one says nothing
  * about the person, and picking it is one tap from a list of twenty. The
  * standings board deliberately does *not* show it — a table of finishing
  * positions is not the place for allegiance — so the requirement stands on the
  * profile alone.
+ *
+ * There was a third, a free-text bio. It was dropped: it was a field people
+ * filled in once with a placeholder and never read, and every extra compulsory
+ * box is another reason to bounce off the one screen standing between a member
+ * and the league.
  *
  * The column stays **nullable**. Completeness is decided here rather than by
  * the database: a `NOT NULL` migration would have to invent a club for every
@@ -27,14 +32,9 @@
  */
 export interface ProfileFields {
   displayName: string | null;
-  bio: string | null;
   favouriteTeam: number | null;
 }
 
 export function isProfileComplete(profile: ProfileFields | null): boolean {
-  return Boolean(
-    profile?.displayName?.trim() &&
-    profile?.bio?.trim() &&
-    profile?.favouriteTeam,
-  );
+  return Boolean(profile?.displayName?.trim() && profile?.favouriteTeam);
 }

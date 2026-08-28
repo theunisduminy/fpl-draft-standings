@@ -22,7 +22,7 @@ import {
   type EntryPicks,
 } from './scoring';
 import { deriveSeasonState } from './season-state';
-import { fplApi, getLeagueId } from './fpl-api';
+import { fplApi, getLeagueId, upstreamSignal } from './fpl-api';
 import { fetchEntryPicks } from './gameweek-squad';
 import { fetchLeagueDetails } from './league';
 import { cachedRead } from './cache';
@@ -49,7 +49,10 @@ const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
  * instead of failing.
  */
 async function fetchEventStatus(): Promise<GameWeekStatus[]> {
-  const res = await fetch(fplApi.eventStatus(), { next: { revalidate: 300 } });
+  const res = await fetch(fplApi.eventStatus(), {
+    signal: upstreamSignal(),
+    next: { revalidate: 300 },
+  });
 
   if (res.status === 404) {
     return [];
@@ -73,7 +76,10 @@ async function fetchEventStatus(): Promise<GameWeekStatus[]> {
  */
 async function fetchGameState(): Promise<GameState | null> {
   try {
-    const res = await fetch(fplApi.game(), { next: { revalidate: 60 } });
+    const res = await fetch(fplApi.game(), {
+      signal: upstreamSignal(),
+      next: { revalidate: 60 },
+    });
 
     if (!res.ok) return null;
 
@@ -105,6 +111,7 @@ async function fetchGameweekBatch(
     batchPromises.push(
       Promise.all([
         fetch(fplApi.eventLive(gw), {
+          signal: upstreamSignal(),
           next: { revalidate: 300 },
         }).then((res) => res.json() as Promise<EventLive>),
         // `entry_id` addresses the URL, `id` identifies the manager. They are

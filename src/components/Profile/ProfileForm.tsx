@@ -16,13 +16,13 @@ import { ClubCrest } from '@/components/ClubCrest';
 import type { PlTeam, TeamCode } from '@/interfaces/fpl';
 
 /**
- * Edit your own display name, bio and club.
+ * Edit your own display name and club.
  *
  * There is no manager picker: which manager you are comes from the curated
  * `league_members` mapping, so it is shown, not chosen.
  *
- * All three fields are required, and `required` here is only the courtesy half
- * of that — the real enforcement is `updateProfile` rejecting a blank one, and
+ * Both fields are required, and `required` here is only the courtesy half of
+ * that — the real enforcement is `updateProfile` rejecting a blank one, and
  * `(onboarded)/layout.tsx` refusing to let anyone past `/profile` until the row
  * is filled in. A Server Action is a public POST endpoint; an attribute in the
  * markup is not a rule.
@@ -37,13 +37,11 @@ import type { PlTeam, TeamCode } from '@/interfaces/fpl';
  */
 export function ProfileForm({
   displayName,
-  bio,
   favouriteTeam,
   teams,
   onboarding = false,
 }: {
   displayName: string | null;
-  bio: string | null;
   favouriteTeam: TeamCode | null;
   /** The 20 clubs, already sorted. The page reads them; this only renders. */
   teams: PlTeam[];
@@ -82,22 +80,6 @@ export function ProfileForm({
           maxLength={60}
           defaultValue={displayName ?? ''}
           placeholder='What the league should call you'
-          className='w-full rounded-md border border-white/15 bg-[#1a0520] px-3 py-2 text-base text-white placeholder:text-white/30 md:text-sm'
-        />
-      </div>
-
-      <div className='space-y-1.5'>
-        <label htmlFor='bio' className='text-sm text-white/70'>
-          Bio
-        </label>
-        <textarea
-          id='bio'
-          name='bio'
-          required
-          rows={3}
-          maxLength={500}
-          defaultValue={bio ?? ''}
-          placeholder='Trash talk goes here'
           className='w-full rounded-md border border-white/15 bg-[#1a0520] px-3 py-2 text-base text-white placeholder:text-white/30 md:text-sm'
         />
       </div>

@@ -10,7 +10,7 @@ import { profiles, type ProfileRow } from '@/server/db/schema';
 export type { ProfileRow };
 
 /**
- * The parts of a profile its owner controls — display name and bio.
+ * The parts of a profile its owner controls — display name and club.
  *
  * Which manager someone is is **not** here: that comes from the curated
  * `league_members` mapping via their session email. See
@@ -43,7 +43,6 @@ export async function getProfilesByUserIds(
 export async function upsertProfile(input: {
   userId: string;
   displayName?: string | null;
-  bio?: string | null;
   /** A `TeamCode`, already checked against the codes upstream returned. */
   favouriteTeam?: number | null;
 }): Promise<ProfileRow> {
@@ -52,14 +51,12 @@ export async function upsertProfile(input: {
     .values({
       userId: input.userId,
       displayName: input.displayName ?? null,
-      bio: input.bio ?? null,
       favouriteTeam: input.favouriteTeam ?? null,
     })
     .onConflictDoUpdate({
       target: profiles.userId,
       set: {
         displayName: input.displayName ?? null,
-        bio: input.bio ?? null,
         favouriteTeam: input.favouriteTeam ?? null,
         updatedAt: new Date(),
       },

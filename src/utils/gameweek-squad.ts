@@ -7,7 +7,7 @@ import type {
   Position,
 } from '@/interfaces/fpl';
 
-import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
+import { fetchUpstream, fplApi, getLeagueId, upstreamSignal } from './fpl-api';
 import { fetchLeagueDetails } from './league';
 import { ensureCovers, getElementLookup } from './draft-elements';
 
@@ -140,6 +140,7 @@ export async function fetchEntryPicks(
   gameweek: number,
 ): Promise<EntryPick[]> {
   const res = await fetch(fplApi.entryEvent(entryId, gameweek), {
+    signal: upstreamSignal(),
     next: { revalidate: 300 },
   });
 

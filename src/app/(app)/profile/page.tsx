@@ -79,7 +79,7 @@ export default async function ProfilePage() {
       title={onboarding ? 'Finish your profile' : 'Your profile'}
       subtitle={
         onboarding
-          ? 'A display name, a bio and your club, and the league is yours'
+          ? 'A display name and your club, and the league is yours'
           : user.email
       }
     >
@@ -177,7 +177,6 @@ async function ProfileBody({
           <CardContent>
             <ProfileForm
               displayName={profile?.displayName ?? null}
-              bio={profile?.bio ?? null}
               favouriteTeam={favouriteTeam}
               teams={teams}
               onboarding={onboarding}

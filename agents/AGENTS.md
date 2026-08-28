@@ -121,11 +121,11 @@ proxy never runs and you are back to the silent failure above.
 
 The proxy is only the first of them. Do not confuse the three:
 
-| Level         | Means                                      | Enforced by                    |
-| ------------- | ------------------------------------------ | ------------------------------ |
-| **Signed in** | a valid Neon session — any Google account  | `src/proxy.ts`                 |
-| **A member**  | that email is in `league_members`          | `getCurrentUser()` → `null`    |
-| **Onboarded** | a name, a bio **and** a club are on record | `(app)/(onboarded)/layout.tsx` |
+| Level         | Means                                     | Enforced by                    |
+| ------------- | ----------------------------------------- | ------------------------------ |
+| **Signed in** | a valid Neon session — any Google account | `src/proxy.ts`                 |
+| **A member**  | that email is in `league_members`         | `getCurrentUser()` → `null`    |
+| **Onboarded** | a name **and** a club are on record       | `(app)/(onboarded)/layout.tsx` |
 
 The last two are enforced together, in one layout: `(onboarded)` redirects to `/profile`
 unless `getCurrentUser()` returns a user whose `profileComplete` is true. So a stranger with
@@ -295,6 +295,40 @@ for three days.
 
 ---
 
+### Never memoise a promise across requests
+
+A serverless instance is **frozen the moment its request ends**. Work still in flight does
+not carry on in the background and it is not cancelled either: the sockets go away and the
+promise simply never settles. So a module-level `let x = somethingAsync()` written to share
+one computation between callers is only safe while those callers are inside the same
+request. Between requests it is a trap.
+
+This shipped, and it cost a real bug. `getCompSeasonId()` in `premier-league-data.ts` held
+the _promise_ and kept it forever on success. Every link in the nav is prefetched in one
+burst the moment somebody signs in — the access log shows six routes invoked in three
+seconds — and a prefetch the browser then discards ends its request with that promise
+pending. It never settled, it was never cleared, and every later render of
+`/premier-league` on that instance awaited it. **The symptom is a page stuck on its loading
+skeleton with no error, no log line and a 200 in the access log**, which a reload "fixes"
+only because it lands on another instance. `/premier-league` was the only page with that
+shape, so it was the only page that did it.
+
+Three rules come out of it, and they apply to any cache, memo or dedup slot:
+
+- **Memoise the settled value, not the promise.** Hold the promise only while it is
+  genuinely in flight, and clear it however it ends — resolved, rejected, or abandoned.
+- **Never `await` an adopted promise unbounded.** `withDeadline` in
+  [`src/utils/deadline.ts`](../src/utils/deadline.ts) is how: past the deadline the caller
+  drops the slot and does the work itself. `cachedRead`'s dedup and the season ID both go
+  through it.
+- **Every upstream `fetch` carries `upstreamSignal()`.** `fetch` has no timeout of its own,
+  so a connection that never answers is the same never-settling promise one layer down.
+
+The general shape to distrust: state that outlives a request, holding something that only
+makes sense inside one.
+
+---
+
 ## File conventions
 
 - **Everything lives under `src/`.** `src/app` (routes), `src/components`,
@@ -392,6 +426,9 @@ for three days.
 - Never store a gameweek that is still being played, and never decide that anywhere other
   than `deriveSeasonState()`.
 - Never render a provisional rank, F1 score or position without saying it is provisional.
+- Never hold a promise in a module-level variable past the request that created it, and
+  never `await` one somebody else started without a deadline — see above.
+- Never call an upstream API without `upstreamSignal()`.
 
 ---
 

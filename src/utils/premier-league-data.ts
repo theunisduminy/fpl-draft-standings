@@ -19,6 +19,7 @@ import {
   toLeagueTable,
 } from '@/utils/premier-league';
 import { cachedRead } from './cache';
+import { TIMED_OUT, withDeadline } from './deadline';
 
 /**
  * The real Premier League table and fixture list, read on the server.
@@ -92,10 +93,22 @@ const readCompSeasonId = cachedRead(
  * runs"; a season ID is not code anyone is iterating on, and a stale one is
  * indistinguishable from a fresh one for a year at a time.
  *
- * The promise is stored rather than the number, so concurrent callers on a
- * cold process share one request instead of each starting their own. A
- * rejection is cleared: caching a failure for the life of the process would
- * mean one bad minute at boot took the page down until the next deploy.
+ * **The resolved number is what is held, not the promise, and that distinction
+ * is a bug this page shipped with.** The promise used to be the memo, kept
+ * forever on success. On a serverless host the request that creates it is very
+ * often a `<Link>` prefetch — every page in the nav is prefetched in one burst,
+ * which the access log shows — and a prefetch the browser discards ends its
+ * request, at which point the instance freezes with that promise still pending.
+ * It never settles and it was never cleared, so every later render of
+ * `/premier-league` on that instance awaited it and hung: no error, no log
+ * line, a 200 in the log, and a skeleton that only a reload onto some other
+ * instance escaped. `/premier-league` was the only page with that shape, which
+ * is why it was the only page that did it. The promise is now kept only while
+ * it is genuinely in flight, adopted behind `withDeadline`, and cleared however
+ * it ends.
+ *
+ * A rejection is cleared too: caching a failure for the life of the process
+ * would mean one bad minute at boot took the page down until the next deploy.
  *
  * **The revalidate job cannot reach this.** `clearCache` drops the two layers
  * `cachedRead` owns; nothing drops a module-level variable, so an instance
@@ -105,16 +118,41 @@ const readCompSeasonId = cachedRead(
  * value changes in June, and the worst case is one instance reading last
  * season for a few minutes at the one moment of the year anyone would notice.
  */
+let seasonId: number | null = null;
 let seasonIdPromise: Promise<number> | null = null;
 
-function getCompSeasonId(): Promise<number> {
-  seasonIdPromise ??= readCompSeasonId().catch((error: unknown) => {
+/**
+ * Long enough for a cold Pulse read (~300ms observed, and `upstreamSignal`
+ * gives up at ten seconds), short enough that a frozen promise costs a wait
+ * rather than the page.
+ */
+const SEASON_ID_DEADLINE_MS = 12_000;
+
+async function getCompSeasonId(): Promise<number> {
+  if (seasonId !== null) return seasonId;
+
+  if (seasonIdPromise) {
+    const result = await withDeadline(seasonIdPromise, SEASON_ID_DEADLINE_MS);
+
+    if (result !== TIMED_OUT) return result;
+
+    // Abandoned by whoever started it. Drop it so nobody else waits on it.
     seasonIdPromise = null;
+  }
 
-    throw error;
-  });
+  const started = (seasonIdPromise = readCompSeasonId().then((id) => {
+    seasonId = id;
 
-  return seasonIdPromise;
+    return id;
+  }));
+
+  try {
+    return await started;
+  } finally {
+    // However it ended, it is no longer in flight. The number above is the
+    // memo now; this slot only ever holds a live request.
+    if (seasonIdPromise === started) seasonIdPromise = null;
+  }
 }
 
 /** The table and every fixture, cached. The page calls this and nothing else. */

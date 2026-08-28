@@ -36,6 +36,31 @@ const PULSE_HEADERS = { Origin: 'https://www.premierleague.com' } as const;
 const LEAGUE_ID_VAR = 'FPL_LEAGUE_ID';
 
 /**
+ * Ten seconds, on every upstream read.
+ *
+ * `fetch` has no timeout of its own, so without this a connection that never
+ * answers stays open until the platform kills the invocation, and a promise
+ * waiting on it never settles. That is survivable inside one request, which
+ * fails with it. It is not survivable when the promise is one this app shares
+ * between requests: see `withDeadline` in `src/utils/deadline.ts` for
+ * how a never-settling read pins a page in its skeleton.
+ *
+ * Ten seconds is generous. Pulse answers in under 300ms and the draft API in
+ * about a second; anything near this number is already broken, and an error the
+ * reader can retry beats a skeleton that never resolves.
+ *
+ * Next strips the signal when it revalidates a cached response in the
+ * background (`patch-fetch.js`), so this bounds the reads a person is waiting
+ * on without touching Next's own refresh, and the Data Cache still applies.
+ */
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
+/** The abort signal every upstream `fetch` in this app carries. */
+export function upstreamSignal(): AbortSignal {
+  return AbortSignal.timeout(UPSTREAM_TIMEOUT_MS);
+}
+
+/**
  * Draft league IDs are season-scoped — a renewed league gets a fresh ID every
  * August — so the ID is read from the environment, never hard-coded.
  *
@@ -79,6 +104,7 @@ export async function fetchUpstream<T>(
 ): Promise<T> {
   const res = await fetch(url, {
     headers,
+    signal: upstreamSignal(),
     next: { revalidate: revalidateSeconds },
   });
 

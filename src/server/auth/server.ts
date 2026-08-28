@@ -44,7 +44,7 @@ export type SignedInUser = {
   /** Which manager they are, from the curated `league_members` mapping. */
   leagueEntry: LeagueEntryId;
   /**
-   * A display name, a bio and a favourite club are all on record. Onboarding
+   * A display name and a favourite club are both on record. Onboarding
    * is compulsory — `src/app/(app)/(onboarded)/layout.tsx` sends anyone
    * without these to `/profile` and keeps them there.
    */
