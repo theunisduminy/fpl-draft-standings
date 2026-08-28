@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/server/auth/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * Onboarding is compulsory: no display name and bio, no app.
+ * Onboarding is compulsory: no display name and club, no app.
  *
  * This is a route group rather than a check inside each page because a layout
  * cannot see the pathname, and a gate that redirects to `/profile` must not run

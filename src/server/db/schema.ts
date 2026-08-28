@@ -131,7 +131,6 @@ export const leagueMembers = pgTable(
 export const profiles = pgTable('profiles', {
   userId: uuid('user_id').primaryKey(),
   displayName: text('display_name'),
-  bio: text('bio'),
   /**
    * `teams[].code` from the classic bootstrap — **not** `teams[].id`.
    *
@@ -140,8 +139,8 @@ export const profiles = pgTable('profiles', {
    * first time a promoted club sorted differently. See `TeamCode` in
    * `src/interfaces/fpl.ts`.
    *
-   * Compulsory, alongside the display name and the bio: `isProfileComplete`
-   * requires all three. It is shown on the profile, not on the standings.
+   * Compulsory, alongside the display name: `isProfileComplete` requires both.
+   * It is shown on the profile, not on the standings.
    *
    * Still **nullable in the database**, and deliberately. Completeness is a
    * rule, and the app decides its rules in code — a `NOT NULL` migration would

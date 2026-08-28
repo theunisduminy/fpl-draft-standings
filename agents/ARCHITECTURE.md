@@ -34,7 +34,7 @@ behind that gate, each enforced somewhere different:
   account clears it.
 - **A member** — that session's email also has a row in `league_members`. `getCurrentUser()`
   returns `null` for anyone else.
-- **Onboarded** — a display name, a bio **and** a favourite club are on record.
+- **Onboarded** — a display name **and** a favourite club are on record.
   `(app)/(onboarded)/layout.tsx` sends anyone missing any of the three to `/profile` and
   keeps them there. `isProfileComplete` in `src/server/auth/server.ts` is the one place that
   decides; the `required` attributes on the form are a courtesy.
@@ -206,7 +206,7 @@ Two consequences worth stating outright:
     │   │   ├── league-members.ts  ★ curated email -> manager mapping
     │   │   ├── elements.ts    draft_elements: read + upsert (no prune)
     │   │   ├── pl-teams.ts    pl_teams: read + upsert, and the allowlist prune
-    │   │   └── profiles.ts    display name and bio
+    │   │   └── profiles.ts    display name and club
     │   ├── actions/           'use server' — validate, write, revalidate
     │   │   └── profile.ts
     │   └── auth/
@@ -386,7 +386,7 @@ therefore **inert rather than wrong**: they stay put and are never read.
 
 **The email is the stable identity across seasons; the entry id is not.** That is why
 `profiles` is keyed on the Neon Auth user id and holds no league entry — display names and
-bios survive the August rollover untouched, while the manager mapping is re-seeded. See
+clubs survive the August rollover untouched, while the manager mapping is re-seeded. See
 [`league-members.README.md`](../league-members.README.md) for the annual procedure.
 
 ### Migrations

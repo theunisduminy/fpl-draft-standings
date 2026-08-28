@@ -11,7 +11,6 @@ import { isProfileComplete } from '@/utils/profile-completeness';
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 const MAX_DISPLAY_NAME = 60;
-const MAX_BIO = 500;
 
 /**
  * Update the signed-in member's own profile.
@@ -22,9 +21,9 @@ const MAX_BIO = 500;
  * `league_members` mapping, so it is not an input to validate. It is not an
  * input at all.
  *
- * All three of display name, bio and favourite club are compulsory, and this
- * is one of the two places that is true — `isProfileComplete` is the other,
- * and it decides who gets past the onboarding gate. Keep them in step: a field
+ * Both the display name and the favourite club are compulsory, and this is one
+ * of the two places that is true — `isProfileComplete` is the other, and it
+ * decides who gets past the onboarding gate. Keep them in step: a field
  * required here but not there lets someone save a profile the gate then
  * bounces, and the reverse traps them on a form that will not accept anything.
  */
@@ -36,17 +35,12 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
   }
 
   const displayName = (formData.get('displayName') as string | null)?.trim();
-  const bio = (formData.get('bio') as string | null)?.trim();
 
-  // Both are compulsory, and this is where that is true. The `required`
-  // attributes on the form are a convenience; `(onboarded)/layout.tsx` reads
-  // the saved row, so a profile saved past the markup would just bounce back.
+  // Compulsory, and this is where that is true. The `required` attribute on the
+  // form is a convenience; `(onboarded)/layout.tsx` reads the saved row, so a
+  // profile saved past the markup would just bounce back.
   if (!displayName) {
     return { ok: false, error: 'A display name is required.' };
-  }
-
-  if (!bio) {
-    return { ok: false, error: 'A bio is required. Anything at all.' };
   }
 
   if (displayName.length > MAX_DISPLAY_NAME) {
@@ -56,11 +50,7 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     };
   }
 
-  if (bio.length > MAX_BIO) {
-    return { ok: false, error: `Bio must be ${MAX_BIO} characters or fewer.` };
-  }
-
-  // Compulsory, like the two above, and it has to be real on top of that. A
+  // Compulsory, like the one above, and it has to be real on top of that. A
   // `<select>` proves nothing: this is a POST endpoint and the body is whatever
   // the caller sent, so the code is checked against the ones upstream returned.
   const rawTeam = (formData.get('favouriteTeam') as string | null)?.trim();
@@ -75,16 +65,16 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: 'That is not a Premier League club.' };
   }
 
-  // The gate's own rule, asked of the values about to be stored. The three
-  // checks above are the ones that can explain themselves to a person; this is
-  // the one that guarantees a save cannot produce a row the onboarding gate
-  // then calls incomplete — which would bounce the member back to this form
-  // from every page, forever, having just been told it saved.
-  if (!isProfileComplete({ displayName, bio, favouriteTeam })) {
+  // The gate's own rule, asked of the values about to be stored. The checks
+  // above are the ones that can explain themselves to a person; this is the one
+  // that guarantees a save cannot produce a row the onboarding gate then calls
+  // incomplete — which would bounce the member back to this form from every
+  // page, forever, having just been told it saved.
+  if (!isProfileComplete({ displayName, favouriteTeam })) {
     return { ok: false, error: 'That profile is missing something.' };
   }
 
-  await upsertProfile({ userId: user.id, displayName, bio, favouriteTeam });
+  await upsertProfile({ userId: user.id, displayName, favouriteTeam });
 
   // The onboarding gate lives in a layout above every page, so a first save
   // changes what the whole app is allowed to render, not just this route.

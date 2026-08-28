@@ -1,5 +1,7 @@
 import { unstable_cache } from 'next/cache';
 
+import { TIMED_OUT, withDeadline } from './deadline';
+
 // Simple in-memory cache with TTL for API route responses
 // Keys are strings, values are { data: T, expiresAt: number }
 
@@ -30,7 +32,9 @@ export function setCache<T>(key: string, data: T, ttlSeconds: number): void {
  * 2. **The in-memory map above** — per process, and worth keeping in front of
  *    it: a Data Cache hit measured ~190ms against ~10ms from memory.
  * 3. **Promise dedup** — concurrent callers on one instance share a single
- *    computation rather than each starting their own.
+ *    computation rather than each starting their own, bounded by
+ *    `ADOPTED_DEADLINE_MS` so that a computation abandoned by the request that
+ *    started it cannot pin every later one behind it.
  *
  * Both domains that need this were wiring up the same three layers by hand,
  * which is how their TTLs drift apart. Revalidate early with
@@ -75,7 +79,24 @@ export function cachedRead<T>(
     const cached = getCache<T>(key);
     if (cached) return cached;
 
-    if (pending) return pending;
+    // Adopting the in-flight computation is the fast path, and it is the one
+    // that has to be defended: the caller who started it is a *different
+    // request*, and once that request ends the instance freezes with the
+    // promise still pending. Waiting on it unconditionally is unbounded, so a
+    // discarded `<Link>` prefetch could leave the next reader on that instance
+    // staring at a skeleton with no error and a 200 in the log. See
+    // `withDeadline`.
+    if (pending) {
+      const adopted = pending;
+      const result = await withDeadline(adopted, ADOPTED_DEADLINE_MS);
+
+      if (result !== TIMED_OUT) return result;
+
+      // Nothing is coming. Clear the slot — unless somebody has already
+      // replaced it — so the next caller does not adopt it too, and do the
+      // work here instead.
+      if (pending === adopted) pending = null;
+    }
 
     pending = readShared().then((value) => {
       setCache(key, value, ttlSeconds);
@@ -89,6 +110,19 @@ export function cachedRead<T>(
     }
   };
 }
+
+/**
+ * How long to wait on a computation another request started before giving up
+ * on it and doing the work again.
+ *
+ * Sized against the slowest honest read in the app, not the fastest: a cold
+ * season is up to 344 upstream calls, each now bounded at ten seconds by
+ * `upstreamSignal`. Fifteen seconds is comfortably past a real one and
+ * comfortably short of forever, which is what the alternative was. Paying for
+ * one duplicate computation is the cheap side of this trade; the expensive side
+ * is a page that never loads again until the instance recycles.
+ */
+const ADOPTED_DEADLINE_MS = 15_000;
 
 /** Per-key hooks that drop an in-flight computation. See `cachedRead`. */
 const resets = new Map<string, () => void>();
