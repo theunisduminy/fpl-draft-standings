@@ -313,6 +313,15 @@ skeleton with no error, no log line and a 200 in the access log**, which a reloa
 only because it lands on another instance. `/premier-league` was the only page with that
 shape, so it was the only page that did it.
 
+**A hang is only one of its symptoms.** The same slot in
+`/api/cron/revalidate` holds the single-flight guard, and nothing awaits it — a
+second caller returns `skipped` at once. Wedge that one and the instance stops
+syncing altogether while answering `ok: true` forever: stale reference tables, and
+a finished gameweek written by whichever visitor arrives first rather than by the
+robot. It is guarded by a timestamp instead of a deadline, because the question
+there is "is anyone still working on this?" rather than "how long will I wait?".
+Ask which question a slot is answering before choosing the guard.
+
 Three rules come out of it, and they apply to any cache, memo or dedup slot:
 
 - **Memoise the settled value, not the promise.** Hold the promise only while it is
