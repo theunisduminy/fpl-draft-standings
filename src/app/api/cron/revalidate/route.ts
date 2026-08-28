@@ -66,7 +66,7 @@ type StepResult =
   | { step: string; ok: false; error: string };
 
 /**
- * The run currently in flight on this instance, if any.
+ * The run currently in flight on this instance, if any, and when it started.
  *
  * The job is now expensive — an uncached 850 KB download, ~600 upserts and a
  * season computation — where it used to be three cache drops, so two overlapping
@@ -79,8 +79,31 @@ type StepResult =
  * That is acceptable: concurrent upserts of the same payload converge, and
  * `storeFinalisedGameweeks` is `onConflictDoNothing`. A cross-instance lock
  * would need a table, and this is not worth one.
+ *
+ * **The timestamp is what makes the guard safe to trust.** A promise held at
+ * module scope outlives the request that created it, and a serverless instance
+ * is frozen the moment that request ends — so an invocation the platform kills
+ * mid-run leaves this slot set with a promise that will never settle and a
+ * `finally` that will never run. Without the stamp, that instance then answers
+ * every later cron tick with `skipped` and **never syncs again**, reporting
+ * `ok: true` while it does nothing: the reference tables go stale, and a
+ * finished gameweek goes back to being written by whichever visitor arrives
+ * first. This is the same trap that pinned `/premier-league` on its loading
+ * skeleton, one symptom over. See "Never memoise a promise across requests" in
+ * `agents/AGENTS.md`.
  */
-let inFlight: Promise<StepResult[]> | null = null;
+let inFlight: { run: Promise<StepResult[]>; startedAt: number } | null = null;
+
+/**
+ * How long a run may plausibly be in flight before the slot holding it is read
+ * as abandoned rather than busy.
+ *
+ * Ten minutes is far past any real run — the platform caps an invocation long
+ * before this — and far short of the three-hour cron interval, so it can never
+ * let two genuine runs overlap. It only ever unsticks a slot nothing is
+ * working on.
+ */
+const ABANDONED_AFTER_MS = 10 * 60 * 1000;
 
 export async function GET(request: Request): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
@@ -102,7 +125,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (inFlight) {
+  if (inFlight && Date.now() - inFlight.startedAt < ABANDONED_AFTER_MS) {
     // Carries `ok` like every other response: a monitor reads that field, and
     // a third shape without it reads as a failure when nothing failed.
     return NextResponse.json({
@@ -111,10 +134,23 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
   }
 
-  inFlight = runSync();
+  if (inFlight) {
+    // Past the window, so whatever set this slot is not coming back. Say so
+    // out loud: a run that vanished mid-flight is worth knowing about, and
+    // silently replacing it would hide the only trace it left.
+    console.error(
+      `[cron] Discarding a sync that has been in flight for ${Math.round(
+        (Date.now() - inFlight.startedAt) / 1000,
+      )}s. Its invocation was almost certainly killed.`,
+    );
+  }
+
+  const started = { run: runSync(), startedAt: Date.now() };
+
+  inFlight = started;
 
   try {
-    const steps = await inFlight;
+    const steps = await started.run;
 
     return NextResponse.json({
       revalidated: TAGS,
@@ -122,7 +158,9 @@ export async function GET(request: Request): Promise<NextResponse> {
       ok: steps.every((step) => step.ok),
     });
   } finally {
-    inFlight = null;
+    // Only if it is still ours. An abandoned run that somehow resumes must not
+    // clear the slot belonging to the run that replaced it.
+    if (inFlight === started) inFlight = null;
   }
 }
 
