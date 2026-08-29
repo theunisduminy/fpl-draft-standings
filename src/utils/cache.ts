@@ -1,6 +1,5 @@
+import { cache as perRequest } from 'react';
 import { unstable_cache } from 'next/cache';
-
-import { TIMED_OUT, withDeadline } from './deadline';
 
 // Simple in-memory cache with TTL for API route responses
 // Keys are strings, values are { data: T, expiresAt: number }
@@ -31,10 +30,9 @@ export function setCache<T>(key: string, data: T, ttlSeconds: number): void {
  *    cold instance does not re-pay the upstream and database round trips.
  * 2. **The in-memory map above** — per process, and worth keeping in front of
  *    it: a Data Cache hit measured ~190ms against ~10ms from memory.
- * 3. **Promise dedup** — concurrent callers on one instance share a single
- *    computation rather than each starting their own, bounded by
- *    `ADOPTED_DEADLINE_MS` so that a computation abandoned by the request that
- *    started it cannot pin every later one behind it.
+ * 3. **Promise dedup, scoped to one request** — concurrent callers *inside a
+ *    single render* share one computation instead of each starting their own.
+ *    Never across requests; see `requestToken`.
  *
  * Both domains that need this were wiring up the same three layers by hand,
  * which is how their TTLs drift apart. Revalidate early with
@@ -65,12 +63,15 @@ export function cachedRead<T>(
     tags: [key],
   });
 
-  let pending: Promise<T> | null = null;
+  let pending: { owner: symbol; run: Promise<T> } | null = null;
 
   // `clearCache` empties the map, but the dedup slot is checked immediately
   // after it — so without this a caller's in-flight *pre-sync* computation
   // survives the clear, gets adopted by whoever asks next, and is written back
   // for the full TTL. Registering the reset lets `clearCache` drop both layers.
+  // It is also what makes the sync job's clear-then-warm work: the warm runs in
+  // the same request as the clear, so a dedup slot that survived it would hand
+  // the warm the value the clear had just thrown away.
   resets.set(key, () => {
     pending = null;
   });
@@ -79,50 +80,58 @@ export function cachedRead<T>(
     const cached = getCache<T>(key);
     if (cached) return cached;
 
-    // Adopting the in-flight computation is the fast path, and it is the one
-    // that has to be defended: the caller who started it is a *different
-    // request*, and once that request ends the instance freezes with the
-    // promise still pending. Waiting on it unconditionally is unbounded, so a
-    // discarded `<Link>` prefetch could leave the next reader on that instance
-    // staring at a skeleton with no error and a 200 in the log. See
-    // `withDeadline`.
-    if (pending) {
-      const adopted = pending;
-      const result = await withDeadline(adopted, ADOPTED_DEADLINE_MS);
+    const owner = requestToken();
 
-      if (result !== TIMED_OUT) return result;
+    // Only ever adopt a computation this same request started. The slot is
+    // module-level and therefore outlives the request that filled it, and a
+    // promise from a request that has ended is not a shortcut — it is a
+    // promise that will never settle. See `requestToken`.
+    if (pending && pending.owner === owner) return pending.run;
 
-      // Nothing is coming. Clear the slot — unless somebody has already
-      // replaced it — so the next caller does not adopt it too, and do the
-      // work here instead.
-      if (pending === adopted) pending = null;
-    }
+    const started = {
+      owner,
+      run: readShared().then((value) => {
+        setCache(key, value, ttlSeconds);
+        return value;
+      }),
+    };
 
-    pending = readShared().then((value) => {
-      setCache(key, value, ttlSeconds);
-      return value;
-    });
+    pending = started;
 
     try {
-      return await pending;
+      return await started.run;
     } finally {
-      pending = null;
+      // Only if it is still ours: a slot dropped by `clearCache` and refilled
+      // by a later caller must not be cleared by this one.
+      if (pending === started) pending = null;
     }
   };
 }
 
 /**
- * How long to wait on a computation another request started before giving up
- * on it and doing the work again.
+ * A token identifying the request currently being served, used to decide
+ * whether an in-flight computation is safe to share.
  *
- * Sized against the slowest honest read in the app, not the fastest: a cold
- * season is up to 344 upstream calls, each now bounded at ten seconds by
- * `upstreamSignal`. Fifteen seconds is comfortably past a real one and
- * comfortably short of forever, which is what the alternative was. Paying for
- * one duplicate computation is the cheap side of this trade; the expensive side
- * is a page that never loads again until the instance recycles.
+ * **The whole bug this exists to stop.** A serverless instance is frozen the
+ * moment its request ends, so a promise created by one request neither
+ * continues nor rejects once that request is gone — it simply never settles.
+ * Every link in the nav is prefetched in one burst, and a prefetch the browser
+ * then discards ends its request mid-computation. A later reader that adopted
+ * that computation inherited something already dead: first as a page pinned on
+ * its loading skeleton forever, then — once every upstream read carried a
+ * timeout — as the same page failing with "the feed could not be reached" ten
+ * seconds after the click, while a reload beside it loaded instantly.
+ *
+ * A deadline was the first attempt and it was the wrong instrument: it bounded
+ * how long the reader waited to find out, rather than stopping it waiting on a
+ * corpse. Sharing has to be scoped to the request instead, which is exactly
+ * what React's `cache` does — one value per request, and, crucially, **a fresh
+ * one when there is no request scope at all** (it calls straight through when
+ * React's dispatcher is absent). So a caller outside a render, such as the
+ * cron route, gets a token nobody else can match and always does its own work,
+ * which is the safe default rather than a special case.
  */
-const ADOPTED_DEADLINE_MS = 15_000;
+const requestToken = perRequest(() => Symbol('request'));
 
 /** Per-key hooks that drop an in-flight computation. See `cachedRead`. */
 const resets = new Map<string, () => void>();

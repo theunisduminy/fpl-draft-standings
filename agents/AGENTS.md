@@ -303,15 +303,28 @@ promise simply never settles. So a module-level `let x = somethingAsync()` writt
 one computation between callers is only safe while those callers are inside the same
 request. Between requests it is a trap.
 
-This shipped, and it cost a real bug. `getCompSeasonId()` in `premier-league-data.ts` held
-the _promise_ and kept it forever on success. Every link in the nav is prefetched in one
-burst the moment somebody signs in — the access log shows six routes invoked in three
-seconds — and a prefetch the browser then discards ends its request with that promise
-pending. It never settled, it was never cleared, and every later render of
-`/premier-league` on that instance awaited it. **The symptom is a page stuck on its loading
-skeleton with no error, no log line and a 200 in the access log**, which a reload "fixes"
-only because it lands on another instance. `/premier-league` was the only page with that
-shape, so it was the only page that did it.
+This shipped, and it cost a real bug, twice. `getCompSeasonId()` in
+`premier-league-data.ts` held the _promise_ and kept it forever on success, and
+`cachedRead`'s dedup slot did the same for the life of a computation. Every link in the nav
+is prefetched in one burst the moment somebody signs in — the access log shows six routes
+invoked in a single second — and a prefetch the browser then discards ends its request
+mid-computation. Every later render of `/premier-league` on that instance adopted what that
+prefetch had started, which was already dead.
+
+**Both symptoms look like a browser problem and neither is.** First it was a page pinned on
+its loading skeleton with no error, no log line and a 200 in the access log. Then, once
+every upstream read carried `upstreamSignal()`, the same page failed with "the feed could
+not be reached" exactly ten seconds after the click. A reload "fixes" both, which is the
+tell: a reload is a fresh request that does not adopt anything.
+
+**The second fix was the wrong instrument, and that is the lesson.** A deadline on the
+adopted promise only bounded how long the reader waited to discover it was waiting on a
+corpse — it converted a hang into an error, which is more honest and no more correct. The
+fix is not to wait more carefully. It is not to share across requests at all: `cachedRead`
+now stamps its slot with a per-request token from React's `cache`, and adopts only its own
+request's work. Outside a request scope React's `cache` calls straight through, so a caller
+with no scope gets a token nobody matches and always does its own work — the safe default
+falls out rather than being special-cased.
 
 **A hang is only one of its symptoms.** The same slot in
 `/api/cron/revalidate` holds the single-flight guard, and nothing awaits it — a
@@ -324,14 +337,15 @@ Ask which question a slot is answering before choosing the guard.
 
 Three rules come out of it, and they apply to any cache, memo or dedup slot:
 
-- **Memoise the settled value, not the promise.** Hold the promise only while it is
-  genuinely in flight, and clear it however it ends — resolved, rejected, or abandoned.
-- **Never `await` an adopted promise unbounded.** `withDeadline` in
-  [`src/utils/deadline.ts`](../src/utils/deadline.ts) is how: past the deadline the caller
-  drops the slot and does the work itself. `cachedRead`'s dedup and the season ID both go
-  through it.
+- **Memoise the settled value, never the promise.** A number, a row, a payload is safe to
+  keep for the life of the process. A promise is only ever safe inside the request that
+  created it.
+- **Scope any sharing of in-flight work to one request.** `requestToken` in
+  [`src/utils/cache.ts`](../src/utils/cache.ts) is how, and `cachedRead` is the only thing
+  that needs it. A deadline is not a substitute: it bounds the wait, not the mistake.
 - **Every upstream `fetch` carries `upstreamSignal()`.** `fetch` has no timeout of its own,
   so a connection that never answers is the same never-settling promise one layer down.
+  This is what turns a silent hang into a loud failure — worth having, and not a fix.
 
 The general shape to distrust: state that outlives a request, holding something that only
 makes sense inside one.
@@ -436,7 +450,7 @@ makes sense inside one.
   than `deriveSeasonState()`.
 - Never render a provisional rank, F1 score or position without saying it is provisional.
 - Never hold a promise in a module-level variable past the request that created it, and
-  never `await` one somebody else started without a deadline — see above.
+  never `await` one another request started — scope the sharing instead. See above.
 - Never call an upstream API without `upstreamSignal()`.
 
 ---
