@@ -222,7 +222,6 @@ async function buildFromTable(): Promise<ElementLookupData | null> {
 async function buildBootstrapData(): Promise<ElementLookupData> {
   const bootstrap = await fetchUpstream<DraftBootstrap>(
     fplApi.draftBootstrap(),
-    CACHE_TTL_SECONDS,
   );
 
   // Both of these are addressed by the bootstrap's own season-scoped `id`,

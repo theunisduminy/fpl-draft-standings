@@ -346,6 +346,14 @@ Three rules come out of it, and they apply to any cache, memo or dedup slot:
 - **Every upstream `fetch` carries `upstreamSignal()`.** `fetch` has no timeout of its own,
   so a connection that never answers is the same never-settling promise one layer down.
   This is what turns a silent hang into a loud failure — worth having, and not a fix.
+- **One cache per thing, and here that cache is `cachedRead`.** Upstream reads are
+  `cache: 'no-store'`. A fetch with a positive `revalidate` takes Next's cached path, which
+  opens with `await incrementalCache.lock(cacheKey)` _before_ the network; a request aborted
+  mid-fetch can leave that per-URL lock held, and the next render waits on it. That is what
+  finally explained `/premier-league`: ten seconds of skeleton, then "the feed could not be
+  reached", while a reload loaded instantly — the timeout expiring on a queue rather than on
+  anything the network did. Pulse answers in under 300ms, cold, every time. Caching the same
+  payload at three layers is what made a slow lock look like a slow API.
 
 The general shape to distrust: state that outlives a request, holding something that only
 makes sense inside one.

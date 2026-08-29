@@ -79,7 +79,7 @@ async function resolvePremierLeagueTeams(): Promise<PlTeam[]> {
 export async function fetchFromBootstrap(): Promise<PlTeam[]> {
   const response = await fetch(fplApi.bootstrapStatic(), {
     signal: upstreamSignal(),
-    next: { revalidate: 86_400 },
+    cache: 'no-store',
   });
 
   if (!response.ok) {

@@ -51,7 +51,7 @@ const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
 async function fetchEventStatus(): Promise<GameWeekStatus[]> {
   const res = await fetch(fplApi.eventStatus(), {
     signal: upstreamSignal(),
-    next: { revalidate: 300 },
+    cache: 'no-store',
   });
 
   if (res.status === 404) {
@@ -78,7 +78,7 @@ async function fetchGameState(): Promise<GameState | null> {
   try {
     const res = await fetch(fplApi.game(), {
       signal: upstreamSignal(),
-      next: { revalidate: 60 },
+      cache: 'no-store',
     });
 
     if (!res.ok) return null;
@@ -112,7 +112,7 @@ async function fetchGameweekBatch(
       Promise.all([
         fetch(fplApi.eventLive(gw), {
           signal: upstreamSignal(),
-          next: { revalidate: 300 },
+          cache: 'no-store',
         }).then((res) => res.json() as Promise<EventLive>),
         // `entry_id` addresses the URL, `id` identifies the manager. They are
         // different numbers for the same person; the branded types are what
