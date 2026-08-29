@@ -62,7 +62,6 @@ const readCompSeasonId = cachedRead(
   async (): Promise<number> => {
     const response = await fetchPulse<PulseCompSeasonsResponse>(
       pulseApi.compSeasons(),
-      SEASON_TTL_SECONDS,
     );
 
     const id = newestCompSeasonId(response);
@@ -150,14 +149,8 @@ const readSeason = cachedRead(
 
     // Two independent reads of the same season — no reason to serialise them.
     const [standings, fixtures] = await Promise.all([
-      fetchPulse<PulseStandingsResponse>(
-        pulseApi.standings(compSeasonId),
-        DATA_TTL_SECONDS,
-      ),
-      fetchPulse<PulseFixturesResponse>(
-        pulseApi.fixtures(compSeasonId),
-        DATA_TTL_SECONDS,
-      ),
+      fetchPulse<PulseStandingsResponse>(pulseApi.standings(compSeasonId)),
+      fetchPulse<PulseFixturesResponse>(pulseApi.fixtures(compSeasonId)),
     ]);
 
     const table: LeagueTableRow[] = toLeagueTable(standings);

@@ -92,7 +92,6 @@ async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
   try {
     const body = await fetchUpstream<{ choices?: DraftChoice[] }>(
       fplApi.draftChoices(leagueId),
-      900,
     );
     return body.choices ?? [];
   } catch {
@@ -107,7 +106,6 @@ async function computeSquads(): Promise<SquadsResponse> {
     fetchLeagueDetails(leagueId),
     fetchUpstream<{ element_status: ElementStatus[] }>(
       fplApi.elementStatus(leagueId),
-      900,
     ),
     // Names, positions, clubs, codes and points come from the shared element
     // lookup — the reference tables when they can answer, the ~850 KB static

@@ -49,9 +49,10 @@ const LEAGUE_ID_VAR = 'FPL_LEAGUE_ID';
  * about a second; anything near this number is already broken, and an error the
  * reader can retry beats a skeleton that never resolves.
  *
- * Next strips the signal when it revalidates a cached response in the
- * background (`patch-fetch.js`), so this bounds the reads a person is waiting
- * on without touching Next's own refresh, and the Data Cache still applies.
+ * It only means anything because these reads are `no-store`: a cached fetch
+ * waits on Next's per-URL lock *before* the request goes out, so a signal
+ * started here would be timing the queue rather than the network. See
+ * `fetchUpstream`.
  */
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
@@ -92,20 +93,38 @@ export function getLeagueId(): number {
  * Read one upstream endpoint as JSON, or throw.
  *
  * The only sanctioned way to assert an upstream payload's shape, so the cast
- * happens in one place and every caller gets the same error format and the
- * same revalidate contract. Endpoints with a documented non-JSON failure mode
- * — `event-status` answers 404 with a bare string — need their own handling
- * rather than this.
+ * happens in one place and every caller gets the same error format. Endpoints
+ * with a documented non-JSON failure mode — `event-status` answers 404 with a
+ * bare string — need their own handling rather than this.
+ *
+ * **`no-store`, deliberately: caching is `cachedRead`'s job and only its job.**
+ * These reads used to carry `next: { revalidate }` as well, which put Next's
+ * per-URL Data Cache underneath a layer that was already caching the finished
+ * result on the same TTL — the same data kept three times, and the third copy
+ * cost a page.
+ *
+ * Any fetch with a positive `revalidate` takes Next's cached path, and that
+ * path opens with `await incrementalCache.lock(cacheKey)` before it touches
+ * the network (`patch-fetch.js`). A request aborted mid-fetch — a discarded
+ * prefetch, a navigation the reader moved on from — can leave that per-URL lock
+ * held, and the next render simply waits on it. On `/premier-league` that was
+ * ten seconds of skeleton followed by "the feed could not be reached", while a
+ * reload beside it loaded instantly: the lock made the *second* caller pay, and
+ * the timeout below, started before the lock wait, expired on queueing rather
+ * than on anything the network did. Pulse answers in under 300ms, cold, every
+ * time.
+ *
+ * So the timeout now measures what a timeout should measure, and there is one
+ * cache instead of two.
  */
 export async function fetchUpstream<T>(
   url: string,
-  revalidateSeconds: number,
   headers?: Record<string, string>,
 ): Promise<T> {
   const res = await fetch(url, {
     headers,
     signal: upstreamSignal(),
-    next: { revalidate: revalidateSeconds },
+    cache: 'no-store',
   });
 
   if (!res.ok) {
@@ -122,11 +141,8 @@ export async function fetchUpstream<T>(
  * a Pulse call that forgets the header does not fail loudly — it comes back
  * `403` and reads as "the Premier League page is down".
  */
-export async function fetchPulse<T>(
-  url: string,
-  revalidateSeconds: number,
-): Promise<T> {
-  return fetchUpstream<T>(url, revalidateSeconds, { ...PULSE_HEADERS });
+export async function fetchPulse<T>(url: string): Promise<T> {
+  return fetchUpstream<T>(url, { ...PULSE_HEADERS });
 }
 
 export const fplApi = {

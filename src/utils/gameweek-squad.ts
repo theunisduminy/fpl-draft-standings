@@ -64,7 +64,7 @@ export async function getGameweekSquad(
   // Started before the league is awaited: neither depends on which manager was
   // asked for, so waiting would put a league round trip in front of them for
   // nothing.
-  const livePromise = fetchUpstream<EventLive>(fplApi.eventLive(gameweek), 300);
+  const livePromise = fetchUpstream<EventLive>(fplApi.eventLive(gameweek));
   const lookupPromise = getElementLookup();
 
   // Swallow a rejection that nobody awaits, in case the early return below
@@ -141,7 +141,7 @@ export async function fetchEntryPicks(
 ): Promise<EntryPick[]> {
   const res = await fetch(fplApi.entryEvent(entryId, gameweek), {
     signal: upstreamSignal(),
-    next: { revalidate: 300 },
+    cache: 'no-store',
   });
 
   if (res.status === 404) return [];

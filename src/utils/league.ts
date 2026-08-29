@@ -12,10 +12,7 @@ export async function fetchLeagueDetails(
   leagueId: number,
 ): Promise<LeagueDetails> {
   try {
-    return await fetchUpstream<LeagueDetails>(
-      fplApi.leagueDetails(leagueId),
-      300,
-    );
+    return await fetchUpstream<LeagueDetails>(fplApi.leagueDetails(leagueId));
   } catch (cause) {
     // League IDs are minted fresh every August, so a failure here is far more
     // often a stale ID than an outage. Say so.
