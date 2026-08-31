@@ -22,7 +22,7 @@ import {
   type EntryPicks,
 } from './scoring';
 import { deriveSeasonState } from './season-state';
-import { fplApi, getLeagueId, upstreamSignal } from './fpl-api';
+import { fplApi, getLeagueId, upstreamFetch } from './fpl-api';
 import { fetchEntryPicks } from './gameweek-squad';
 import { fetchLeagueDetails } from './league';
 import { cachedRead } from './cache';
@@ -49,10 +49,7 @@ const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
  * instead of failing.
  */
 async function fetchEventStatus(): Promise<GameWeekStatus[]> {
-  const res = await fetch(fplApi.eventStatus(), {
-    signal: upstreamSignal(),
-    cache: 'no-store',
-  });
+  const res = await upstreamFetch(fplApi.eventStatus());
 
   if (res.status === 404) {
     return [];
@@ -62,7 +59,7 @@ async function fetchEventStatus(): Promise<GameWeekStatus[]> {
     throw new Error(`Event status request failed with ${res.status}`);
   }
 
-  const body = await res.json();
+  const body = (await res.json()) as { status?: GameWeekStatus[] } | null;
   return Array.isArray(body?.status) ? body.status : [];
 }
 
@@ -76,10 +73,7 @@ async function fetchEventStatus(): Promise<GameWeekStatus[]> {
  */
 async function fetchGameState(): Promise<GameState | null> {
   try {
-    const res = await fetch(fplApi.game(), {
-      signal: upstreamSignal(),
-      cache: 'no-store',
-    });
+    const res = await upstreamFetch(fplApi.game());
 
     if (!res.ok) return null;
 
@@ -110,10 +104,9 @@ async function fetchGameweekBatch(
   for (let gw = startGw; gw <= endGw; gw++) {
     batchPromises.push(
       Promise.all([
-        fetch(fplApi.eventLive(gw), {
-          signal: upstreamSignal(),
-          cache: 'no-store',
-        }).then((res) => res.json() as Promise<EventLive>),
+        upstreamFetch(fplApi.eventLive(gw)).then(
+          (res) => res.json() as Promise<EventLive>,
+        ),
         // `entry_id` addresses the URL, `id` identifies the manager. They are
         // different numbers for the same person; the branded types are what
         // stop them being swapped here.

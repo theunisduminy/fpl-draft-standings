@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { Agent, fetch as undiciFetch } from 'undici';
+
 import type { EntryId } from '@/interfaces/fpl';
 
 /**
@@ -62,6 +64,62 @@ export function upstreamSignal(): AbortSignal {
 }
 
 /**
+ * One fresh connection per upstream read, closed when the response lands.
+ *
+ * `pipelining: 0` is undici's "no keep-alive": nothing about a finished read
+ * outlives it, and that is the entire point. The default pool keeps idle
+ * sockets to reuse, which is exactly the state a serverless pause corrupts.
+ * The sign-in burst prefetches every page in the nav, one of those renders
+ * opens a connection to Pulse, and the instance is then paused with that
+ * socket in its pool. The far end gives up on it during the pause — but the
+ * FIN or RST arrives while nothing is listening, so on resume undici still
+ * believes the socket is alive, writes the next request into the void, and
+ * waits. That was `/premier-league` timing out after exactly ten seconds on
+ * the first click of every session while a reload beside it answered in
+ * 300ms: the click reused the corpse (and, by timing out, destroyed it),
+ * the reload got the fresh connection the click should have had.
+ *
+ * This is the third face of the same law — never share state across requests
+ * that only makes sense inside one. First the memoised promise, then the
+ * dedup slot, now the socket pool: each fix moved the sharing down a layer
+ * and the pause corrupted the next one. A TCP connection is request-scoped
+ * state here, so it is not kept.
+ *
+ * The price is a TLS handshake per read — one to three reads per page miss,
+ * against caches measured in minutes. Pulse answers in ~300ms cold including
+ * the handshake; reuse was buying nothing and costing the page.
+ *
+ * `undici`'s own `fetch` rather than the global: Node's bundled fetch rejects
+ * a dispatcher built by a different undici major (`invalid onRequestStart`),
+ * so the agent and the fetch must come from the same package. Bypassing
+ * Next's patched fetch also loses nothing — these reads were `no-store`
+ * precisely so that patch would do nothing.
+ */
+const freshConnectionAgent = new Agent({ pipelining: 0 });
+
+/**
+ * The one door every upstream read leaves through.
+ *
+ * Returns the raw `Response`, for the callers that must read a status before
+ * a body — `event-status` 404s with a bare string, `entryEvent` 404s meaning
+ * "no picks yet". `fetchUpstream` below is the JSON-or-throw wrapper over it.
+ *
+ * A caller may bring its own `signal` (the cron job runs a longer deadline);
+ * everyone else gets `upstreamSignal()`. Both the fresh connection and the
+ * timeout are applied here so no call site can forget either.
+ */
+export function upstreamFetch(
+  url: string,
+  init?: { headers?: Record<string, string>; signal?: AbortSignal },
+): ReturnType<typeof undiciFetch> {
+  return undiciFetch(url, {
+    headers: init?.headers,
+    signal: init?.signal ?? upstreamSignal(),
+    dispatcher: freshConnectionAgent,
+  });
+}
+
+/**
  * Draft league IDs are season-scoped — a renewed league gets a fresh ID every
  * August — so the ID is read from the environment, never hard-coded.
  *
@@ -116,16 +174,15 @@ export function getLeagueId(): number {
  *
  * So the timeout now measures what a timeout should measure, and there is one
  * cache instead of two.
+ *
+ * `upstreamFetch` sidesteps Next's fetch patching entirely, which is what
+ * `cache: 'no-store'` was opting out of, so that option goes with it.
  */
 export async function fetchUpstream<T>(
   url: string,
   headers?: Record<string, string>,
 ): Promise<T> {
-  const res = await fetch(url, {
-    headers,
-    signal: upstreamSignal(),
-    cache: 'no-store',
-  });
+  const res = await upstreamFetch(url, { headers });
 
   if (!res.ok) {
     throw new Error(`Request to ${url} failed with ${res.status}`);

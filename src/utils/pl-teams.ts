@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { fplApi, upstreamSignal } from '@/utils/fpl-api';
+import { fplApi, upstreamFetch } from '@/utils/fpl-api';
 import { asTeamCode, type PlTeam, type TeamCode } from '@/interfaces/fpl';
 import { readTeams } from '@/server/data/pl-teams';
 import {
@@ -77,10 +77,7 @@ async function resolvePremierLeagueTeams(): Promise<PlTeam[]> {
  * table, which is exactly the state the season starts in.
  */
 export async function fetchFromBootstrap(): Promise<PlTeam[]> {
-  const response = await fetch(fplApi.bootstrapStatic(), {
-    signal: upstreamSignal(),
-    cache: 'no-store',
-  });
+  const response = await upstreamFetch(fplApi.bootstrapStatic());
 
   if (!response.ok) {
     throw new Error(`Bootstrap-static request failed with ${response.status}`);

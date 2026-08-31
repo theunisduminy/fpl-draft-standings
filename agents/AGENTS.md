@@ -335,7 +335,21 @@ robot. It is guarded by a timestamp instead of a deadline, because the question
 there is "is anyone still working on this?" rather than "how long will I wait?".
 Ask which question a slot is answering before choosing the guard.
 
-Three rules come out of it, and they apply to any cache, memo or dedup slot:
+**The socket pool is the same trap one layer below JavaScript.** With the promise
+sharing fixed and the fetch caching gone, `/premier-league` still hung ten seconds on
+the first click of every session — and the tell was the same: a reload beside it loaded
+instantly. The sign-in prefetch burst opens a connection to Pulse, the instance is
+paused with that socket idle in undici's keep-alive pool, and the far end gives up on
+it during the pause. The FIN arrives while nothing is listening, so on resume undici
+still believes the socket is alive, writes the click's request into the void, and waits
+out the full timeout — which, by aborting, destroys the corpse and hands the reload the
+fresh connection the click should have had. A TCP connection is request-scoped state
+exactly like a promise, so upstream reads no longer keep any: `upstreamFetch` in
+`src/utils/fpl-api.ts` dispatches every one through an undici agent with
+`pipelining: 0`, one fresh connection per read, closed when the response lands. A TLS
+handshake per read is nothing against caches measured in minutes.
+
+The rules that come out of it apply to any cache, memo, dedup slot — or pool:
 
 - **Memoise the settled value, never the promise.** A number, a row, a payload is safe to
   keep for the life of the process. A promise is only ever safe inside the request that
@@ -343,9 +357,12 @@ Three rules come out of it, and they apply to any cache, memo or dedup slot:
 - **Scope any sharing of in-flight work to one request.** `requestToken` in
   [`src/utils/cache.ts`](../src/utils/cache.ts) is how, and `cachedRead` is the only thing
   that needs it. A deadline is not a substitute: it bounds the wait, not the mistake.
-- **Every upstream `fetch` carries `upstreamSignal()`.** `fetch` has no timeout of its own,
-  so a connection that never answers is the same never-settling promise one layer down.
-  This is what turns a silent hang into a loud failure — worth having, and not a fix.
+- **Every upstream read goes through `upstreamFetch`** (or `fetchUpstream`/`fetchPulse`
+  over it), which applies both `upstreamSignal()` and the fresh-connection dispatcher so
+  no call site can forget either. `fetch` has no timeout of its own, so a connection that
+  never answers is the same never-settling promise one layer down; the timeout is what
+  turns a silent hang into a loud failure — worth having, and not a fix. The dispatcher
+  is what stops the hang happening at all.
 - **One cache per thing, and here that cache is `cachedRead`.** Upstream reads are
   `cache: 'no-store'`. A fetch with a positive `revalidate` takes Next's cached path, which
   opens with `await incrementalCache.lock(cacheKey)` _before_ the network; a request aborted
@@ -459,7 +476,9 @@ makes sense inside one.
 - Never render a provisional rank, F1 score or position without saying it is provisional.
 - Never hold a promise in a module-level variable past the request that created it, and
   never `await` one another request started — scope the sharing instead. See above.
-- Never call an upstream API without `upstreamSignal()`.
+- Never call an upstream API with the global `fetch` — go through `upstreamFetch`, which
+  applies the timeout and the fresh-connection dispatcher together. A pooled keep-alive
+  socket is a promise across requests in TCP form.
 
 ---
 
