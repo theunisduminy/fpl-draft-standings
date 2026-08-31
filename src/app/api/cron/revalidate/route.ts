@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 import type { DraftBootstrap } from '@/interfaces/fpl';
 import { upsertElements } from '@/server/data/elements';
 import { upsertTeams } from '@/server/data/pl-teams';
-import { fplApi, getLeagueId } from '@/utils/fpl-api';
+import { fplApi, getLeagueId, upstreamFetch } from '@/utils/fpl-api';
 import { toElementRows, toTeamRows } from '@/utils/reference-mapping';
 import { clearCache } from '@/utils/cache';
 import { computeSeasonUncached, getGameweekData } from '@/utils/gameweek-data';
@@ -327,8 +327,7 @@ type BootstrapAttempt =
 
 async function attemptBootstrapFetch(): Promise<BootstrapAttempt> {
   try {
-    const response = await fetch(fplApi.draftBootstrap(), {
-      cache: 'no-store',
+    const response = await upstreamFetch(fplApi.draftBootstrap(), {
       signal: AbortSignal.timeout(BOOTSTRAP_TIMEOUT_MS),
     });
 

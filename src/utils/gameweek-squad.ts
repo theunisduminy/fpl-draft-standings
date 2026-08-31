@@ -7,7 +7,7 @@ import type {
   Position,
 } from '@/interfaces/fpl';
 
-import { fetchUpstream, fplApi, getLeagueId, upstreamSignal } from './fpl-api';
+import { fetchUpstream, fplApi, getLeagueId, upstreamFetch } from './fpl-api';
 import { fetchLeagueDetails } from './league';
 import { ensureCovers, getElementLookup } from './draft-elements';
 
@@ -139,10 +139,7 @@ export async function fetchEntryPicks(
   entryId: EntryId,
   gameweek: number,
 ): Promise<EntryPick[]> {
-  const res = await fetch(fplApi.entryEvent(entryId, gameweek), {
-    signal: upstreamSignal(),
-    cache: 'no-store',
-  });
+  const res = await upstreamFetch(fplApi.entryEvent(entryId, gameweek));
 
   if (res.status === 404) return [];
 
