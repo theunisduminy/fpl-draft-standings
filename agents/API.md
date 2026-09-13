@@ -859,16 +859,16 @@ level, updates the candidate block reason, and leaves the gameweek absent for re
 Every probe returns `{ name, pass, evidence }`, with evidence bounded at 500 characters
 plus observed field values: the offending snippet, never the payload.
 
-| Probe                      | Trap it catches                                                                                              | Evidence attached                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| `event-status-shape`       | `event-status` 404s with the bare string `"Game not started"`, not `{ status: [...] }`                       | `expected { status: [...] }, saw` plus the body snippet                    |
-| `event-status-rows`        | one row per date, not per gameweek: `leagues_updated` going true on opening night is not a finished gameweek | the failing row index and the offending row snippet                       |
-| `live-elements-present`    | `elements: {}` is truthy but means nothing is scored yet                                                     | the element key count                                   |
-| `live-elements-played`     | a full elements map with every element on zero minutes is the pre kickoff shape, not a scored week           | the played signal from `hasBeenPlayed()`                |
-| `standings-identity`       | `standings[].league_entry` values must resolve to known `league_entries[].id` values, not `entry_id` values  | the unresolvable values                                 |
-| `pulse-season-started`     | out of season Pulse returns all 20 clubs on zero with `tables[0].gameWeek` at 0                              | the `gameWeek` value plus the entry count               |
-| `pulse-season-selectable`  | season labels are mixed formats, so only the highest `id` is current                                         | the selected `id` and how many seasons were listed      |
-| `probe-runner`             | the probe harness itself threw, which proves nothing about the payload                                       | the thrown message                                      |
+| Probe                     | Trap it catches                                                                                              | Evidence attached                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| `event-status-shape`      | `event-status` 404s with the bare string `"Game not started"`, not `{ status: [...] }`                       | `expected { status: [...] }, saw` plus the body snippet |
+| `event-status-rows`       | one row per date, not per gameweek: `leagues_updated` going true on opening night is not a finished gameweek | the failing row index and the offending row snippet     |
+| `live-elements-present`   | `elements: {}` is truthy but means nothing is scored yet                                                     | the element key count                                   |
+| `live-elements-played`    | a full elements map with every element on zero minutes is the pre kickoff shape, not a scored week           | the played signal from `hasBeenPlayed()`                |
+| `standings-identity`      | `standings[].league_entry` values must resolve to known `league_entries[].id` values, not `entry_id` values  | the unresolvable values                                 |
+| `pulse-season-started`    | out of season Pulse returns all 20 clubs on zero with `tables[0].gameWeek` at 0                              | the `gameWeek` value plus the entry count               |
+| `pulse-season-selectable` | season labels are mixed formats, so only the highest `id` is current                                         | the selected `id` and how many seasons were listed      |
+| `probe-runner`            | the probe harness itself threw, which proves nothing about the payload                                       | the thrown message                                      |
 
 The Pulse probes annotate rather than block. Pulse has no fallback by design: if Pulse
 is unreachable, `/premier-league` says so, and its probes attach the reason to the

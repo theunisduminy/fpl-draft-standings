@@ -63,10 +63,7 @@
       "compositePrimaryKeys": {
         "draft_elements_league_id_element_id_pk": {
           "name": "draft_elements_league_id_element_id_pk",
-          "columns": [
-            "league_id",
-            "element_id"
-          ]
+          "columns": ["league_id", "element_id"]
         }
       },
       "uniqueConstraints": {},
@@ -122,10 +119,7 @@
       "compositePrimaryKeys": {
         "finalisation_candidates_league_id_gameweek_pk": {
           "name": "finalisation_candidates_league_id_gameweek_pk",
-          "columns": [
-            "league_id",
-            "gameweek"
-          ]
+          "columns": ["league_id", "gameweek"]
         }
       },
       "uniqueConstraints": {},
@@ -180,11 +174,7 @@
       "compositePrimaryKeys": {
         "gameweek_scores_league_id_gameweek_league_entry_pk": {
           "name": "gameweek_scores_league_id_gameweek_league_entry_pk",
-          "columns": [
-            "league_id",
-            "gameweek",
-            "league_entry"
-          ]
+          "columns": ["league_id", "gameweek", "league_entry"]
         }
       },
       "uniqueConstraints": {},
@@ -221,10 +211,7 @@
       "compositePrimaryKeys": {
         "gameweeks_league_id_gameweek_pk": {
           "name": "gameweeks_league_id_gameweek_pk",
-          "columns": [
-            "league_id",
-            "gameweek"
-          ]
+          "columns": ["league_id", "gameweek"]
         }
       },
       "uniqueConstraints": {},
@@ -267,20 +254,14 @@
       "compositePrimaryKeys": {
         "league_members_league_id_email_pk": {
           "name": "league_members_league_id_email_pk",
-          "columns": [
-            "league_id",
-            "email"
-          ]
+          "columns": ["league_id", "email"]
         }
       },
       "uniqueConstraints": {
         "league_members_league_id_league_entry_unique": {
           "name": "league_members_league_id_league_entry_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "league_id",
-            "league_entry"
-          ]
+          "columns": ["league_id", "league_entry"]
         }
       },
       "policies": {},
@@ -328,10 +309,7 @@
       "compositePrimaryKeys": {
         "pl_teams_league_id_code_pk": {
           "name": "pl_teams_league_id_code_pk",
-          "columns": [
-            "league_id",
-            "code"
-          ]
+          "columns": ["league_id", "code"]
         }
       },
       "uniqueConstraints": {},
