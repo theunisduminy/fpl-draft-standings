@@ -61,6 +61,35 @@ export const STANDINGS_HIDDEN_BELOW_MD = STANDINGS_COLUMN_SHAPES.flatMap(
 );
 
 /**
+ * The live tower's six columns, in order: manager, points, interval, cushion,
+ * starters, form.
+ *
+ * Read by `LiveTower` for the real board and by `LiveTowerSkeleton` for the
+ * placeholder, for the same reason the standings shapes are shared: the table
+ * is `table-fixed`, so the columns that stay visible must sum to 100 on a
+ * phone (38 + 24 + 20 + 18), and all six must at `md`
+ * (26 + 14 + 14 + 14 + 16 + 16).
+ *
+ * Interval and cushion hide below `md`, following the standings precedent of
+ * keeping the phone board to four columns. The full gaps stay one breakpoint
+ * away rather than stacked as sub-lines, which the eye check for narrow widths
+ * should confirm.
+ */
+export const LIVE_TOWER_COLUMN_SHAPES: ColumnShape[] = [
+  { width: 'w-[38%] md:w-[26%]' },
+  { width: 'w-[24%] md:w-[14%]' },
+  { width: 'md:w-[14%]', hideBelow: 'md' },
+  { width: 'md:w-[14%]', hideBelow: 'md' },
+  { width: 'w-[20%] md:w-[16%]' },
+  { width: 'w-[18%] md:w-[16%]' },
+];
+
+/** The indexes a phone hides, for a skeleton that works in positions. */
+export const LIVE_TOWER_HIDDEN_BELOW_MD = LIVE_TOWER_COLUMN_SHAPES.flatMap(
+  (column, index) => (column.hideBelow === 'md' ? [index] : []),
+);
+
+/**
  * The row grammar the standings cards share.
  *
  * The season tab's heatmap and form guide sit side by side and are supposed to
