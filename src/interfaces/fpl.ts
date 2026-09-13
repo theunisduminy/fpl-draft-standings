@@ -163,8 +163,24 @@ export interface LeagueStanding {
   event_total: number;
 }
 
+/**
+ * One draft in the `league.drafts[]` list from `/api/league/{id}/details`.
+ *
+ * A season holds two: the August draft at `event` 1 and the re-draft at
+ * `event` 24 (see `agents/API.md`). Only the four fields the lineage selector
+ * reads are kept — the rest of the payload (`draft_dt`, `order_method`, …)
+ * stays dropped with the trim, as with everything else in this file.
+ */
+export interface DraftInfo {
+  id: number;
+  event: number;
+  draft_started: boolean;
+  draft_completed: string | null;
+}
+
 /** `/api/league/{id}/details`, trimmed to the parts we read. */
 export interface LeagueDetails {
+  league: { drafts: DraftInfo[] };
   league_entries: LeagueEntry[];
   standings: LeagueStanding[];
 }
