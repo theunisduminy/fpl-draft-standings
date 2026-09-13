@@ -374,6 +374,22 @@ The draft itself: 120 rows over 15 rounds, in pick order. Each carries `element`
 A historical record — it does **not** track later trades or waivers, so it is the wrong
 source for "who owns X now". Good for a draft-recap view.
 
+**Seed and guard (cron-owned).** `/api/cron/revalidate` seeds the frozen `draft_picks`
+record from this endpoint, once per started draft id in `league.drafts` — and the table,
+not this endpoint, is what the squads page reads once seeded:
+
+- The guard keys on the upstream **draft id**, not on row count: a populated table is
+  never re-synced, while a newly started draft (the GW24 re-draft) still seeds when its
+  id appears.
+- An empty choices response seeds nothing and **deletes nothing**. Against a populated
+  table that is the draft board surviving an upstream wipe; against an empty one the
+  next run simply retries.
+- Choices whose element resolves to no stable `code` are dropped from the seed set
+  rather than stored with a null code.
+- Ownership snapshots are the sibling write in the same step: one ~581-row snapshot per
+  **newly-finalised** gameweek only, from a fresh `element-status` read in the same run.
+  Older gameweeks are unrecoverable from present-tense ownership and stay absent.
+
 ### `GET /api/bootstrap-static` (draft)
 
 The draft game's own static dataset: `elements`, `teams`, `element_types`, `events`,
@@ -726,15 +742,17 @@ returns a different club or a different footballer.
 
 **There are two route handlers, and only one of them is ours.**
 
-| Route                  | Returns                          | Backed by                                     |
-| ---------------------- | -------------------------------- | --------------------------------------------- |
-| `/api/auth/[...path]`  | Neon Auth's own handler          | `auth.handler()`                              |
-| `/api/cron/revalidate` | Per-step sync outcomes, and `ok` | the reference DAL + `computeSeasonUncached()` |
+| Route                  | Returns                          | Backed by                                                                |
+| ---------------------- | -------------------------------- | ------------------------------------------------------------------------ |
+| `/api/auth/[...path]`  | Neon Auth's own handler          | `auth.handler()`                                                         |
+| `/api/cron/revalidate` | Per-step sync outcomes, and `ok` | the reference DAL + `computeSeasonUncached()` + the lineage DAL          |
 
 `/api/cron/revalidate` is the sync job: every three hours it refreshes
 `draft_elements` and `pl_teams` from the draft bootstrap, writes any newly
-finalised gameweek, then expires the cache tags, clears the in-memory map and
-re-warms. Its caller is Vercel Cron rather than a person, so it authenticates
+finalised gameweek, then — in a sequential `lineage` step — seeds `draft_picks`
+for started drafts with no rows yet and snapshots ownership for exactly the
+gameweeks just finalised, before expiring the cache tags, clearing the in-memory map and
+re-warming. Its caller is Vercel Cron rather than a person, so it authenticates
 with a constant-time bearer `CRON_SECRET` comparison and `src/proxy.ts` excludes
 `/api/cron` from the sign-in redirect. That exclusion buys authentication
 written by hand; it does not make the path public, and nothing else may be

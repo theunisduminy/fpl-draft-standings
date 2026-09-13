@@ -13,6 +13,7 @@ import {
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
 import { ensureCovers, getElementLookup } from './draft-elements';
+import { readDraftPicks } from '@/server/data/lineage';
 import { cachedRead } from './cache';
 
 /**
@@ -82,11 +83,74 @@ export interface SquadsResponse {
 }
 
 /**
+ * One stored draft pick, as the lineage DAL returns it.
+ *
+ * Named through the reader rather than imported so this module does not take
+ * a second opinion on the row shape: whatever `readDraftPicks` resolves to an
+ * array of is what provenance joins against.
+ */
+type StoredDraftPick = Awaited<ReturnType<typeof readDraftPicks>>[number];
+
+/**
+ * The draft choices for the provenance join, database first.
+ *
+ * Stored picks win when they cover every owned element; anything else — an
+ * empty table pre-seed, an unreadable one mid-outage, a table missing one
+ * owned element — falls the whole read back to live choices rather than
+ * rendering a partial record. Live choices are therefore fetched only on that
+ * fallback path, never alongside a covering table.
+ *
+ * The join semantics below are exactly today's: a stored row becomes the same
+ * `DraftChoice` shape the live endpoint would have given, so `toSquadPlayer`
+ * cannot tell which source answered.
+ */
+async function resolveChoices(
+  leagueId: number,
+  stored: StoredDraftPick[],
+  owned: ReadonlySet<ElementId>,
+): Promise<Map<ElementId, DraftChoice>> {
+  const storedByElement = new Map(stored.map((pick) => [pick.elementId, pick]));
+  const covers =
+    stored.length > 0 &&
+    [...owned].every((element) => storedByElement.has(element));
+
+  if (covers) {
+    return new Map(
+      stored.map((pick) => [
+        pick.elementId,
+        {
+          element: pick.elementId,
+          entry: pick.entry,
+          round: pick.round,
+          pick: pick.pick,
+          index: pick.draftIndex,
+          was_auto: pick.wasAuto,
+          seconds_to_pick: pick.secondsToPick,
+        } satisfies DraftChoice,
+      ]),
+    );
+  }
+
+  if (stored.length > 0) {
+    console.error(
+      '[squads] stored draft picks do not cover every owned element; falling back to live choices.',
+    );
+  }
+
+  return new Map(
+    (await fetchDraftChoices(leagueId)).map((choice) => [
+      choice.element,
+      choice,
+    ]),
+  );
+}
+
+/**
  * The draft choices, or `[]` if the draft has not run.
  *
  * Missing choices are not an error — pre-draft the squads are simply empty,
  * and a squad view that renders "not drafted yet" is more use than one that
- * throws.
+ * throws. Now also the fallback behind the stored-picks read above.
  */
 async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
   try {
@@ -102,7 +166,7 @@ async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
 async function computeSquads(): Promise<SquadsResponse> {
   const leagueId = getLeagueId();
 
-  const [league, ownership, initialLookup, choices] = await Promise.all([
+  const [league, ownership, initialLookup, storedPicks] = await Promise.all([
     fetchLeagueDetails(leagueId),
     fetchUpstream<{ element_status: ElementStatus[] }>(
       fplApi.elementStatus(leagueId),
@@ -111,12 +175,17 @@ async function computeSquads(): Promise<SquadsResponse> {
     // lookup — the reference tables when they can answer, the ~850 KB static
     // dataset when they cannot. See `draft-elements.ts`.
     getElementLookup(),
-    fetchDraftChoices(leagueId),
+    // The frozen draft record, when the cron has seeded it. A failure here
+    // must cost the database read, never the page: `null` falls through to
+    // live choices below exactly like an empty table.
+    readDraftPicks().catch((error) => {
+      console.error(
+        '[squads] stored draft picks could not be read; falling back to live choices.',
+        error,
+      );
+      return null;
+    }),
   ]);
-
-  const choiceByElement = new Map<ElementId, DraftChoice>(
-    choices.map((choice) => [choice.element, choice]),
-  );
 
   // Keyed by entry_id, because that is what `element_status[].owner` gives us.
   const owned = new Map<EntryId, ElementId[]>();
@@ -136,6 +205,18 @@ async function computeSquads(): Promise<SquadsResponse> {
   // Ownership is what finally says which elements this page needs, so the
   // completeness check happens here rather than when the lookup was built.
   const lookup = await ensureCovers(initialLookup, [...owned.values()].flat());
+
+  // Provenance is database first: stored picks drive the join when they cover
+  // every owned element, and live choices are read only while the table cannot
+  // answer — empty, unreadable, or missing one owned element. The fallback is
+  // whole-read rather than per-element, so a gap never renders one `free-agent`
+  // hole in an otherwise drafted squad. This is the deliberate inverse of the
+  // reference-table trust direction: picks are a record, not an accelerator.
+  const choiceByElement = await resolveChoices(
+    leagueId,
+    storedPicks ?? [],
+    new Set<ElementId>([...owned.values()].flat()),
+  );
 
   function toSquadPlayer(element: ElementId, owner: EntryId): SquadPlayer {
     const choice = choiceByElement.get(element);
