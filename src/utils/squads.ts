@@ -1,5 +1,7 @@
 import {
   POSITION_ORDER,
+  asElementId,
+  asEntryId,
   type DraftChoice,
   type ElementCode,
   type ElementId,
@@ -117,10 +119,10 @@ async function resolveChoices(
   if (covers) {
     return new Map(
       stored.map((pick) => [
-        pick.elementId,
+        asElementId(pick.elementId),
         {
-          element: pick.elementId,
-          entry: pick.entry,
+          element: asElementId(pick.elementId),
+          entry: asEntryId(pick.entry),
           round: pick.round,
           pick: pick.pick,
           index: pick.draftIndex,

@@ -10,6 +10,7 @@ import type {
   ElementId,
   ElementStatus,
   LeagueDetails,
+  LeagueEntryId,
 } from '@/interfaces/fpl';
 import { upsertElements } from '@/server/data/elements';
 import { getFinalisedGameweeks } from '@/server/data/gameweeks';
@@ -525,10 +526,21 @@ async function seedUnseededDrafts(
     return `choices empty; ${unseeded.length} draft(s) left unseeded`;
   }
 
+  const codeByElement = new Map<number, ElementCode>();
+  for (const choice of choices) {
+    const code = codeOf(choice.element);
+    if (code !== null) codeByElement.set(choice.element, code);
+  }
+
   let written = 0;
 
   for (const draft of unseeded) {
-    const rows = toDraftPickRows(choices, draft, codeOf);
+    const rows = toDraftPickRows(choices, {
+      leagueId,
+      draftId: draft.id,
+      draftEvent: draft.event,
+      codeByElement,
+    });
 
     // Nothing resolvable (no codes): inserting an empty set would write
     // nothing anyway, and the draft stays unseeded for the next run.
@@ -579,15 +591,24 @@ async function snapshotNewlyFinalised(
   // One read, resolved once: every snapshotted gameweek shares the same
   // present-tense ownership, which is exactly why only newly-finalised ones
   // may be stored.
-  const rows = toOwnershipSnapshotRows(
-    ownership.element_status,
-    details.league_entries,
-    codeOf,
+  const codeByElement = new Map<number, ElementCode>();
+  for (const status of ownership.element_status) {
+    const code = codeOf(status.element);
+    if (code !== null) codeByElement.set(status.element, code);
+  }
+  const leagueEntryByEntry = new Map<number, LeagueEntryId>(
+    details.league_entries.map((entry) => [entry.entry_id, entry.id]),
   );
 
   let stored = 0;
 
   for (const gameweek of attributable) {
+    const rows = toOwnershipSnapshotRows(ownership.element_status, {
+      leagueId,
+      gameweek,
+      codeByElement,
+      leagueEntryByEntry,
+    });
     stored += await storeOwnershipSnapshots(gameweek, rows);
   }
 
