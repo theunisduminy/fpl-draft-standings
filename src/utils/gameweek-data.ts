@@ -14,6 +14,23 @@ import {
   getStoredPerformances,
   storeFinalisedGameweeks,
 } from '@/server/data/gameweeks';
+/**
+ * Candidate persistence (U3 lands in a sibling branch in parallel, behind a
+ * hand applied migration).
+ *
+ * Assumed contract, reconciled post-merge: `readCandidates` resolves the
+ * current league's candidate rows (`{ gameweek, fingerprint, firstSeenAt,
+ * lastCheckedAt, blockReason }`); `recordCandidate(gameweek, fingerprint)`
+ * creates or resets one; `confirmCandidate(gameweek)` deletes one (used for
+ * both confirm and drop); `noteBlocked(gameweek, reason)` records or updates
+ * the truncated block reason without confirming.
+ */
+import {
+  confirmCandidate,
+  noteBlocked,
+  readCandidates,
+  recordCandidate,
+} from '@/server/data/finalisation';
 import {
   aggregatePlayers,
   assignRanks,
@@ -22,6 +39,30 @@ import {
   type EntryPicks,
 } from './scoring';
 import { deriveSeasonState } from './season-state';
+/**
+ * Two-phase finalise gate (U1 lands in a sibling branch in parallel).
+ *
+ * Assumed contract, reconciled post-merge: `fingerprintPerformances` stably
+ * serialises one gameweek's scored content; `evaluateCandidate` maps
+ * `{ candidate, fingerprint, now, stillFinal }` to `{ action }` with `action`
+ * one of `record`, `hold`, `confirm`, `reset` or `drop`; and
+ * `CANDIDATE_HOLD_SECONDS` (7200, two hours against the three hour cron) is
+ * the minimum age of a candidate before it may confirm.
+ */
+import {
+  CANDIDATE_HOLD_SECONDS,
+  evaluateCandidate,
+  fingerprintPerformances,
+} from './finalisation';
+/**
+ * Draft shape-tripwire probes (U2 lands in a sibling branch in parallel).
+ *
+ * Assumed contract, reconciled post-merge: `runDraftProbes` is pure and
+ * synchronous, taking the freshly fetched inputs for one gameweek and
+ * returning one `{ name, pass, evidence }` result per probe, failing closed on
+ * unknown shapes.
+ */
+import { runDraftProbes } from './shape-tripwires';
 import { fplApi, getLeagueId, upstreamFetch } from './fpl-api';
 import { fetchEntryPicks } from './gameweek-squad';
 import { fetchLeagueDetails } from './league';
@@ -92,13 +133,21 @@ async function fetchGameState(): Promise<GameState | null> {
  * `finished` is threaded straight through to `scoreGameweek` and is what marks
  * the results as safe to persist. The in-flight gameweek goes through this same
  * function with `false`.
+ *
+ * Returns the scored performances alongside the raw live feed per gameweek.
+ * The feed is what the shape-tripwire probes read: an unscored week leaves no
+ * performances behind, so without it the probes could not tell an empty feed
+ * from a played one.
  */
 async function fetchGameweekBatch(
   startGw: number,
   endGw: number,
   leagueEntries: LeagueEntry[],
   finished: boolean,
-): Promise<GameweekPerformance[]> {
+): Promise<{
+  performances: GameweekPerformance[];
+  liveByGameweek: Map<number, EventLive | null>;
+}> {
   const batchPromises = [];
 
   for (let gw = startGw; gw <= endGw; gw++) {
@@ -134,11 +183,18 @@ async function fetchGameweekBatch(
 
   const results = await Promise.all(batchPromises);
 
+  const liveByGameweek = new Map<number, EventLive | null>();
+
   // `scoreGameweek` returns nothing for a gameweek that cannot be scored, so an
   // unplayed week falls out of the results rather than being stored as zeros.
-  return results.flatMap(({ gameweek, liveData, playerPicks }) =>
-    scoreGameweek(gameweek, liveData, playerPicks, finished),
+  const performances = results.flatMap(
+    ({ gameweek, liveData, playerPicks }) => {
+      liveByGameweek.set(gameweek, liveData);
+      return scoreGameweek(gameweek, liveData, playerPicks, finished);
+    },
   );
+
+  return { performances, liveByGameweek };
 }
 
 /**
@@ -156,8 +212,12 @@ async function fetchGameweekBatch(
 async function fetchMissingGameweeks(
   missing: number[],
   leagueEntries: LeagueEntry[],
-): Promise<GameweekPerformance[]> {
+): Promise<{
+  performances: GameweekPerformance[];
+  liveByGameweek: Map<number, EventLive | null>;
+}> {
   const fetched: GameweekPerformance[] = [];
+  const liveByGameweek = new Map<number, EventLive | null>();
 
   for (let i = 0; i < missing.length; i += BATCH_SIZE) {
     const batch = missing.slice(i, i + BATCH_SIZE);
@@ -170,10 +230,15 @@ async function fetchMissingGameweeks(
       // Only ever called with gameweeks `deriveSeasonState` has declared final.
       true,
     );
-    fetched.push(...batchData.filter((p) => missing.includes(p.event)));
+    batchData.liveByGameweek.forEach((live, gameweek) => {
+      liveByGameweek.set(gameweek, live);
+    });
+    fetched.push(
+      ...batchData.performances.filter((p) => missing.includes(p.event)),
+    );
   }
 
-  return fetched;
+  return { performances: fetched, liveByGameweek };
 }
 
 /**
@@ -189,7 +254,9 @@ async function fetchMissingGameweeks(
  * return a count without doing that work while still reporting success. Every
  * other caller wants the cached wrapper.
  */
-export async function computeSeasonUncached(): Promise<GameweekDataResponse> {
+export async function computeSeasonUncached(
+  report?: FinalisationGateReport,
+): Promise<GameweekDataResponse> {
   const leagueId = getLeagueId();
 
   // The two database reads are keyed off the league alone, so they do not
@@ -223,14 +290,27 @@ export async function computeSeasonUncached(): Promise<GameweekDataResponse> {
     if (!finalised.has(gw)) missing.push(gw);
   }
 
-  const freshPerformances = await fetchMissingGameweeks(
-    missing,
-    league_entries,
-  );
+  const { performances: freshPerformances, liveByGameweek } =
+    await fetchMissingGameweeks(missing, league_entries);
 
-  if (freshPerformances.length > 0) {
-    await storeFinalisedGameweeks(freshPerformances);
-  }
+  // Every finalised-but-unstored write passes two gates here, in both page
+  // renders and the sync job: draft shape-tripwire probes first, then
+  // candidate agreement across two reads. Either gate refuses by leaving the
+  // gameweek absent for retry, never by throwing. `storeFinalisedGameweeks`
+  // below is untouched as the last line of defence, and what is shown this run
+  // is unchanged: held and blocked weeks still render from `freshPerformances`.
+  await finaliseGatedGameweeks({
+    missing,
+    performances: freshPerformances,
+    liveByGameweek,
+    status,
+    game,
+    leagueEntries: league_entries,
+    standings,
+    finalisedThrough,
+    stored: finalised,
+    report,
+  });
 
   // The gameweek being played right now, scored fresh on every cache miss and
   // deliberately never written down.
@@ -243,7 +323,8 @@ export async function computeSeasonUncached(): Promise<GameweekDataResponse> {
   const inFlight = currentGameweek > finalisedThrough ? currentGameweek : null;
 
   const provisional = inFlight
-    ? await fetchGameweekBatch(inFlight, inFlight, league_entries, false)
+    ? (await fetchGameweekBatch(inFlight, inFlight, league_entries, false))
+        .performances
     : [];
 
   const historicalData = [
@@ -280,6 +361,339 @@ export async function computeSeasonUncached(): Promise<GameweekDataResponse> {
     provisionalGameweek,
     rumblerData: buildRumblerData(historicalData, league_entries),
   };
+}
+
+/**
+ * What the two-phase finalise gate decided on this computation, per gameweek.
+ *
+ * Additive observability only: the season response shape is unchanged, and a
+ * caller that does not care passes nothing and gets nothing. The cron sync job
+ * passes one in and formats it into the finalise step detail, so Monday
+ * behaviour (held, blocked, dropped) is visible without new routes.
+ */
+export interface FinalisationGateReport {
+  /** Gameweeks confirmed by two agreeing reads and written by this run. */
+  finalised: number[];
+  /** Gameweeks read as final but not yet writable, with why. */
+  held: { gameweek: number; reason: string }[];
+  /** Gameweeks refused by a shape-tripwire probe, with evidence. */
+  blocked: { gameweek: number; probes: string[]; evidence: string }[];
+  /** Gameweeks whose candidate was removed without a write. */
+  dropped: number[];
+}
+
+/**
+ * Route every finalised-but-unstored gameweek through the two pre-write gates.
+ *
+ * On 2026-08-21 a single agreeing read froze a wrong GW1 for the season: a
+ * finalised gameweek is never refetched and writes are onConflictDoNothing, so
+ * a gameweek stored early stays wrong. Since then no gameweek finalises on one
+ * read. The first read that finds a gameweek final but unstored records a
+ * candidate row and holds; the write happens only when a later read, at least
+ * CANDIDATE_HOLD_SECONDS after the first, still finds it final with an
+ * identical fingerprint. Upstream shape drift blocks the write before that,
+ * with payload evidence.
+ *
+ * Gate refusals stay non-throwing by design, following rejectUnfinalisable:
+ * the caller serves every page render, so refusing the write is the entire
+ * job. The gameweek stays absent and the next run tries again.
+ */
+async function finaliseGatedGameweeks(args: {
+  missing: number[];
+  performances: GameweekPerformance[];
+  liveByGameweek: Map<number, EventLive | null>;
+  status: GameWeekStatus[];
+  game: GameState | null;
+  leagueEntries: LeagueEntry[];
+  standings: LeagueStanding[];
+  finalisedThrough: number;
+  stored: Set<number>;
+  report: FinalisationGateReport | undefined;
+}): Promise<void> {
+  const {
+    missing,
+    performances,
+    liveByGameweek,
+    status,
+    game,
+    leagueEntries,
+    standings,
+    finalisedThrough,
+    stored,
+  } = args;
+  const gate: FinalisationGateReport = args.report ?? {
+    finalised: [],
+    held: [],
+    blocked: [],
+    dropped: [],
+  };
+
+  // Candidates are the proof that two reads agreed across a cron boundary:
+  // instance memory does not survive serverless cold starts. Without the table
+  // (before the hand applied production migration lands) there is no proof, so
+  // every write waits. That is the safe direction: finalisation holds rather
+  // than confirms.
+  const candidates = new Map<
+    number,
+    { fingerprint: string; firstSeenAt: number }
+  >();
+  try {
+    const rows = await readCandidates();
+    rows.forEach((row) => {
+      candidates.set(row.gameweek, {
+        fingerprint: row.fingerprint,
+        firstSeenAt: toEpochMs(row.firstSeenAt),
+      });
+    });
+  } catch (error) {
+    console.error(
+      '[season] Finalisation candidates could not be read; holding every write until they can be.',
+      error,
+    );
+    missing.forEach((gameweek) => {
+      gate.held.push({ gameweek, reason: 'candidate store unreachable' });
+    });
+    return;
+  }
+
+  // Decider reversal, and the already-stored leftover: a candidate for a
+  // gameweek deriveSeasonState no longer calls final is dropped, never
+  // confirmed, and a candidate whose gameweek somehow got stored has served
+  // its purpose. Both delete through confirmCandidate.
+  for (const gameweek of candidates.keys()) {
+    const alreadyStored = stored.has(gameweek);
+    if (!alreadyStored && gameweek <= finalisedThrough) continue;
+    try {
+      await confirmCandidate(gameweek);
+    } catch (error) {
+      console.error(
+        `[season] GW${gameweek} candidate could not be dropped; it stays and will be retried.`,
+        error,
+      );
+      continue;
+    }
+    candidates.delete(gameweek);
+    gate.dropped.push(gameweek);
+    console.error(
+      `[season] GW${gameweek} candidate dropped ` +
+        `(${alreadyStored ? 'already stored' : 'no longer final'}).`,
+    );
+  }
+
+  const byGameweek = new Map<number, GameweekPerformance[]>();
+  performances.forEach((performance) => {
+    const week = byGameweek.get(performance.event) ?? [];
+    week.push(performance);
+    byGameweek.set(performance.event, week);
+  });
+
+  const writable: GameweekPerformance[] = [];
+  const confirmPending: number[] = [];
+
+  for (const gameweek of missing) {
+    const week = byGameweek.get(gameweek) ?? [];
+
+    // scoreGameweek already refused the unscorable shapes (an empty or
+    // all-zero live feed, unreadable picks), which is why there is nothing
+    // here. An empty list never confirms, so no candidate is recorded and the
+    // week stays absent for retry.
+    if (week.length === 0) {
+      gate.held.push({ gameweek, reason: 'awaiting scored performances' });
+      continue;
+    }
+
+    // Gate one: draft probes run before anything is stored. A failure drops
+    // the week from the writable set, records the block reason on the
+    // candidate, and leaves the week absent for retry.
+    const failed = probeGameweekFailures({
+      gameweek,
+      week,
+      liveByGameweek,
+      status,
+      game,
+      leagueEntries,
+      standings,
+    });
+    if (failed.length > 0) {
+      const probes = failed.map((result) => result.name);
+      const evidence = truncateEvidence(
+        failed
+          .map((result) => `${result.name}: ${result.evidence}`)
+          .join(' | '),
+      );
+      console.error(
+        `[season] GW${gameweek} blocked by shape tripwire (${probes.join(', ')}). ` +
+          `Evidence: ${evidence} It stays absent and will be retried.`,
+      );
+      try {
+        await noteBlocked(
+          gameweek,
+          truncateEvidence(`blocked by ${probes.join(', ')}: ${evidence}`),
+        );
+      } catch (error) {
+        console.error(
+          `[season] GW${gameweek} block reason could not be recorded; the write is still refused.`,
+          error,
+        );
+      }
+      gate.blocked.push({ gameweek, probes, evidence });
+      continue;
+    }
+
+    // Gate two: candidate agreement. First sighting records and holds; an
+    // agreeing read past the hold interval confirms; a changed fingerprint
+    // resets the hold; a decider reversal drops (unreachable for a missing
+    // week, which is still final by construction, but handled all the same).
+    const fingerprint = fingerprintPerformances(week);
+    const now = Date.now();
+    const decision = evaluateCandidate({
+      candidate: candidates.get(gameweek) ?? null,
+      fingerprint,
+      now,
+      stillFinal: true,
+    });
+
+    if (decision.action === 'confirm') {
+      writable.push(...week);
+      confirmPending.push(gameweek);
+    } else if (decision.action === 'drop') {
+      try {
+        await confirmCandidate(gameweek);
+      } catch (error) {
+        console.error(
+          `[season] GW${gameweek} candidate could not be dropped; it stays and will be retried.`,
+          error,
+        );
+        gate.held.push({
+          gameweek,
+          reason: 'candidate drop failed; will be retried',
+        });
+        continue;
+      }
+      candidates.delete(gameweek);
+      gate.dropped.push(gameweek);
+      console.error(
+        `[season] GW${gameweek} candidate dropped (no longer final).`,
+      );
+    } else {
+      if (decision.action !== 'hold') {
+        try {
+          await recordCandidate(gameweek, fingerprint);
+        } catch (error) {
+          console.error(
+            `[season] GW${gameweek} candidate could not be recorded; holding without proof.`,
+            error,
+          );
+        }
+        candidates.set(gameweek, { fingerprint, firstSeenAt: now });
+      }
+      gate.held.push({
+        gameweek,
+        reason:
+          decision.action === 'reset'
+            ? 'fingerprint changed; hold restarted'
+            : decision.action === 'record'
+              ? `first sighting; held at least ${CANDIDATE_HOLD_SECONDS}s for a second agreeing read`
+              : 'agreeing read inside the hold window',
+      });
+    }
+  }
+
+  // The write itself, still through the untouched last line of defence:
+  // storeFinalisedGameweeks refuses provisional rows and all-zero weeks, and
+  // inserts onConflictDoNothing. Only a week it actually wrote has its
+  // candidate confirmed away; a refused week stays absent (held) with its
+  // candidate intact for the next tick.
+  const storedNow =
+    writable.length > 0
+      ? new Set(await storeFinalisedGameweeks(writable))
+      : new Set<number>();
+
+  for (const gameweek of confirmPending) {
+    if (!storedNow.has(gameweek)) {
+      console.error(
+        `[season] GW${gameweek} confirmed twice but refused by the final guard. It stays absent and will be retried.`,
+      );
+      gate.held.push({
+        gameweek,
+        reason: 'refused by the final guard; stays absent',
+      });
+      continue;
+    }
+    try {
+      await confirmCandidate(gameweek);
+    } catch (error) {
+      console.error(
+        `[season] GW${gameweek} stored but its candidate could not be confirmed away; the next tick drops it as already stored.`,
+        error,
+      );
+    }
+    candidates.delete(gameweek);
+    gate.finalised.push(gameweek);
+  }
+}
+
+/**
+ * Run the draft shape-tripwire probes for one gameweek, failing closed.
+ *
+ * A probe harness that throws proves nothing about the payload, so the throw
+ * itself becomes the failing probe and the write is refused with it as
+ * evidence. Follows rejectUnfinalisable: never throws.
+ */
+function probeGameweekFailures(args: {
+  gameweek: number;
+  week: GameweekPerformance[];
+  liveByGameweek: Map<number, EventLive | null>;
+  status: GameWeekStatus[];
+  game: GameState | null;
+  leagueEntries: LeagueEntry[];
+  standings: LeagueStanding[];
+}): { name: string; pass: boolean; evidence: string }[] {
+  try {
+    return runDraftProbes({
+      gameweek: args.gameweek,
+      status: args.status,
+      game: args.game,
+      leagueEntries: args.leagueEntries,
+      standings: args.standings,
+      performances: args.week,
+      liveData: args.liveByGameweek.get(args.gameweek) ?? null,
+    }).filter((result) => !result.pass);
+  } catch (error) {
+    return [
+      {
+        name: 'probe-runner',
+        pass: false,
+        evidence: truncateEvidence(
+          error instanceof Error ? error.message : String(error),
+        ),
+      },
+    ];
+  }
+}
+
+/**
+ * Candidate timestamps cross the database driver, so read them structurally:
+ * a Date in the normal case, epoch millis or an ISO string if the row type
+ * ever says otherwise.
+ */
+function toEpochMs(value: Date | number | string): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Date.parse(value);
+  return value.getTime();
+}
+
+/**
+ * Bound probe evidence to a readable snippet. Logs carry the offending
+ * fields, never the payload: upstream responses hold no credentials, but they
+ * are kilobytes long and a refusal needs one line, not one dump.
+ */
+const EVIDENCE_LIMIT = 500;
+
+function truncateEvidence(evidence: string): string {
+  return evidence.length > EVIDENCE_LIMIT
+    ? `${evidence.slice(0, EVIDENCE_LIMIT)}...`
+    : evidence;
 }
 
 /**
