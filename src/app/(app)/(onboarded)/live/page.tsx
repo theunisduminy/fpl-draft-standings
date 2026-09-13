@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { getLiveGameweek } from '@/utils/live-gameweek';
-import { LiveTower, type LiveTowerRow } from '@/components/LiveRoom/LiveTower';
+import { LiveTower } from '@/components/LiveRoom/LiveTower';
 import { LiveTowerSkeleton } from '@/components/LiveRoom/LiveTowerSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { SkeletonRegion } from '@/components/SkeletonRegion';
@@ -62,24 +62,23 @@ async function LiveRoom() {
     );
   }
 
-  // Field mapping assumption against the frozen slice: the live member carries
+  // Field mapping against the frozen slice: the live member carries
   // `gameweek`, `computedAt` epoch millis, and `rows` in provisional order
-  // where each row carries at least the `LiveTowerRow` fields (`position`,
-  // `managerName`, `teamName`, `points`, `interval`, `cushion`, `done`,
-  // `toPlay`, `movement`). The callback annotation asserts exactly that, so a
-  // slice that spells a field differently fails here at merge rather than
-  // rendering undefined. Nothing here invents a number.
+  // where each row carries `rank` and `event_total` from the derivation. Those
+  // map to the presentation `position` and `points` below, so a slice that
+  // spells a field differently fails here at merge rather than rendering
+  // undefined. Nothing here invents a number.
   if (result?.state === 'live') {
     return (
       <LiveTower
         data={{
           gameweek: result.gameweek,
           computedAt: result.computedAt,
-          rows: result.rows.map((row: LiveTowerRow) => ({
-            position: row.position,
+          rows: result.rows.map((row) => ({
+            position: row.rank,
             managerName: row.managerName,
             teamName: row.teamName,
-            points: row.points,
+            points: row.event_total,
             interval: row.interval,
             cushion: row.cushion,
             done: row.done,
