@@ -4,7 +4,8 @@ import type { Metadata } from 'next';
 import { getGameweekData } from '@/utils/gameweek-data';
 import { standingsByGameweek, standingsMovement } from '@/utils/scoring';
 import { StandingsTabs } from '@/components/TableView/StandingsTabs';
-import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
+import { LiveTowerSkeleton } from '@/components/LiveRoom/LiveTowerSkeleton';
+import { LiveTowerView } from '@/components/LiveRoom/LiveTowerView';
 import { StandingsSkeleton } from '@/components/TableView/StandingsSkeleton';
 import { SkeletonRegion } from '@/components/SkeletonRegion';
 import { PageShell } from '@/components/Layout/PageShell';
@@ -52,16 +53,27 @@ async function Standings() {
 
   return (
     <div className='space-y-4'>
-      {/* Inside the boundary, not in `PageShell`'s `action` slot: whether a
-          gameweek is in flight is a fact about the data, and the heading is
-          painted before the data is read. */}
-      {data.provisionalGameweek !== null && (
-        <LiveGameweekBadge gameweek={data.provisionalGameweek} />
-      )}
       <StandingsTabs
         data={data}
         snapshots={snapshots}
         movement={standingsMovement(snapshots)}
+        live={
+          // The live view is a standings tab while a gameweek is in flight,
+          // not a destination: the tab itself carries the meaning, so no
+          // badge is needed. Absent otherwise, so nothing is fetched and no
+          // tab is offered. The slice streams in on its own boundary.
+          data.provisionalGameweek === null ? undefined : (
+            <Suspense
+              fallback={
+                <SkeletonRegion>
+                  <LiveTowerSkeleton />
+                </SkeletonRegion>
+              }
+            >
+              <LiveTowerView />
+            </Suspense>
+          )
+        }
       />
     </div>
   );

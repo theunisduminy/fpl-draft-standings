@@ -65,9 +65,8 @@ export interface LiveTowerData {
  * `RefreshControl`, which owns the manual refresh interaction and nothing
  * else.
  *
- * Every figure on this board is provisional, and it says so three ways: the
- * badge above the board, a provisional tag on every points value, and the note
- * beside the freshness stamp. No provisional figure renders unlabeled.
+ * Every figure on this board is provisional, and it says so two ways: the
+ * badge above the board and the note beside the freshness stamp. No provisional figure renders unlabeled.
  */
 /** UK-time stamp for the freshness line, built once. */
 const UPDATED_AT_FORMAT = new Intl.DateTimeFormat('en-GB', {
@@ -170,13 +169,8 @@ export function LiveTower({ data }: { data: LiveTowerData }) {
                     </div>
                   </TableCell>
                   <TableCell className={cn(TOWER_CELL_CLASS, 'text-center')}>
-                    <span className='inline-flex flex-col items-center gap-1'>
-                      <span className='text-base font-bold text-positive'>
-                        {row.points}
-                      </span>
-                      <span className='inline-flex rounded-full border border-positive/40 bg-positive/10 px-2 py-0.5 text-[10px] font-medium text-positive'>
-                        Provisional
-                      </span>
+                    <span className='text-base font-bold text-positive'>
+                      {row.points}
                     </span>
                   </TableCell>
                   <TableCell

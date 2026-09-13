@@ -28,6 +28,17 @@ import * as schema from './schema';
 const SANDBOX_VAR = 'NEON_CONNECTION_STRING_SANDBOX';
 const PROD_VAR = 'NEON_CONNECTION_STRING_PROD';
 
+/**
+ * Which branch this process reads: the sandbox when set, else production.
+ *
+ * Mirrors {@link connectionString} exactly (including the empty-string case)
+ * for log hints and repair commands, so a suggested `forget-gameweek` run
+ * targets the branch actually read rather than always production.
+ */
+export function dbTargetName(): 'sandbox' | 'production' {
+  return process.env[SANDBOX_VAR] ? 'sandbox' : 'production';
+}
+
 function connectionString(): string {
   const url = process.env[SANDBOX_VAR] || process.env[PROD_VAR];
 

@@ -1,49 +1,17 @@
-import { Suspense } from 'react';
-import type { Metadata } from 'next';
-
 import { getLiveGameweek } from '@/utils/live-gameweek';
-import { LiveTower } from '@/components/LiveRoom/LiveTower';
-import { LiveTowerSkeleton } from '@/components/LiveRoom/LiveTowerSkeleton';
 import { EmptyState } from '@/components/EmptyState';
-import { SkeletonRegion } from '@/components/SkeletonRegion';
-import { PageShell } from '@/components/Layout/PageShell';
-
-export const metadata: Metadata = { title: 'Live room' };
-
-// Reads live upstream data, so it is never prerendered.
-export const dynamic = 'force-dynamic';
+import { LiveTower } from './LiveTower';
 
 /**
- * The matchday board: who is where right now, by how much, and who still has
- * players to come.
+ * The live tower as a standings tab panel.
  *
- * `PageShell` paints the static heading before the boundary is reached; the
- * gameweek specific line (badge, tower, or empty state) renders inside the
- * streamed subtree, because whether a gameweek is in flight is a fact about
- * the data. The boundary lives here rather than in a `loading.tsx` at the app
- * root: that would wrap every route beneath it. A sibling `loading.tsx` covers
- * this route alone, which cannot 404.
+ * Reads the live slice and maps it onto the presentation rows, or renders
+ * the honest empty state for every non-live condition: pre-kickoff, idle,
+ * and unreadable all explain themselves rather than throwing or ranking
+ * zeros. The tab itself carries the "live" meaning, so there is no badge
+ * here — the tower's own provisional labelling stands as is.
  */
-export default function LivePage() {
-  return (
-    <PageShell
-      title='Live room'
-      subtitle='Provisional tower for the gameweek in progress'
-    >
-      <Suspense
-        fallback={
-          <SkeletonRegion>
-            <LiveTowerSkeleton />
-          </SkeletonRegion>
-        }
-      >
-        <LiveRoom />
-      </Suspense>
-    </PageShell>
-  );
-}
-
-async function LiveRoom() {
+export async function LiveTowerView() {
   const result = await getLiveGameweek();
 
   // Pre-kickoff: fixtures exist but nobody has played, so there is nothing to

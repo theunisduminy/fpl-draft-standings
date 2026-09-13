@@ -2,26 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Trophy,
-  Radio,
-  BarChart3,
-  Beer,
-  Users,
-  Shield,
-  User,
-} from 'lucide-react';
+import { Trophy, BarChart3, Beer, Users, Shield, User } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
 /**
- * Seven here against `MobileNav`'s six: this rail has vertical room, so it
+ * Six here against `MobileNav`'s five: this rail has vertical room, so it
  * carries Profile as well and spells "Premier League" out in full where the
- * bottom bar has to say "Prem".
+ * bottom bar has to say "Prem". (Live is a standings tab while a gameweek is
+ * in flight, not a destination.)
  */
 const navigation = [
   { name: 'Standings', href: '/', icon: Trophy },
-  { name: 'Live', href: '/live', icon: Radio },
   { name: 'Results', href: '/results', icon: BarChart3 },
   { name: 'Rumblers', href: '/rumblers', icon: Beer },
   { name: 'Squads', href: '/squads', icon: Users },

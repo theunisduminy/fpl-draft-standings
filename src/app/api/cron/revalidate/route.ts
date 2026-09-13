@@ -84,8 +84,8 @@ import { getPremierLeagueTeams } from '@/utils/pl-teams';
  *
  * `live-gameweek` is invalidated here but deliberately never warmed below: a
  * 60 second cache warmed on a three hour schedule buys nothing and spends 12
- * upstream calls per run. The first `/live` visit after a sync warms it on
- * demand.
+ * upstream calls per run. The first standings Live tab visit after a sync
+ * warms it on demand.
  */
 const TAGS = [
   'gameweek-data',

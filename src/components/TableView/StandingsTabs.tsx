@@ -1,7 +1,7 @@
 'use client';
-import { Trophy, LineChart, Swords } from 'lucide-react';
+import { Trophy, LineChart, Swords, Radio } from 'lucide-react';
 
-import { SectionTabs } from '@/components/SectionTabs';
+import { SectionTabs, type SectionTab } from '@/components/SectionTabs';
 import StandingsTable from './StandingsTable';
 import SeasonInsights from './SeasonInsights';
 import RivalsInsights from './RivalsInsights';
@@ -26,53 +26,63 @@ import type { SeasonSnapshot } from '@/utils/scoring';
  * fetched here, but note the panels below still ship to the browser: their
  * chart leaves are all `'use client'` for recharts, so there is no server
  * subtree to preserve by passing them in as slots.
+ *
+ * The optional live panel is the exception that proves the slot rule: the
+ * tower is a server subtree (fetched and shaped on the server, streaming in
+ * on its own boundary), so it arrives as a node rather than being built
+ * here. It is appended last so the permanent tabs keep stable positions
+ * whether or not a gameweek is in flight — and landing on the standings
+ * still means landing on the rankings, so it is never the default.
  */
 export function StandingsTabs({
   data,
   snapshots,
   movement,
+  live,
 }: {
   data: GameweekDataResponse;
   snapshots: SeasonSnapshot[];
+  live?: React.ReactNode;
 } & StandingsContext) {
-  return (
-    <SectionTabs
-      defaultValue='standings'
-      tabs={[
-        {
-          value: 'standings',
-          label: 'Standings',
-          icon: Trophy,
-          // The ledger sits with the board rather than with the charts: it is
-          // six answers, not a thing to study, and the tab someone lands on is
-          // where answers belong.
-          className: 'space-y-4',
-          content: (
-            <>
-              <StandingsTable players={data.players} movement={movement} />
-              <LeagueLedger
-                players={data.players}
-                performances={data.gameweekPerformances}
-              />
-            </>
-          ),
-        },
-        {
-          value: 'season',
-          label: 'Season',
-          icon: LineChart,
-          content: <SeasonInsights data={data} snapshots={snapshots} />,
-        },
-        // Season is the story over time; rivals is the season collapsed into
-        // comparisons. Splitting them keeps either tab to three cards, which is
-        // roughly a screen — six on one tab was a scroll nobody would finish.
-        {
-          value: 'rivals',
-          label: 'Rivals',
-          icon: Swords,
-          content: <RivalsInsights data={data} />,
-        },
-      ]}
-    />
-  );
+  const tabs: SectionTab[] = [
+    {
+      value: 'standings',
+      label: 'Standings',
+      icon: Trophy,
+      // The ledger sits with the board rather than with the charts: it is
+      // six answers, not a thing to study, and the tab someone lands on is
+      // where answers belong.
+      className: 'space-y-4',
+      content: (
+        <>
+          <StandingsTable players={data.players} movement={movement} />
+          <LeagueLedger
+            players={data.players}
+            performances={data.gameweekPerformances}
+          />
+        </>
+      ),
+    },
+    {
+      value: 'season',
+      label: 'Season',
+      icon: LineChart,
+      content: <SeasonInsights data={data} snapshots={snapshots} />,
+    },
+    // Season is the story over time; rivals is the season collapsed into
+    // comparisons. Splitting them keeps either tab to three cards, which is
+    // roughly a screen — six on one tab was a scroll nobody would finish.
+    {
+      value: 'rivals',
+      label: 'Rivals',
+      icon: Swords,
+      content: <RivalsInsights data={data} />,
+    },
+  ];
+
+  if (live) {
+    tabs.push({ value: 'live', label: 'Live', icon: Radio, content: live });
+  }
+
+  return <SectionTabs defaultValue='standings' tabs={tabs} />;
 }

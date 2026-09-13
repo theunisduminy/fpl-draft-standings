@@ -67,6 +67,9 @@ import {
  * reads every row.
  */
 import { runDraftProbes, truncateText } from './shape-tripwires';
+// Target name only (no client, no data): the repair hint below must mirror
+// the database precedence owned by `src/server/db/client.ts`.
+import { dbTargetName } from '@/server/db/client';
 import { fplApi, getLeagueId, upstreamFetch } from './fpl-api';
 import { fetchEntryPicks } from './gameweek-squad';
 import { fetchLeagueDetails } from './league';
@@ -742,10 +745,14 @@ function withoutInFlight(
   if (inFlight === null || !replaced) return stored;
   if (!stored.some((gw) => gw.event === inFlight)) return stored;
 
+  // The repair hint targets whichever branch this process actually read:
+  // the sandbox wins when set (see `dbTargetName`), so a hardcoded `--prod`
+  // would send a sandbox reader at production.
+  const forgetProdFlag = dbTargetName() === 'production' ? ' --prod' : '';
   console.error(
     `[season] GW${inFlight} is stored as finalised but is still being played. ` +
       'Using the live scoring; delete the stored rows with ' +
-      `\`node --env-file=.env.local scripts/forget-gameweek.mjs ${inFlight} --prod\`.`,
+      `\`node --env-file=.env.local scripts/forget-gameweek.mjs ${inFlight}${forgetProdFlag}\`.`,
   );
 
   return stored.filter((gw) => gw.event !== inFlight);
