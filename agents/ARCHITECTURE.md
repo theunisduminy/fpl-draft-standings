@@ -1,6 +1,6 @@
 ---
 name: Better Draft — Architecture
-last_updated: 2026-08-15
+last_updated: 2026-09-13
 ---
 
 # Architecture
@@ -54,10 +54,12 @@ The product surface:
 - `/auth/sign-in` — the only route a signed-out visitor can reach
 
 **The split of ownership matters.** The league roster, scores and fixtures are upstream's
-and are read from the FPL API. What the database holds is exactly two things: **a cache of
+and are read from the FPL API. What the database holds is exactly three things: **a cache of
 immutable facts** (finished gameweek scores, so we don't refetch a season of history on
-every cold start) and **data with no upstream source at all** (profiles, and later bets).
-The F1 scoring table itself is neither — it is _our policy_, and it lives in code.
+every cold start), **a stale-tolerant accelerator of reference data** (`draft_elements` and
+`pl_teams` — upstream-sourced, trusted only for `REFERENCE_STALE_AFTER_SECONDS`, every
+reader falls back to the API), and **data with no upstream source at all** (profiles, and later bets).
+The F1 scoring table itself is none of these — it is _our policy_, and it lives in code.
 
 **There are three upstreams, not two.** Neither FPL game can answer "what is the Premier
 League table?" — the classic bootstrap carries `played`, `win`, `draw`, `loss`, `points` and
@@ -326,15 +328,16 @@ season, because there is no way to invalidate it short of a deploy.
 The open question is what to store rather than re-derive. The line that falls out of the
 data itself:
 
-| Data                                             | Mutability                       | Verdict                                             |
-| ------------------------------------------------ | -------------------------------- | --------------------------------------------------- |
-| A **finished** gameweek's scores and ranks       | Immutable once `leagues_updated` | **Persist.** Write once, read forever.              |
-| The **in-flight** gameweek                       | Changes every few minutes        | **Read live.** Never cache hard.                    |
-| League entries (names, teams)                    | Changes ~never mid-season        | Read live; cheap, one call.                         |
-| Clubs, fixtures, element metadata                | Changes rarely                   | Read live behind a long TTL.                        |
-| The **F1 points table**                          | Our policy, not a fact           | **Keep in code.** Never in a DB.                    |
-| Profiles, weekly bets, email subscriptions       | No upstream source exists        | **Persist.** Nothing else can.                      |
-| Who is in the league, and which manager they are | Curated by an admin              | **Persist.** Upstream has no notion of our members. |
+| Data                                             | Mutability                       | Verdict                                                                                               |
+| ------------------------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| A **finished** gameweek's scores and ranks       | Immutable once `leagues_updated` | **Persist.** Write once, read forever.                                                                |
+| The **in-flight** gameweek                       | Changes every few minutes        | **Read live.** Never cache hard.                                                                      |
+| League entries (names, teams)                    | Changes ~never mid-season        | Read live; cheap, one call.                                                                           |
+| Clubs and element metadata                       | Changes rarely                   | **Persist as an accelerator** (`draft_elements`, `pl_teams`), stale-tolerant with bootstrap fallback. |
+| Fixtures                                         | Changes rarely                   | Read live behind a long TTL.                                                                          |
+| The **F1 points table**                          | Our policy, not a fact           | **Keep in code.** Never in a DB.                                                                      |
+| Profiles, weekly bets, email subscriptions       | No upstream source exists        | **Persist.** Nothing else can.                                                                        |
+| Who is in the league, and which manager they are | Curated by an admin              | **Persist.** Upstream has no notion of our members.                                                   |
 
 The win is concentrated in row one: persisting finished gameweeks turns a 344-call cold
 recompute into a single indexed query, and makes the whole season's history available
@@ -344,7 +347,8 @@ The trap to avoid is persisting **derived** values. Store the facts — gameweek
 entry, points, rank — and compute the F1 score from them at read time. Store `f1_score` and
 the day you tune the points table you own a backfill.
 
-**This is implemented**, in `src/server/data/gameweeks.ts`. Rows one, six and seven of the
+**This is implemented**, in `src/server/data/gameweeks.ts`, `src/server/data/elements.ts`
+and `src/server/data/pl-teams.ts`. Rows one, four, seven and eight of the
 table above are the tables in `public`; every other row still reads live.
 
 ### Everything persisted is scoped by league

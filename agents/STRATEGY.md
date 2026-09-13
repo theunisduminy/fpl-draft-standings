@@ -1,6 +1,6 @@
 ---
 name: Better Draft
-last_updated: 2026-08-13
+last_updated: 2026-09-13
 ---
 
 # Better Draft Strategy
@@ -64,8 +64,10 @@ signals that actually indicate the app is working.
   chat. _Leading, deliberately informal._ It measures bet two directly, and no dashboard
   will capture it.
 - **Cold-load time on the standings page** — time to real content, not to spinner.
-  _Leading._ Currently gated by a client fetch over a recompute that reaches 344 upstream
-  calls by season's end. If the app is slow on a Monday it does not get opened on a Tuesday.
+  _Leading._ Finished gameweeks persist in Postgres so a cold start costs one query
+  instead of a 344-call recompute; reference data (`draft_elements`, `pl_teams`) is
+  synced every three hours with bootstrap fallback. If the app is slow on a Monday it
+  does not get opened on a Tuesday.
 - **Season completion** — whether the league is still using it in May. _Lagging._ The only
   verdict that counts.
 
@@ -93,6 +95,18 @@ The part worth keeping in mind: the three FPL identifiers (`LeagueEntryId`, `Ent
 _Why it served the approach:_ the two worst bugs this codebase has had — a fabricated
 700-point standings table and a crash on a bare-string 404 — were both shape bugs at the
 upstream boundary. Types are the cheapest insurance available.
+
+### Database reference cache and sync job — **done**
+
+Footballer and club reference data is served from Postgres (`draft_elements`,
+`pl_teams`) instead of re-downloading the 850 KB draft bootstrap on every cold read,
+and the cron route is a sync job: refresh both tables, finalise any completed gameweek,
+revalidate, clear the in-memory map, re-warm. Every reader falls back to the API when
+its table is empty, stale, incomplete or unreachable. See
+[`docs/plans/2026-08-14-001-feat-db-reference-cache-plan.md`](../docs/plans/2026-08-14-001-feat-db-reference-cache-plan.md).
+
+_Why it served the approach:_ it moves the cold-start cost onto a robot on a schedule,
+so Monday's first visitor stops paying for the season's static data.
 
 ### New stats and visualisations
 

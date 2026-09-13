@@ -3,12 +3,29 @@ title: Database Reference Cache and Sync Job - Plan
 type: feat
 date: 2026-08-14
 artifact_contract: ce-unified-plan/v1
-artifact_readiness: implementation-ready
+artifact_readiness: done
 product_contract_source: ce-plan-bootstrap
 execution: code
+completed: 2026-08-15
+implementation_pr: 14
 ---
 
 # Database Reference Cache and Sync Job - Plan
+
+## Completion record
+
+- **Status:** done. Shipped as PR #14 (`feat/db-reference-cache`), with follow-ups #16
+  (quieter fallback logging) and #24 (cron single-flight guard timestamp), plus the
+  KTD10 plain-data cache fix.
+- **Definition of Done:** all boxes met — both tables exist with `league_id` and `code`,
+  `/squads` and `/profile` answer from Postgres with bootstrap fallback (including on
+  unreachable database), club short names verified row by row, warm demonstrably runs
+  `compute` after `clearCache()`, cron syncs/finalises/revalidates/warms with per-step
+  outcomes on a three-hour schedule, agents docs reconciled.
+- **Q1:** answered — team account, `0 */3 * * *`.
+- **Q2:** still open as validation debt — Neon scale-to-zero vs cached-bootstrap
+  measurement never recorded on the production path. U4/U5 shipped regardless.
+- **Q3:** deferred by design — `first_name`/`second_name` on `draft_elements`.
 
 ## Goal Capsule
 
