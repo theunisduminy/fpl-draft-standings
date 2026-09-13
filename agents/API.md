@@ -734,7 +734,9 @@ returns a different club or a different footballer.
 `/api/cron/revalidate` is the sync job: every three hours it refreshes
 `draft_elements` and `pl_teams` from the draft bootstrap, writes any newly
 finalised gameweek, then expires the cache tags, clears the in-memory map and
-re-warms. Its caller is Vercel Cron rather than a person, so it authenticates
+re-warms. A newly finalised gameweek is held for a second agreeing read first,
+so it is stored up to about one cycle later than it settles (see Finalisation
+safety below). Its caller is Vercel Cron rather than a person, so it authenticates
 with a constant-time bearer `CRON_SECRET` comparison and `src/proxy.ts` excludes
 `/api/cron` from the sign-in redirect. That exclusion buys authentication
 written by hand; it does not make the path public, and nothing else may be
@@ -778,6 +780,9 @@ One call:
    only place "is this gameweek over?" is decided.
 3. For every **finalised** gameweek not already stored, fetches the live data **and all 8
    entries' picks**, in batches of 5, and writes the result to `gameweek_scores`.
+   Nothing is written on a single read: draft probes gate every write, and a newly final
+   gameweek is held as a candidate until a second agreeing read (see Finalisation safety
+   below).
 4. Sums `total_points` over each entry's starting XI (`position <= 11`).
 5. Ranks the 8 entries within the gameweek and awards F1 points —
    `[20, 15, 12, 10, 8, 6, 4, 2]`.
@@ -813,6 +818,87 @@ than its own inputs froze a live score at whatever it was an hour ago.
 
 That cost, not upstream latency, is the argument for persisting finished gameweeks.
 See [ARCHITECTURE.md → Where to draw the persistence line](./ARCHITECTURE.md#where-to-draw-the-persistence-line).
+
+---
+
+## Finalisation safety: holds, blocks, and the undo
+
+A finalised gameweek is never refetched and writes use `onConflictDoNothing`, so a
+gameweek stored early stays wrong for the season. On 2026-08-21 the app stored eight
+managers on 0 points before kickoff and served that for three days. Two gates now sit
+in front of every write in
+[`src/utils/gameweek-data.ts`](../src/utils/gameweek-data.ts), in both page renders
+and the sync job, and both report through the cron finalise step detail rather than
+through new routes.
+
+### Held: no gameweek finalises on a single read
+
+The first read that finds a gameweek final but unstored records a candidate row
+(`league_id`, gameweek, fingerprint, first seen timestamp) and holds. The write
+happens only when a later read, at least `CANDIDATE_HOLD_SECONDS` (7200, two hours
+against the three hour cron) after the first, still finds it final with an identical
+fingerprint. The fingerprint is a stable serialisation of the sorted
+(`league_entry`, `event_total`, `rank`) content plus the played signal, so two
+different wrong payloads can never confirm each other. A changed fingerprint restarts
+the hold; a decider reversal drops the candidate without a write. The pure agreement
+logic lives in [`src/utils/finalisation.ts`](../src/utils/finalisation.ts) and the
+rows live behind
+[`src/server/data/finalisation.ts`](../src/server/data/finalisation.ts).
+
+Expected cost (R4): a genuinely finished gameweek is stored up to about one three hour
+cron cycle later than it settles. The in-flight display covers the gap with provisional
+labelling intact.
+
+### Blocked: shape drift refuses the write with evidence
+
+Each known upstream trap is an explicit probe in
+[`src/utils/shape-tripwires.ts`](../src/utils/shape-tripwires.ts), run by `runDraftProbes`
+for the draft subset and `runPulseProbes` for the Pulse subset. Probes gate the write;
+they never throw. A failed draft probe refuses the write, logs the evidence at error
+level, updates the candidate block reason, and leaves the gameweek absent for retry.
+Every probe returns `{ name, pass, evidence }`, with evidence bounded at 500 characters
+plus observed field values: the offending snippet, never the payload.
+
+| Probe                      | Trap it catches                                                                                              | Evidence attached                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| `event-status-bare-string` | `event-status` 404s with the bare string `"Game not started"`, not `{ status: [...] }`                       | the response body snippet                               |
+| `event-status-every-row`   | one row per date, not per gameweek: `leagues_updated` going true on opening night is not a finished gameweek | the rows seen for the gameweek and which dates disagree |
+| `live-elements-present`    | `elements: {}` is truthy but means nothing is scored yet                                                     | the element key count                                   |
+| `live-elements-played`     | a full elements map with every element on zero minutes is the pre kickoff shape, not a scored week           | the played signal from `hasBeenPlayed()`                |
+| `standings-identity`       | `standings[].league_entry` values must resolve to known `league_entries[].id` values, not `entry_id` values  | the unresolvable values                                 |
+| `pulse-season-unstarted`   | out of season Pulse returns all 20 clubs on zero with `tables[0].gameWeek` at 0                              | the `gameWeek` value plus the entry count               |
+| `pulse-season-selection`   | season labels are mixed formats, so only the highest `id` is current                                         | the selected `id` and the labels compared               |
+| `probe-runner`             | the probe harness itself threw, which proves nothing about the payload                                       | the thrown message                                      |
+
+The Pulse probes annotate rather than block. Pulse has no fallback by design: if Pulse
+is unreachable, `/premier-league` says so, and its probes attach the reason to the
+failure the page already raises.
+
+### The cron finalise step detail
+
+The `finalise` step reports
+`N finalised gameweek(s), M held (...), K blocked (...), J dropped (...)[, GWx in flight]`,
+where each keyword means:
+
+- `finalised`: confirmed by two agreeing reads and written by this run.
+- `held`: read as final but not yet writable. Either a first sighting inside the hold
+  window, an agreeing read that arrived too soon, a restarted hold after a fingerprint
+  change, or a week with nothing scorable fetched yet.
+- `blocked`: a probe refused the write. The gameweek and the failing probe names are
+  named inline; the payload evidence is in the log. Blocked writes never persist.
+- `dropped`: the candidate was removed without a write, because the decider no longer
+  calls the gameweek final or because the week was already stored.
+
+A blocked detail also points at the log evidence and at the undo below. The undo is for
+the opposite case, a write that should not have happened.
+
+### Undo: reversing a mistaken finalisation
+
+`scripts/forget-gameweek.mjs` is the guarded undo. It runs dry by default, deletes only
+the `league_id` plus gameweek slice (scores, marker, and candidate row), and its help
+text documents the sandbox default, the explicit prod flag, and the revalidate run that
+requeues the fetch. Deleting the slice is sufficient: the next read refetches the
+gameweek through the two-phase path above, held first and finalised on agreement.
 
 ---
 

@@ -10,6 +10,7 @@ import { fplApi, getLeagueId, upstreamFetch } from '@/utils/fpl-api';
 import { toElementRows, toTeamRows } from '@/utils/reference-mapping';
 import { clearCache } from '@/utils/cache';
 import { computeSeasonUncached, getGameweekData } from '@/utils/gameweek-data';
+import type { FinalisationGateReport } from '@/utils/gameweek-data';
 import { getSquads } from '@/utils/squads';
 import { getPremierLeagueTeams } from '@/utils/pl-teams';
 
@@ -357,25 +358,67 @@ async function attemptBootstrapFetch(): Promise<BootstrapAttempt> {
  * Write any newly finalised gameweek, by the robot rather than by whichever
  * visitor arrives first.
  *
- * `getGameweekData()` already does the work and already stores what it finds;
- * calling it here just moves *when*. A gameweek that produced no performances
- * is still not recorded, so it is retried next run — that rule lives in
- * `storeFinalisedGameweeks` and this route does not second-guess it.
+ * Two-phase since the 2026-08-21 incident: a gameweek that newly reads as
+ * final is held as a candidate and only written after a second agreeing read
+ * at least CANDIDATE_HOLD_SECONDS later, with draft shape-tripwire probes
+ * gating every write. So a genuinely finished gameweek is stored up to about
+ * one three hour cron cycle later than it settles, and the in-flight display
+ * covers the gap with provisional labelling. The detail below names every
+ * gameweek that was finalised, held for agreement, blocked by a probe, or
+ * dropped without a write; held and blocked weeks stay absent and are retried
+ * next run. A gameweek that produced no performances is still not recorded, so
+ * it is retried next run — that rule lives in `storeFinalisedGameweeks` and
+ * this route does not second-guess it.
  */
 async function finaliseGameweeks(): Promise<string> {
   // Deliberately **not** `getGameweekData()`. That wrapper would answer from
   // the process-local map on a warm instance and return a count without doing
   // any work — reporting `ok: true` while the write this step exists for never
   // happened. Writing is the point, so it goes straight to the computation.
-  const season = await computeSeasonUncached();
+  const gate: FinalisationGateReport = {
+    finalised: [],
+    held: [],
+    blocked: [],
+    dropped: [],
+  };
+  const season = await computeSeasonUncached(gate);
 
-  const finalised = season.scoredGameweeks.filter(
-    (gameweek) => gameweek !== season.provisionalGameweek,
+  // finalised: confirmed by two agreeing reads and written. held: read as
+  // final but awaiting a second agreeing read (or scored data). blocked: a
+  // probe refused the write, with the failing probe names and payload
+  // evidence in the log. dropped: the candidate was removed without a write
+  // (decider reversal, or the week was already stored).
+  const parts = [`${gate.finalised.length} finalised gameweek(s)`];
+  parts.push(
+    gate.held.length > 0
+      ? `${gate.held.length} held (${gate.held.map((h) => `GW${h.gameweek}`).join(', ')})`
+      : '0 held',
+  );
+  parts.push(
+    gate.blocked.length > 0
+      ? `${gate.blocked.length} blocked (${gate.blocked.map((b) => `GW${b.gameweek}: ${b.probes.join('+')}`).join(', ')})`
+      : '0 blocked',
+  );
+  parts.push(
+    gate.dropped.length > 0
+      ? `${gate.dropped.length} dropped (${gate.dropped.map((gameweek) => `GW${gameweek}`).join(', ')})`
+      : '0 dropped',
   );
 
-  return season.provisionalGameweek
-    ? `${finalised.length} finalised gameweek(s), GW${season.provisionalGameweek} in flight`
-    : `${finalised.length} finalised gameweek(s)`;
+  if (season.provisionalGameweek) {
+    parts.push(`GW${season.provisionalGameweek} in flight`);
+  }
+
+  if (gate.blocked.length > 0) {
+    // A blocked write never persists, so this points at the log evidence, not
+    // at a repair: the undo below is for the opposite case, a write that
+    // should not have happened.
+    parts.push(
+      'blocked writes never persist (see the log evidence); reverse a bad write with scripts/forget-gameweek.mjs',
+    );
+  }
+
+  return parts.join(', ');
 }
 
 async function step(
