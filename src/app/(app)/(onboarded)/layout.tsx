@@ -38,6 +38,9 @@ export const dynamic = 'force-dynamic';
  * subgroup whose layout awaits the gate before the page renders, not under
  * this boundary. Everything else streams here (the `(streamed)` subgroup).
  * Groups are URL-neutral, so the split never changes a URL.
+ *
+ * Concrete split: `(streamed)` holds `(home)`, `results`, `rumblers`,
+ * `squads`, `premier-league`; `(blocking)` holds `players/[playerId]` only.
  */
 export default function OnboardedLayout({
   children,
