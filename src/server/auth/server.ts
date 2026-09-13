@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { redirect } from 'next/navigation';
+
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 
 import { getLeagueMemberByEmail } from '@/server/data/league-members';
@@ -89,4 +91,22 @@ export async function getCurrentUser(): Promise<SignedInUser | null> {
     leagueEntry: asLeagueEntryId(member.leagueEntry),
     profileComplete: isProfileComplete(profile),
   };
+}
+
+/**
+ * The onboarded member, or a redirect to `/profile`.
+ *
+ * The enforcement predicate, spelled once: a null user (no session, or a
+ * session whose email has no `league_members` row) or an incomplete profile
+ * is not onboarded. Both gates call this — the suspended `MembershipGate`
+ * and the blocking `(blocking)` layout — which differ only in WHEN they read
+ * (below a Suspense boundary or ahead of a 404-able route), never in WHO
+ * passes, so the predicate cannot drift between them.
+ */
+export async function requireOnboardedUser(): Promise<SignedInUser> {
+  const user = await getCurrentUser();
+
+  if (!user || !user.profileComplete) redirect('/profile');
+
+  return user;
 }

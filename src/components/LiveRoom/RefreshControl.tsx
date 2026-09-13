@@ -40,10 +40,13 @@ export default function RefreshControl() {
           aria-hidden='true'
           className={cn('h-4 w-4', pending && 'animate-spin')}
         />
-        {pending ? 'Refreshing…' : 'Refresh'}
+        {/* Static label: swapping in a longer pending label widens the
+            button mid-flight. Pending is already signalled by the spinner,
+            the disabled state, and the live region below. */}
+        Refresh
       </Button>
       <span aria-live='polite' role='status' className='sr-only'>
-        {pending ? 'Refreshing live figures.' : 'Live figures up to date.'}
+        {pending ? 'Refreshing live figures.' : 'Refresh finished.'}
       </span>
     </div>
   );

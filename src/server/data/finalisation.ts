@@ -49,7 +49,9 @@ function candidateScope(gameweek: number) {
  * Record a sighting of a finished-but-unstored gameweek.
  *
  * Insert-only: a first sighting inserts, a repeat sighting with the same
- * fingerprint only touches `lastChecked`, and a sighting with a *different*
+ * fingerprint only touches `lastChecked` — unless the row is coming out of
+ * a block, in which case the hold restarts (a refused sighting is not an
+ * agreeing read) — and a sighting with a *different*
  * fingerprint resets the row (new fingerprint, fresh `firstSeen`, cleared
  * block reason) rather than duplicating it. Nothing here ever confirms — the
  * caller decides that from the pure agreement rules, then deletes via
@@ -90,6 +92,18 @@ export async function recordCandidate(
         lastChecked: now,
         blockReason: null,
       })
+      .where(scope);
+    return;
+  }
+
+  if (current.blockReason !== null) {
+    // First probe-passing sighting after a block: the blocked sighting was
+    // never an agreeing read, so the hold starts now rather than then.
+    // Without this a block followed a hold-window later by one good read
+    // would confirm on a single agreement.
+    await db
+      .update(finalisationCandidates)
+      .set({ firstSeen: now, lastChecked: now, blockReason: null })
       .where(scope);
     return;
   }

@@ -4,6 +4,7 @@ import type {
   ElementCode,
   ElementId,
   ElementStatus,
+  EntryId,
   LeagueEntryId,
 } from '@/interfaces/fpl';
 import type {
@@ -132,7 +133,7 @@ export function toDraftPickRows(
     leagueId: number;
     draftId: number;
     draftEvent: number;
-    codeByElement: ReadonlyMap<number, ElementCode>;
+    codeByElement: ReadonlyMap<ElementId, ElementCode>;
   },
 ): NewDraftPickRow[] {
   return choices.flatMap((choice) => {
@@ -189,8 +190,8 @@ export function toOwnershipSnapshotRow(
 export function buildCodeByElement(
   elements: readonly ElementId[],
   codeOf: (element: ElementId) => ElementCode | null,
-): Map<number, ElementCode> {
-  const codeByElement = new Map<number, ElementCode>();
+): Map<ElementId, ElementCode> {
+  const codeByElement = new Map<ElementId, ElementCode>();
 
   for (const element of elements) {
     const code = codeOf(element);
@@ -213,8 +214,8 @@ export function toOwnershipSnapshotRows(
   context: {
     leagueId: number;
     gameweek: number;
-    codeByElement: ReadonlyMap<number, ElementCode>;
-    leagueEntryByEntry: ReadonlyMap<number, LeagueEntryId>;
+    codeByElement: ReadonlyMap<ElementId, ElementCode>;
+    leagueEntryByEntry: ReadonlyMap<EntryId, LeagueEntryId>;
   },
 ): NewOwnershipSnapshotRow[] {
   return statuses.flatMap((status) => {

@@ -69,7 +69,17 @@ export async function computeLiveGameweek(): Promise<LiveGameweekData> {
     fetchLeagueDetails(leagueId),
     fetchEventStatus(),
     fetchGameState(),
-    getStoredPerformances(),
+    // Baseline is enhancement, not input: the rows render without it (every
+    // movement reads as level, by design), so a stored-read failure degrades
+    // the slice instead of failing it. Entries and status have no such
+    // fallback — without them there is nothing to shape or decide.
+    getStoredPerformances().catch((error) => {
+      console.error(
+        '[live] stored performances could not be read; movement unknown.',
+        error,
+      );
+      return [];
+    }),
   ]);
 
   // The one place "is this gameweek over?" is decided. Never re-decided here:
@@ -102,11 +112,19 @@ export async function computeLiveGameweek(): Promise<LiveGameweekData> {
   // gameweek, from stored facts alone. Stored rows for the in-flight gameweek
   // should never exist, but if they do they are excluded — the live scoring
   // wins, exactly as `withoutInFlight` insists for the season aggregate.
+  //
+  // No settled weeks (opening weekend): an empty map, so every manager reads
+  // as level. The alternative — ranking everyone from an all-zero aggregate —
+  // pins seven managers as fallers on day one.
+  const settled = stored.filter(
+    (performance) => performance.event !== inFlight,
+  );
   const settledRanks = new Map(
-    aggregatePlayers(
-      league_entries,
-      stored.filter((performance) => performance.event !== inFlight),
-    ).map((player) => [player.id, player.f1_ranking] as const),
+    settled.length === 0
+      ? []
+      : aggregatePlayers(league_entries, settled).map(
+          (player) => [player.id, player.f1_ranking] as const,
+        ),
   );
 
   return buildLiveTower({

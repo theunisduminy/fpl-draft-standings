@@ -504,6 +504,20 @@ async function finaliseGatedGameweeks(args: {
       continue;
     }
 
+    // Coverage: every league entry must have scored. A transiently unreadable
+    // entry drops out of the week upstream, and two agreeing partial reads
+    // would fingerprint identically and freeze seven managers' truth in as
+    // the eight's — the joint-first bug in a subtler shape. The week holds
+    // for retry rather than confirming short.
+    const scoredEntries = new Set(week.map((p) => p.league_entry));
+    if (!leagueEntries.every((entry) => scoredEntries.has(entry.id))) {
+      gate.held.push({
+        gameweek,
+        reason: 'incomplete picks; will be retried',
+      });
+      continue;
+    }
+
     // The fingerprint is the scored content the confirming read must
     // reproduce exactly, mixed with the played signal so an unscored feed
     // wearing the shape of a scored one cannot agree with the real thing.

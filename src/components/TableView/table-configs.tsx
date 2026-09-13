@@ -7,12 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowUp, ArrowDown, Eye, Minus } from 'lucide-react';
 
-// Rank badge styling. The palette lives in `shapes.ts` so the server-rendered
-// live tower reads the same classes without importing this client-adjacent
-// module; this stays as the standings board's entry point.
-export const getRankBadgeClasses = (rank: number): string =>
-  rankBadgeClasses(rank);
-
 /**
  * A rank badge.
  *
@@ -26,7 +20,7 @@ export const getRankBadgeClasses = (rank: number): string =>
 export const renderRankBadge = (rank: number) => (
   <Badge
     variant='outline'
-    className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border p-0 text-sm font-bold ${getRankBadgeClasses(rank)}`}
+    className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border p-0 text-sm font-bold ${rankBadgeClasses(rank)}`}
   >
     {rank}
   </Badge>

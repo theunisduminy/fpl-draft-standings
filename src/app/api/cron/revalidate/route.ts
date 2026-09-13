@@ -8,6 +8,7 @@ import type {
   ElementCode,
   ElementId,
   ElementStatus,
+  EntryId,
   LeagueDetails,
   LeagueEntryId,
 } from '@/interfaces/fpl';
@@ -460,7 +461,7 @@ async function finaliseGameweeks(): Promise<{
   const parts = [`${gate.finalised.length} finalised gameweek(s)`];
   parts.push(
     gate.held.length > 0
-      ? `${gate.held.length} held (${gate.held.map((h) => `GW${h.gameweek}`).join(', ')})`
+      ? `${gate.held.length} held (${gate.held.map((h) => `GW${h.gameweek}: ${h.reason}`).join(', ')})`
       : '0 held',
   );
   parts.push(
@@ -644,7 +645,7 @@ async function snapshotNewlyFinalised(
     ownership.element_status.map((status) => status.element),
     codeOf,
   );
-  const leagueEntryByEntry = new Map<number, LeagueEntryId>(
+  const leagueEntryByEntry = new Map<EntryId, LeagueEntryId>(
     details.league_entries.map((entry) => [entry.entry_id, entry.id]),
   );
 
@@ -658,6 +659,15 @@ async function snapshotNewlyFinalised(
       leagueEntryByEntry,
     });
     stored += await storeOwnershipSnapshots(gameweek, rows);
+  }
+
+  // Zero rows stored for attributable gameweeks is a failure, not a quiet
+  // success: it means the ownership read was refused or nothing resolved,
+  // and reporting ok would retire the gameweeks from every future diff.
+  if (stored === 0) {
+    throw new Error(
+      `snapshotted 0 row(s) for GW${attributable.join(', GW')}; failing the step so it retries`,
+    );
   }
 
   return `snapshotted GW${attributable.join(', GW')} (${stored} row(s))`;

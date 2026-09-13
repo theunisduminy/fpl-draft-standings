@@ -96,7 +96,20 @@ const candidates = await sql`
   where league_id = ${leagueId} and gameweek = ${options.gameweek}
 `;
 
-if (rows.length === 0 && markers.length === 0 && candidates.length === 0) {
+// Counted, never printed: a snapshot is ~581 narrow rows, and the dry run
+// exists to confirm the slice, not to dump it.
+const snapshots = await sql`
+  select element_code
+  from ownership_snapshots
+  where league_id = ${leagueId} and gameweek = ${options.gameweek}
+`;
+
+if (
+  rows.length === 0 &&
+  markers.length === 0 &&
+  candidates.length === 0 &&
+  snapshots.length === 0
+) {
   console.log(
     `No stored rows for ${slice.label} on ${target.name}. Nothing to do.`,
   );
@@ -107,6 +120,7 @@ console.log(`Target: ${target.name} (${target.connectionVar}).`);
 console.log(
   `${slice.label}: ${rows.length} score row(s), ` +
     `${markers.length} finalised marker(s), ` +
+    `${snapshots.length} snapshot row(s), ` +
     `${candidates.length} candidate row(s).`,
 );
 
@@ -123,20 +137,27 @@ if (!options.apply) {
   process.exit(0);
 }
 
-await sql`
-  delete from gameweek_scores
-  where league_id = ${leagueId} and gameweek = ${options.gameweek}
-`;
-
-await sql`
-  delete from gameweeks
-  where league_id = ${leagueId} and gameweek = ${options.gameweek}
-`;
-
-await sql`
-  delete from finalisation_candidates
-  where league_id = ${leagueId} and gameweek = ${options.gameweek}
-`;
+// One non-interactive transaction: a crash between deletes must not leave
+// scores deleted with the finalised marker kept, or vice versa. Re-running
+// the script converges a half-applied delete.
+await sql.transaction([
+  sql`
+    delete from gameweek_scores
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+  sql`
+    delete from gameweeks
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+  sql`
+    delete from ownership_snapshots
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+  sql`
+    delete from finalisation_candidates
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+]);
 
 console.log(
   `Deleted ${slice.label} from ${slice.tables.join(', ')}. ` +

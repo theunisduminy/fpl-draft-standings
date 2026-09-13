@@ -11,6 +11,7 @@ import {
   runDraftProbes,
   runPulseProbes,
   TRIPWIRE_EVIDENCE_MAX_CHARS,
+  type DraftProbeInputs,
   type TripwireResult,
 } from './shape-tripwires';
 
@@ -144,6 +145,13 @@ describe('runDraftProbes', () => {
     expect(results).toHaveLength(5);
     expect(results.every((result) => result.pass)).toBe(true);
   });
+
+  it('fails every probe on missing inputs without throwing', () => {
+    const results = runDraftProbes(null as unknown as DraftProbeInputs);
+
+    expect(results).toHaveLength(5);
+    expect(results.every((result) => !result.pass)).toBe(true);
+  });
 });
 
 describe('runPulseProbes', () => {
@@ -255,7 +263,7 @@ describe('probeEventStatusRows', () => {
     const result = probeEventStatusRows({ ...body, status: tampered });
 
     expect(result.pass).toBe(false);
-    expect(result.evidence).toContain('2');
+    expect(result.evidence).toContain('row 2');
   });
 
   it('fails when there is no status array at all', () => {
@@ -364,6 +372,18 @@ describe('probeStandingsIdentity', () => {
         standings: [{ league_entry: '39837' }],
       }).pass,
     ).toBe(false);
+  });
+
+  it('names the known-entry count when ids match neither table', () => {
+    const details = leagueDetailsBody();
+
+    const result = probeStandingsIdentity({
+      ...details,
+      standings: [{ league_entry: 39999 }],
+    });
+
+    expect(result.pass).toBe(false);
+    expect(result.evidence).toContain('known entries');
   });
 });
 

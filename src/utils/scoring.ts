@@ -101,6 +101,33 @@ export function hasBeenPlayed(liveData: EventLive | null): boolean {
 }
 
 /**
+ * The played signal for one element of unknown shape.
+ *
+ * The same minutes-or-points rule as {@link hasBeenPlayed}, narrowed from
+ * `unknown` instead of asserted: only real numbers count, so a malformed
+ * value reads as unplayed (fail-closed, the probe discipline) rather than
+ * coercing its way to played. For well-formed payloads this agrees with
+ * `hasBeenPlayed` exactly.
+ */
+export function hasPlayedElement(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const stats = (value as { stats?: unknown }).stats;
+
+  if (typeof stats !== 'object' || stats === null) return false;
+
+  const { minutes, total_points } = stats as {
+    minutes?: unknown;
+    total_points?: unknown;
+  };
+
+  return (
+    (typeof minutes === 'number' ? minutes : 0) > 0 ||
+    (typeof total_points === 'number' ? total_points : 0) !== 0
+  );
+}
+
+/**
  * The starting XI: positions 1–11 count, 12–15 are the bench.
  *
  * One place for the rule `scoreGameweek` sums by and the live tower counts

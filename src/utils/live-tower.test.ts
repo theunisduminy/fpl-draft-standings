@@ -437,3 +437,61 @@ describe('buildLiveTower error path', () => {
     expect(data.rows).toEqual([]);
   });
 });
+
+describe('unknown managers', () => {
+  const liveData = makeLive({
+    1: { points: 10, minutes: 90 },
+    2: { points: 5, minutes: 90 },
+  });
+
+  it("renders 'Unknown' for a scored manager missing from the entries", () => {
+    const entries = makeEntries(1);
+    const data = buildLiveTower(
+      input({
+        liveData,
+        playerPicks: [
+          starPicks(entries[0].id, asElementId(1)),
+          starPicks(asLeagueEntryId(999), asElementId(2)),
+        ],
+        entries,
+        settledRanks: new Map(),
+      }),
+    );
+
+    expect(data.state).toBe('live');
+    if (data.state !== 'live') return;
+
+    const ghost = data.rows.find(
+      (row) => row.league_entry === asLeagueEntryId(999),
+    );
+
+    expect(ghost?.managerName).toBe('Unknown');
+    expect(ghost?.teamName).toBe('Unknown');
+  });
+
+  it("renders 'Unknown' for blank names rather than an empty string", () => {
+    const entries = [
+      {
+        ...makeEntries(1)[0],
+        player_first_name: '',
+        player_last_name: '',
+        entry_name: '',
+      },
+    ];
+    const data = buildLiveTower(
+      input({
+        liveData,
+        playerPicks: [starPicks(entries[0].id, asElementId(1))],
+        entries,
+        settledRanks: new Map(),
+      }),
+    );
+
+    expect(data.state).toBe('live');
+    if (data.state !== 'live') return;
+
+    expect(data.rows).toHaveLength(1);
+    expect(data.rows[0].managerName).toBe('Unknown');
+    expect(data.rows[0].teamName).toBe('Unknown');
+  });
+});

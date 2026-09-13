@@ -352,7 +352,7 @@ describe('evaluateCandidate', () => {
         nowSeconds: FIRST_SEEN + 3 * HOUR,
         isEmpty: true,
       }).outcome,
-    ).not.toBe('confirm');
+    ).toBe('hold');
   });
 
   it('holds an empty read against the stored candidate instead of resetting its clock', () => {

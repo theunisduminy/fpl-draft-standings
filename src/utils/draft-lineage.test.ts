@@ -8,11 +8,13 @@ import {
   type DraftChoice,
   type DraftInfo,
   type ElementCode,
+  type ElementId,
   type ElementStatus,
   type EntryId,
   type LeagueEntryId,
 } from '@/interfaces/fpl';
 import {
+  buildCodeByElement,
   draftForGameweek,
   toDraftPickRow,
   toDraftPickRows,
@@ -70,14 +72,16 @@ const SAKA_CODE = asElementCode(223094);
 
 function codeByElement(
   entries: [number, ElementCode][] = [[101, SAKA_CODE]],
-): Map<number, ElementCode> {
-  return new Map(entries);
+): Map<ElementId, ElementCode> {
+  return new Map(entries.map(([id, code]) => [asElementId(id), code]));
 }
 
 function leagueEntryByEntry(
   entries: [number, LeagueEntryId][] = [[39781, asLeagueEntryId(39837)]],
-): Map<number, LeagueEntryId> {
-  return new Map(entries);
+): Map<EntryId, LeagueEntryId> {
+  return new Map(
+    entries.map(([id, leagueEntry]) => [asEntryId(id), leagueEntry]),
+  );
 }
 
 describe('draftForGameweek', () => {
@@ -282,5 +286,39 @@ describe('toOwnershipSnapshotRow', () => {
       ownerEntry: 39999,
       ownerLeagueEntry: null,
     });
+  });
+});
+
+describe('buildCodeByElement', () => {
+  const codeOf = (element: ElementId): ElementCode | null =>
+    element === asElementId(101) ? SAKA_CODE : null;
+
+  it('resolves every element through the lookup callback', () => {
+    const map = buildCodeByElement([asElementId(101)], codeOf);
+
+    expect(map.get(asElementId(101))).toBe(SAKA_CODE);
+  });
+
+  it('drops elements the lookup cannot name', () => {
+    const map = buildCodeByElement(
+      [asElementId(101), asElementId(102)],
+      codeOf,
+    );
+
+    expect(map.has(asElementId(102))).toBe(false);
+    expect(map.size).toBe(1);
+  });
+
+  it('resolves an empty input to an empty map', () => {
+    expect(buildCodeByElement([], codeOf).size).toBe(0);
+  });
+
+  it('collapses duplicate elements to one entry', () => {
+    const map = buildCodeByElement(
+      [asElementId(101), asElementId(101)],
+      codeOf,
+    );
+
+    expect(map.size).toBe(1);
   });
 });

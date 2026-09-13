@@ -1,14 +1,12 @@
-import { redirect } from 'next/navigation';
-
-import { getCurrentUser } from '@/server/auth/server';
+import { requireOnboardedUser } from '@/server/auth/server';
 
 /**
  * The membership check for everything in `(onboarded)`, suspended below the
  * `<Suspense>` boundary in `(onboarded)/layout.tsx` so AppChrome flushes
  * before this read resolves.
  *
- * Enforcement is exactly what the layout used to do inline: a null user (no
- * session, or a session whose email has no `league_members` row) or an
+ * Enforcement is the shared `requireOnboardedUser` predicate: a null user
+ * (no session, or a session whose email has no `league_members` row) or an
  * incomplete profile redirects to `/profile`. See the layout comment for why
  * the group — and not a per-page check — owns this.
  *
@@ -22,9 +20,7 @@ export async function MembershipGate({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
-
-  if (!user || !user.profileComplete) redirect('/profile');
+  await requireOnboardedUser();
 
   return <>{children}</>;
 }

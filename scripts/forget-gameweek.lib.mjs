@@ -22,13 +22,16 @@ export const APPLY_FLAG = '--apply';
  * Every table holding rows for one league plus gameweek slice, in deletion
  * order. `finalisation_candidates` rides along so a forgotten gameweek is
  * genuinely refetched through the two-phase path rather than confirmed from
- * a stale candidate.
+ * a stale candidate — and `ownership_snapshots` rides along because snapshot
+ * writes are first-write-wins: a stale snapshot would block the re-snapshot
+ * of the corrected gameweek forever.
  *
  * @type {string[]}
  */
 export const TABLES = [
   'gameweek_scores',
   'gameweeks',
+  'ownership_snapshots',
   'finalisation_candidates',
 ];
 
@@ -217,8 +220,9 @@ export function usage() {
     'Usage: node --env-file=.env.local scripts/forget-gameweek.mjs',
     `  <gameweek ${MIN_GAMEWEEK}..${MAX_GAMEWEEK}> [${APPLY_FLAG}] [${PROD_FLAG}]`,
     '',
-    'Deletes one league plus gameweek slice (scores, finalised marker, and',
-    'finalisation candidate) so the next read refetches it from the API.',
+    'Deletes one league plus gameweek slice (scores, finalised marker,',
+    'ownership snapshot, and finalisation candidate) so the next read',
+    'refetches it from the API.',
     '',
     'Dry run by default: prints the slice and row counts, deletes nothing.',
     `Pass ${APPLY_FLAG} to delete. Pass ${PROD_FLAG} to target production;`,

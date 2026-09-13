@@ -1,6 +1,4 @@
-import type { EventLive } from '@/interfaces/fpl';
-
-import { hasBeenPlayed } from './scoring';
+import { hasPlayedElement } from './scoring';
 
 /**
  * The seven known upstream traps as named probes.
@@ -191,7 +189,8 @@ export function probeLiveElementsPresent(liveData: LiveBody): TripwireResult {
  * The harder trap: once a gameweek's fixtures exist, the feed lists every
  * element in the game on nil minutes hours before kickoff, which the key
  * count above cannot tell from a scored week. The verdict is
- * `hasBeenPlayed`'s, applied per element so the evidence count and the pass
+ * `hasPlayedElement`'s — the same minutes-or-points signal as
+ * `hasBeenPlayed`, narrowed per element — so the evidence count and the pass
  * flag cannot disagree.
  */
 export function probeLiveElementsPlayed(liveData: LiveBody): TripwireResult {
@@ -207,9 +206,7 @@ export function probeLiveElementsPlayed(liveData: LiveBody): TripwireResult {
 
   const elements = liveData.elements;
   const keys = Object.keys(elements);
-  const played = keys.filter((key) =>
-    hasBeenPlayed({ elements: { [key]: elements[key] } } as EventLive),
-  ).length;
+  const played = keys.filter((key) => hasPlayedElement(elements[key])).length;
 
   if (played > 0) {
     return {

@@ -118,7 +118,7 @@ describe('parseArgs', () => {
 });
 
 describe('sliceDescriptor', () => {
-  it('covers scores, marker, and candidate tables for one slice', () => {
+  it('covers scores, marker, snapshot, and candidate tables for one slice', () => {
     const slice = sliceDescriptor(8337, 7);
 
     expect(slice).toEqual({
@@ -130,6 +130,7 @@ describe('sliceDescriptor', () => {
     expect(TABLES).toEqual([
       'gameweek_scores',
       'gameweeks',
+      'ownership_snapshots',
       'finalisation_candidates',
     ]);
   });
@@ -138,7 +139,7 @@ describe('sliceDescriptor', () => {
     const slice = sliceDescriptor(8337, 7);
     slice.tables.push('gameweek_scores');
 
-    expect(TABLES).toHaveLength(3);
+    expect(TABLES).toHaveLength(4);
   });
 });
 
