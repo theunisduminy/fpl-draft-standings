@@ -1,5 +1,5 @@
 'use client';
-import { Trophy, LineChart, Swords, Radio } from 'lucide-react';
+import { Trophy, LineChart, Swords } from 'lucide-react';
 
 import { SectionTabs, type SectionTab } from '@/components/SectionTabs';
 import StandingsTable from './StandingsTable';
@@ -26,23 +26,14 @@ import type { SeasonSnapshot } from '@/utils/scoring';
  * fetched here, but note the panels below still ship to the browser: their
  * chart leaves are all `'use client'` for recharts, so there is no server
  * subtree to preserve by passing them in as slots.
- *
- * The optional live panel is the exception that proves the slot rule: the
- * tower is a server subtree (fetched and shaped on the server, streaming in
- * on its own boundary), so it arrives as a node rather than being built
- * here. It is appended last so the permanent tabs keep stable positions
- * whether or not a gameweek is in flight — and landing on the standings
- * still means landing on the rankings, so it is never the default.
  */
 export function StandingsTabs({
   data,
   snapshots,
   movement,
-  live,
 }: {
   data: GameweekDataResponse;
   snapshots: SeasonSnapshot[];
-  live?: React.ReactNode;
 } & StandingsContext) {
   const tabs: SectionTab[] = [
     {
@@ -79,10 +70,6 @@ export function StandingsTabs({
       content: <RivalsInsights data={data} />,
     },
   ];
-
-  if (live) {
-    tabs.push({ value: 'live', label: 'Live', icon: Radio, content: live });
-  }
 
   return <SectionTabs defaultValue='standings' tabs={tabs} />;
 }

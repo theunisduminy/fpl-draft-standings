@@ -70,22 +70,17 @@ import { getPremierLeagueTeams } from '@/utils/pl-teams';
  * Every cache `cachedRead` owns, tagged with its own key.
  *
  * Checked against the `cachedRead` call sites rather than maintained by hand:
- * `gameweek-data.ts`, `squads.ts`, `draft-elements.ts`, `pl-teams.ts`,
- * `premier-league-data.ts` and `live-gameweek.ts`. A tag nobody registers is a
- * silent no-op that reads as coverage — and the reverse is worse: adding a
- * `cachedRead` without adding it here leaves a cache this job claims to clear
- * and does not.
+ * `gameweek-data.ts`, `squads.ts`, `draft-elements.ts`, `pl-teams.ts` and
+ * `premier-league-data.ts`. A tag nobody registers is a silent no-op that
+ * reads as coverage — and the reverse is worse: adding a `cachedRead`
+ * without adding it here leaves a cache this job claims to clear and does
+ * not.
  *
  * The two Pulse caches are here for that invariant rather than out of need.
  * `premier-league` expires on its own every five minutes, well inside the
  * three-hour interval, and `pulse-compseason` answers a question whose answer
  * changes once a year. Neither costs anything to drop, and leaving them out
  * would mean the list above needed a footnote instead of being simply true.
- *
- * `live-gameweek` is invalidated here but deliberately never warmed below: a
- * 60 second cache warmed on a three hour schedule buys nothing and spends 12
- * upstream calls per run. The first standings Live tab visit after a sync
- * warms it on demand.
  */
 const TAGS = [
   'gameweek-data',
@@ -94,7 +89,6 @@ const TAGS = [
   'pl-teams',
   'premier-league',
   'pulse-compseason',
-  'live-gameweek',
 ] as const;
 
 /** One step's outcome, so a partial failure cannot be mistaken for success. */

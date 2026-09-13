@@ -4,8 +4,6 @@ import type { Metadata } from 'next';
 import { getGameweekData } from '@/utils/gameweek-data';
 import { standingsByGameweek, standingsMovement } from '@/utils/scoring';
 import { StandingsTabs } from '@/components/TableView/StandingsTabs';
-import { LiveTowerSkeleton } from '@/components/LiveRoom/LiveTowerSkeleton';
-import { LiveTowerView } from '@/components/LiveRoom/LiveTowerView';
 import { StandingsSkeleton } from '@/components/TableView/StandingsSkeleton';
 import { SkeletonRegion } from '@/components/SkeletonRegion';
 import { PageShell } from '@/components/Layout/PageShell';
@@ -57,23 +55,6 @@ async function Standings() {
         data={data}
         snapshots={snapshots}
         movement={standingsMovement(snapshots)}
-        live={
-          // The live view is a standings tab while a gameweek is in flight,
-          // not a destination: the tab itself carries the meaning, so no
-          // badge is needed. Absent otherwise, so nothing is fetched and no
-          // tab is offered. The slice streams in on its own boundary.
-          data.provisionalGameweek === null ? undefined : (
-            <Suspense
-              fallback={
-                <SkeletonRegion>
-                  <LiveTowerSkeleton />
-                </SkeletonRegion>
-              }
-            >
-              <LiveTowerView />
-            </Suspense>
-          )
-        }
       />
     </div>
   );
