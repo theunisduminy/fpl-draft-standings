@@ -1,6 +1,8 @@
-import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
-import { getCurrentUser } from '@/server/auth/server';
+import { MembershipGate } from '@/components/Layout/MembershipGate';
+import { SkeletonRegion } from '@/components/SkeletonRegion';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Reads the session, so nothing beneath it can be prerendered.
 export const dynamic = 'force-dynamic';
@@ -23,15 +25,38 @@ export const dynamic = 'force-dynamic';
  *
  * Adding a page that should skip onboarding — another pre-app step, say — means
  * putting it beside `profile/` in `(app)`, not here.
+ *
+ * Streaming shape: this layout is sync — it never awaits `getCurrentUser()`
+ * itself. The check lives in `<MembershipGate>`, awaited below a `<Suspense>`
+ * boundary with a skeleton-only fallback, so AppChrome flushes before the
+ * user lookup resolves while enforcement stays identical (null or incomplete
+ * profile still redirects to `/profile`, and the fallback carries zero league
+ * content — neutral bars only, no names, scores, or rumblers).
+ *
+ * Routes that can 404 are the exception: a flushed shell commits the HTTP
+ * status before `notFound()` runs, so such routes belong in a `(blocking)`
+ * subgroup whose layout awaits the gate before the page renders, not under
+ * this boundary. Everything else streams here (the `(streamed)` subgroup).
+ * Groups are URL-neutral, so the split never changes a URL.
  */
-export default async function OnboardedLayout({
+export default function OnboardedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
-
-  if (!user || !user.profileComplete) redirect('/profile');
-
-  return <>{children}</>;
+  return (
+    <Suspense
+      fallback={
+        <SkeletonRegion>
+          <div className='space-y-4'>
+            <Skeleton className='h-8 w-48' />
+            <Skeleton className='h-4 w-64' />
+            <Skeleton className='h-64 w-full' />
+          </div>
+        </SkeletonRegion>
+      }
+    >
+      <MembershipGate>{children}</MembershipGate>
+    </Suspense>
+  );
 }
