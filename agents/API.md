@@ -742,10 +742,10 @@ returns a different club or a different footballer.
 
 **There are two route handlers, and only one of them is ours.**
 
-| Route                  | Returns                          | Backed by                                                                |
-| ---------------------- | -------------------------------- | ------------------------------------------------------------------------ |
-| `/api/auth/[...path]`  | Neon Auth's own handler          | `auth.handler()`                                                         |
-| `/api/cron/revalidate` | Per-step sync outcomes, and `ok` | the reference DAL + `computeSeasonUncached()` + the lineage DAL          |
+| Route                  | Returns                          | Backed by                                                       |
+| ---------------------- | -------------------------------- | --------------------------------------------------------------- |
+| `/api/auth/[...path]`  | Neon Auth's own handler          | `auth.handler()`                                                |
+| `/api/cron/revalidate` | Per-step sync outcomes, and `ok` | the reference DAL + `computeSeasonUncached()` + the lineage DAL |
 
 `/api/cron/revalidate` is the sync job: every three hours it refreshes
 `draft_elements` and `pl_teams` from the draft bootstrap, writes any newly
