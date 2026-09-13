@@ -3,10 +3,36 @@ import { timingSafeEqual } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
-import type { DraftBootstrap } from '@/interfaces/fpl';
+import type {
+  DraftBootstrap,
+  DraftChoice,
+  ElementCode,
+  ElementId,
+  ElementStatus,
+  LeagueDetails,
+  LeagueEntryId,
+} from '@/interfaces/fpl';
 import { upsertElements } from '@/server/data/elements';
+import { getFinalisedGameweeks } from '@/server/data/gameweeks';
+import {
+  readDraftPicks,
+  seedDraftPicks,
+  storeOwnershipSnapshots,
+} from '@/server/data/lineage';
 import { upsertTeams } from '@/server/data/pl-teams';
-import { fplApi, getLeagueId, upstreamFetch } from '@/utils/fpl-api';
+import {
+  draftForGameweek,
+  toDraftPickRows,
+  toOwnershipSnapshotRows,
+} from '@/utils/draft-lineage';
+import { getElementLookup } from '@/utils/draft-elements';
+import {
+  fetchUpstream,
+  fplApi,
+  getLeagueId,
+  upstreamFetch,
+} from '@/utils/fpl-api';
+import { fetchLeagueDetails } from '@/utils/league';
 import { toElementRows, toTeamRows } from '@/utils/reference-mapping';
 import { clearCache } from '@/utils/cache';
 import { computeSeasonUncached, getGameweekData } from '@/utils/gameweek-data';
@@ -170,10 +196,28 @@ async function runSync(): Promise<StepResult[]> {
   // 500s must not cost us a finalised gameweek, and vice versa. `Promise.all`
   // is safe here only because `step` catches — it returns a failed `StepResult`
   // rather than rejecting, so neither branch can abort the other.
+  //
+  // `newlyFinalised` is captured out of the finalise closure: the lineage step
+  // below snapshots exactly those gameweeks, so it needs the list, not just
+  // the display string.
+  let newlyFinalised: number[] = [];
+
   const [reference, finalisation] = await Promise.all([
     step('reference', syncReferenceTables),
-    step('finalise', finaliseGameweeks),
+    step('finalise', async () => {
+      const result = await finaliseGameweeks();
+      newlyFinalised = result.newlyStored;
+      return result.detail;
+    }),
   ]);
+
+  // Sequential, after finalisation. Ownership snapshots must read the present —
+  // `element-status` reflects now, not the gameweek — so they cover exactly the
+  // gameweeks this run newly finalised: never older ones, whose ownership is
+  // unrecoverable, and never the in-flight one. The draft seed lives here too,
+  // guarded on draft id. A failure fails only this step; reference and
+  // finalise still report honestly through `step`.
+  const lineage = await step('lineage', () => syncLineage(newlyFinalised));
 
   // Expire, then clear, then warm. Both halves are easy to get wrong in ways
   // that report success:
@@ -235,7 +279,7 @@ async function runSync(): Promise<StepResult[]> {
     return summary;
   });
 
-  return [reference, finalisation, invalidate, warm];
+  return [reference, finalisation, lineage, invalidate, warm];
 }
 
 /**
@@ -369,8 +413,26 @@ async function attemptBootstrapFetch(): Promise<BootstrapAttempt> {
  * next run. A gameweek that produced no performances is still not recorded, so
  * it is retried next run — that rule lives in `storeFinalisedGameweeks` and
  * this route does not second-guess it.
+ *
+ * Returns the display detail plus the gameweeks this run newly stored, so the
+ * lineage step can snapshot exactly those. The outward `StepResult` shape is
+ * unchanged — `runSync` unwraps `detail` for the step.
  */
-async function finaliseGameweeks(): Promise<string> {
+async function finaliseGameweeks(): Promise<{
+  detail: string;
+  newlyStored: number[];
+}> {
+  // The before-image for the newly-stored diff below. A read failure here must
+  // not fail finalisation — it only means lineage snapshots nothing this run,
+  // which is the safe direction (absence over misattribution).
+  const before = await getFinalisedGameweeks().catch((error) => {
+    console.error(
+      '[cron] could not read finalised gameweeks before finalising; lineage will snapshot nothing.',
+      error,
+    );
+    return null;
+  });
+
   // Deliberately **not** `getGameweekData()`. That wrapper would answer from
   // the process-local map on a warm instance and return a count without doing
   // any work — reporting `ok: true` while the write this step exists for never
@@ -418,7 +480,199 @@ async function finaliseGameweeks(): Promise<string> {
     );
   }
 
-  return parts.join(', ');
+  const detail = parts.join(', ');
+
+  // The diff, not the store's own return: `storeFinalisedGameweeks` reports
+  // every storable gameweek including ones already held, while snapshots must
+  // cover exactly what this run added — `onConflictDoNothing` means re-stored
+  // rows are not new facts.
+  const after = await getFinalisedGameweeks().catch((error) => {
+    console.error(
+      '[cron] could not read finalised gameweeks after finalising; lineage will snapshot nothing.',
+      error,
+    );
+    return null;
+  });
+
+  const newlyStored =
+    before && after
+      ? [...after]
+          .filter((gameweek) => !before.has(gameweek))
+          .sort((a, b) => a - b)
+      : [];
+
+  return { detail, newlyStored };
+}
+
+/**
+ * Persist the draft-to-waiver lineage: the frozen draft record and one
+ * ownership snapshot per newly-finalised gameweek.
+ *
+ * Runs sequentially after finalisation in the same invocation, so "newly
+ * finalised" and "present ownership" are minutes apart at most. Everything
+ * throws into the `step` wrapper: a failed `element-status` read fails only
+ * this step while reference and finalise still report honestly.
+ */
+async function syncLineage(newlyFinalised: number[]): Promise<string> {
+  const leagueId = getLeagueId();
+  const details = await fetchLeagueDetails(leagueId);
+  const lookup = await getElementLookup();
+
+  // Stable codes are the join key everywhere lineage persists. The lookup
+  // resolves them, and anything it cannot resolve is dropped by the mapping
+  // helpers rather than stored with a null code.
+  const codeOf = (element: ElementId): ElementCode | null =>
+    lookup.describe(element).code;
+
+  const seeded = await seedUnseededDrafts(details, codeOf, leagueId);
+  const snapshotted = await snapshotNewlyFinalised(
+    newlyFinalised,
+    details,
+    codeOf,
+    leagueId,
+  );
+
+  return `${seeded}; ${snapshotted}`;
+}
+
+/**
+ * Seed the frozen draft record, once per draft id.
+ *
+ * The guard keys on the upstream draft id, not on row count: a populated table
+ * is never re-synced, while a newly started draft (the GW24 re-draft) still
+ * seeds when its id appears. An empty choices response seeds nothing and
+ * deletes nothing — against a populated table that is the draft board surviving
+ * an upstream wipe; against an empty one the next run simply retries.
+ */
+async function seedUnseededDrafts(
+  details: LeagueDetails,
+  codeOf: (element: ElementId) => ElementCode | null,
+  leagueId: number,
+): Promise<string> {
+  const started = details.league.drafts.filter((draft) => draft.draft_started);
+
+  if (started.length === 0) return 'no started drafts to seed';
+
+  const stored = await readDraftPicks();
+  const seededIds = new Set(stored.map((pick) => pick.draftId));
+  const unseeded = started.filter((draft) => !seededIds.has(draft.id));
+
+  if (unseeded.length === 0) {
+    return `${started.length} started draft(s) already seeded`;
+  }
+
+  // Once: the choices endpoint is league scoped, not draft scoped, so every
+  // unseeded draft is attributed the same list.
+  const choices = await fetchDraftChoices(leagueId);
+
+  if (choices.length === 0) {
+    return `choices empty; ${unseeded.length} draft(s) left unseeded`;
+  }
+
+  const codeByElement = new Map<number, ElementCode>();
+  for (const choice of choices) {
+    const code = codeOf(choice.element);
+    if (code !== null) codeByElement.set(choice.element, code);
+  }
+
+  let written = 0;
+
+  for (const draft of unseeded) {
+    const rows = toDraftPickRows(choices, {
+      leagueId,
+      draftId: draft.id,
+      draftEvent: draft.event,
+      codeByElement,
+    });
+
+    // Nothing resolvable (no codes): inserting an empty set would write
+    // nothing anyway, and the draft stays unseeded for the next run.
+    if (rows.length === 0) continue;
+
+    written += await seedDraftPicks(rows);
+  }
+
+  return `seeded ${written} pick(s) across ${unseeded.length} draft(s)`;
+}
+
+/**
+ * Snapshot ownership for exactly the gameweeks this run newly finalised.
+ *
+ * `element-status` reflects the present, so snapshotting any other gameweek
+ * would misattribute it: older ones are unrecoverable and stay absent, and the
+ * in-flight one is never in the list. A gameweek no draft covers is
+ * unattributable rather than an error, so it is skipped and named.
+ */
+async function snapshotNewlyFinalised(
+  newlyFinalised: number[],
+  details: LeagueDetails,
+  codeOf: (element: ElementId) => ElementCode | null,
+  leagueId: number,
+): Promise<string> {
+  if (newlyFinalised.length === 0) {
+    return 'no newly-finalised gameweeks to snapshot';
+  }
+
+  const attributable = newlyFinalised.filter((gameweek) => {
+    if (draftForGameweek(details.league.drafts, gameweek)) return true;
+
+    console.error(
+      `[cron] GW${gameweek} is finalised but no draft covers it; leaving it unsnapshotted.`,
+    );
+
+    return false;
+  });
+
+  if (attributable.length === 0) {
+    return 'no attributable gameweeks to snapshot';
+  }
+
+  const ownership = await fetchUpstream<{ element_status: ElementStatus[] }>(
+    fplApi.elementStatus(leagueId),
+  );
+
+  // One read, resolved once: every snapshotted gameweek shares the same
+  // present-tense ownership, which is exactly why only newly-finalised ones
+  // may be stored.
+  const codeByElement = new Map<number, ElementCode>();
+  for (const status of ownership.element_status) {
+    const code = codeOf(status.element);
+    if (code !== null) codeByElement.set(status.element, code);
+  }
+  const leagueEntryByEntry = new Map<number, LeagueEntryId>(
+    details.league_entries.map((entry) => [entry.entry_id, entry.id]),
+  );
+
+  let stored = 0;
+
+  for (const gameweek of attributable) {
+    const rows = toOwnershipSnapshotRows(ownership.element_status, {
+      leagueId,
+      gameweek,
+      codeByElement,
+      leagueEntryByEntry,
+    });
+    stored += await storeOwnershipSnapshots(gameweek, rows);
+  }
+
+  return `snapshotted GW${attributable.join(', GW')} (${stored} row(s))`;
+}
+
+/**
+ * The draft choices, or `[]` when they cannot be read.
+ *
+ * Lenient like the squads read path: pre-draft there is nothing to seed yet,
+ * and mid-season a blip must not fail the step — the next run retries.
+ */
+async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
+  try {
+    const body = await fetchUpstream<{ choices?: DraftChoice[] }>(
+      fplApi.draftChoices(leagueId),
+    );
+    return body.choices ?? [];
+  } catch {
+    return [];
+  }
 }
 
 async function step(
