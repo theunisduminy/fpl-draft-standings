@@ -325,6 +325,22 @@ describe('evaluateCandidate', () => {
     ).toEqual({ outcome: 'drop', candidate: null });
   });
 
+  it('drops on a decider reversal even when the read is empty', () => {
+    const stored = candidateFor(
+      fingerprintPerformances(scoredWeek(), playedLive([1, 2, 3])),
+    );
+
+    expect(
+      evaluateCandidate({
+        existing: stored,
+        fingerprint: fingerprintPerformances([], null),
+        deciderFinal: false,
+        nowSeconds: FIRST_SEEN + 3 * HOUR,
+        isEmpty: true,
+      }),
+    ).toEqual({ outcome: 'drop', candidate: null });
+  });
+
   it('never confirms an empty performance list', () => {
     const emptyFingerprint = fingerprintPerformances([], null);
 
