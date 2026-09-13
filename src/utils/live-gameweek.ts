@@ -1,6 +1,5 @@
 import 'server-only';
 
-import type { GameWeekStatus } from '@/interfaces/match';
 import type { EventLive, GameState } from '@/interfaces/fpl';
 import { getStoredPerformances } from '@/server/data/gameweeks';
 import { cachedRead } from './cache';
@@ -9,6 +8,7 @@ import { deriveSeasonState } from './season-state';
 import { fetchLeagueDetails } from './league';
 import { fetchEntryPicks } from './gameweek-squad';
 import { aggregatePlayers, type EntryPicks } from './scoring';
+import { fetchEventStatus } from './gameweek-data';
 import { buildLiveTower, type LiveRoomData } from './live-tower';
 
 /**
@@ -157,33 +157,15 @@ async function fetchLiveFeed(gameweek: number): Promise<EventLive | null> {
 }
 
 /**
- * Between seasons `/pl/event-status` answers 404 with the bare string
- * "Game not started" — not the usual `{ status: [...] }` object. Treat that
- * as "no gameweeks have been played yet" so the slice renders idle instead of
- * failing. (Duplicated from `gameweek-data.ts` rather than exported from it:
- * widening that module's surface for one reader is the worse trade.)
- */
-async function fetchEventStatus(): Promise<GameWeekStatus[]> {
-  const res = await upstreamFetch(fplApi.eventStatus());
-
-  if (res.status === 404) {
-    return [];
-  }
-
-  if (!res.ok) {
-    throw new Error(`Event status request failed with ${res.status}`);
-  }
-
-  const body = (await res.json()) as { status?: GameWeekStatus[] } | null;
-  return Array.isArray(body?.status) ? body.status : [];
-}
-
-/**
  * `/api/game` — the only draft endpoint that answers year-round.
  *
  * Resolves to `null` rather than throwing, because it is a cross-check:
  * without it `deriveSeasonState` falls back to `event-status` alone, which is
  * still correct for a completed gameweek and merely defers an in-flight one.
+ *
+ * Local rather than shared with `gameweek-data.ts`: the only difference is
+ * the log tag, and that tag is what tells the operator which surface
+ * suffered. A parameter for it would be sprawl for a log line.
  */
 async function fetchGameState(): Promise<GameState | null> {
   try {

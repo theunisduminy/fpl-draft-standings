@@ -34,6 +34,22 @@ export interface TripwireResult {
  */
 export const TRIPWIRE_EVIDENCE_MAX_CHARS = 500;
 
+/**
+ * Bound a string to a readable length.
+ *
+ * The one truncation rule: probe evidence, gate evidence and stored block
+ * reasons all share the budget above and differ only in suffix, so the length
+ * check lives here once. Callers keep their own suffix — probe logs name the
+ * cut, the cron detail does not, and the stored block reason carries none.
+ */
+export function truncateText(
+  text: string,
+  max: number = TRIPWIRE_EVIDENCE_MAX_CHARS,
+  suffix: string = '...',
+): string {
+  return text.length > max ? `${text.slice(0, max)}${suffix}` : text;
+}
+
 /** Raw parsed body of `/api/pl/event-status`, before any mapping. */
 export type EventStatusBody = unknown;
 
@@ -66,9 +82,7 @@ function snippet(value: unknown): string {
     raw = String(value);
   }
 
-  return raw.length > TRIPWIRE_EVIDENCE_MAX_CHARS
-    ? `${raw.slice(0, TRIPWIRE_EVIDENCE_MAX_CHARS)}... (truncated)`
-    : raw;
+  return truncateText(raw, TRIPWIRE_EVIDENCE_MAX_CHARS, '... (truncated)');
 }
 
 /**

@@ -25,7 +25,12 @@
  */
 
 import type { EventLive, LeagueEntry, LeagueEntryId } from '@/interfaces/fpl';
-import { hasBeenPlayed, scoreGameweek, type EntryPicks } from './scoring';
+import {
+  hasBeenPlayed,
+  scoreGameweek,
+  startingXI,
+  type EntryPicks,
+} from './scoring';
 
 /** Where a manager sits relative to their settled station entering the week. */
 export type LiveMovement = 'riser' | 'faller' | 'level';
@@ -173,7 +178,7 @@ export function buildLiveTower(input: LiveTowerInput): LiveRoomData {
   const xiByEntry = new Map<LeagueEntryId, EntryPicks['picks']>(
     playerPicks.map((player) => [
       player.league_entry,
-      (player.picks ?? []).filter((pick) => pick.position <= 11),
+      startingXI(player.picks),
     ]),
   );
 

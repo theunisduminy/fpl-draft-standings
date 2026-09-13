@@ -34,6 +34,18 @@ export interface ColumnShape {
 }
 
 /**
+ * The indexes hidden below `md`, for a skeleton that works in positions.
+ *
+ * One derivation for every column list, so the board and its placeholder
+ * cannot disagree about which columns a phone hides.
+ */
+function hiddenBelowMdIndexes(shapes: ColumnShape[]): number[] {
+  return shapes.flatMap((column, index) =>
+    column.hideBelow === 'md' ? [index] : [],
+  );
+}
+
+/**
  * The standings board's five columns, in order: manager, team, move, F1,
  * points.
  *
@@ -56,8 +68,8 @@ export const STANDINGS_COLUMN_SHAPES: ColumnShape[] = [
 ];
 
 /** The indexes a phone hides, for a skeleton that works in positions. */
-export const STANDINGS_HIDDEN_BELOW_MD = STANDINGS_COLUMN_SHAPES.flatMap(
-  (column, index) => (column.hideBelow === 'md' ? [index] : []),
+export const STANDINGS_HIDDEN_BELOW_MD = hiddenBelowMdIndexes(
+  STANDINGS_COLUMN_SHAPES,
 );
 
 /**
@@ -85,9 +97,58 @@ export const LIVE_TOWER_COLUMN_SHAPES: ColumnShape[] = [
 ];
 
 /** The indexes a phone hides, for a skeleton that works in positions. */
-export const LIVE_TOWER_HIDDEN_BELOW_MD = LIVE_TOWER_COLUMN_SHAPES.flatMap(
-  (column, index) => (column.hideBelow === 'md' ? [index] : []),
+export const LIVE_TOWER_HIDDEN_BELOW_MD = hiddenBelowMdIndexes(
+  LIVE_TOWER_COLUMN_SHAPES,
 );
+
+/**
+ * The `hidden md:table-cell` literal for a tower column a phone hides, or
+ * nothing.
+ *
+ * Positions, not breakpoints: the skeleton hides exactly the columns the
+ * board hides, so a phone hands over with no shift. A literal lookup, because
+ * Tailwind reads the source: a class assembled at runtime generates no rule
+ * (see `base-table.tsx`).
+ */
+export function liveTowerHiddenClass(col: number): string {
+  return LIVE_TOWER_HIDDEN_BELOW_MD.includes(col) ? 'hidden md:table-cell' : '';
+}
+
+/**
+ * Header and cell rhythm for the live tower, shared by the board and its
+ * skeleton so the handover lands with no shift.
+ *
+ * The tower's own set, not the `TABLE_*` classes in `base-table.tsx`: those
+ * belong to a `'use client'` module a server component cannot read without
+ * dragging it through the client reference machinery, and the tower's values
+ * differ anyway (semantic tokens rather than the board's hard coded purples,
+ * no hover, no divider).
+ */
+export const TOWER_HEAD_CLASS =
+  'px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-muted-foreground md:px-4';
+
+export const TOWER_CELL_CLASS = 'px-3 py-3 text-sm text-foreground md:px-4';
+
+/** Row floor without dividers or hover: tower rows are not clickable. */
+export const TOWER_ROW_CLASS = 'h-14 border-0';
+
+/**
+ * The league's rank palette, first through eighth.
+ *
+ * Lives here rather than in `table-configs.tsx`: that module sits beside a
+ * `'use client'` table and pulls the button primitive with it, which is
+ * exactly the drag this file exists to stop. A pure function of string
+ * literals, so Tailwind still sees every class and neither the standings
+ * board nor the live tower keeps its own copy.
+ */
+export function rankBadgeClasses(rank: number): string {
+  if (rank === 1)
+    return 'bg-yellow-400/20 text-yellow-400 border-yellow-400/30';
+  if (rank === 2) return 'bg-gray-300/20 text-gray-300 border-gray-300/30';
+  if (rank === 3) return 'bg-amber-600/20 text-amber-500 border-amber-600/30';
+  if (rank === 8) return 'bg-red-600/20 text-red-400 border-red-600/30';
+  return 'bg-white/10 text-white/70 border-white/20';
+}
 
 /**
  * The row grammar the standings cards share.

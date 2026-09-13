@@ -1,14 +1,12 @@
 import 'server-only';
 
-import { and, asc, eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 
-import type { ElementCode } from '@/interfaces/fpl';
 import { getDb } from '@/server/db/client';
 import {
   draftPicks,
   ownershipSnapshots,
   type DraftPickRow,
-  type OwnershipSnapshotRow,
 } from '@/server/db/schema';
 import { getLeagueId } from '@/utils/fpl-api';
 // Row-mapping helpers owned by the sibling pure module (`src/utils/draft-lineage.ts`,
@@ -68,53 +66,6 @@ export async function readDraftPicks(): Promise<DraftPickRow[]> {
     .from(draftPicks)
     .where(eq(draftPicks.leagueId, leagueId))
     .orderBy(asc(draftPicks.draftEvent), asc(draftPicks.draftIndex));
-}
-
-/**
- * Who owned every footballer at the end of one gameweek, for the current
- * league.
- *
- * Absence is honest: gameweeks finalised before this feature launched were
- * never snapshotted and stay absent rather than reconstructed (R4).
- */
-export async function readOwnershipSnapshot(
-  gameweek: number,
-): Promise<OwnershipSnapshotRow[]> {
-  const leagueId = getLeagueId();
-
-  return getDb()
-    .select()
-    .from(ownershipSnapshots)
-    .where(
-      and(
-        eq(ownershipSnapshots.leagueId, leagueId),
-        eq(ownershipSnapshots.gameweek, gameweek),
-      ),
-    )
-    .orderBy(asc(ownershipSnapshots.elementCode));
-}
-
-/**
- * Every stored owner of one footballer across the season, oldest first.
- *
- * Keyed by the stable code so the history survives the August id re-mint.
- * The ledger views of a later plan read through here.
- */
-export async function readOwnershipHistory(
-  elementCode: ElementCode,
-): Promise<OwnershipSnapshotRow[]> {
-  const leagueId = getLeagueId();
-
-  return getDb()
-    .select()
-    .from(ownershipSnapshots)
-    .where(
-      and(
-        eq(ownershipSnapshots.leagueId, leagueId),
-        eq(ownershipSnapshots.elementCode, elementCode),
-      ),
-    )
-    .orderBy(asc(ownershipSnapshots.gameweek));
 }
 
 /**

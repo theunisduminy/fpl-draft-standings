@@ -1,7 +1,10 @@
 import { cn } from '@/lib/utils';
 import {
   LIVE_TOWER_COLUMN_SHAPES,
-  LIVE_TOWER_HIDDEN_BELOW_MD,
+  liveTowerHiddenClass,
+  TOWER_CELL_CLASS,
+  TOWER_HEAD_CLASS,
+  TOWER_ROW_CLASS,
 } from '@/components/shapes';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton, SkeletonText, cellWidth } from '@/components/ui/skeleton';
@@ -42,9 +45,9 @@ export function LiveTowerSkeleton() {
                   <TableHead
                     key={col}
                     className={cn(
-                      SKELETON_HEAD_CLASS,
+                      TOWER_HEAD_CLASS,
                       column.width,
-                      hiddenBelowMd(col),
+                      liveTowerHiddenClass(col),
                     )}
                   >
                     <SkeletonText
@@ -58,17 +61,17 @@ export function LiveTowerSkeleton() {
             </TableHeader>
             <TableBody>
               {Array.from({ length: 8 }).map((_, row) => (
-                <TableRow key={row} className={SKELETON_ROW_CLASS}>
+                <TableRow key={row} className={TOWER_ROW_CLASS}>
                   {LIVE_TOWER_COLUMN_SHAPES.map((_, col) => (
                     <TableCell
                       key={col}
                       className={
                         col === 0
-                          ? SKELETON_CELL_CLASS
+                          ? TOWER_CELL_CLASS
                           : cn(
-                              SKELETON_CELL_CLASS,
+                              TOWER_CELL_CLASS,
                               'text-center',
-                              hiddenBelowMd(col),
+                              liveTowerHiddenClass(col),
                             )
                       }
                     >
@@ -103,24 +106,3 @@ export function LiveTowerSkeleton() {
     </div>
   );
 }
-
-/**
- * The `hidden md:table-cell` literal for a column the real board hides, or
- * nothing. Positions, not breakpoints: the skeleton hides exactly the columns
- * the board hides, so a phone hands over with no shift.
- */
-function hiddenBelowMd(col: number): string {
-  return LIVE_TOWER_HIDDEN_BELOW_MD.includes(col) ? 'hidden md:table-cell' : '';
-}
-
-/**
- * The tower's own rhythm, restated to match `LiveTower` by construction.
- * Header, cell, and row classes are spelled out in both files rather than
- * shared through a client module; see the note above `TOWER_HEAD_CLASS`.
- */
-const SKELETON_HEAD_CLASS =
-  'px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-muted-foreground md:px-4';
-
-const SKELETON_CELL_CLASS = 'px-3 py-3 text-sm text-foreground md:px-4';
-
-const SKELETON_ROW_CLASS = 'h-14 border-0';

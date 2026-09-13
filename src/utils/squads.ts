@@ -15,6 +15,7 @@ import {
 import { fetchUpstream, fplApi, getLeagueId } from './fpl-api';
 import { fetchLeagueDetails } from './league';
 import { ensureCovers, getElementLookup } from './draft-elements';
+import { missingElements } from './reference-mapping';
 import { readDraftPicks } from '@/server/data/lineage';
 import { cachedRead } from './cache';
 
@@ -114,7 +115,8 @@ async function resolveChoices(
   const storedByElement = new Map(stored.map((pick) => [pick.elementId, pick]));
   const covers =
     stored.length > 0 &&
-    [...owned].every((element) => storedByElement.has(element));
+    missingElements((element) => storedByElement.has(element), [...owned])
+      .length === 0;
 
   if (covers) {
     return new Map(
@@ -152,9 +154,12 @@ async function resolveChoices(
  *
  * Missing choices are not an error — pre-draft the squads are simply empty,
  * and a squad view that renders "not drafted yet" is more use than one that
- * throws. Now also the fallback behind the stored-picks read above.
+ * throws. Now also the fallback behind the stored-picks read above, and the
+ * seed read for the cron lineage step.
  */
-async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
+export async function fetchDraftChoices(
+  leagueId: number,
+): Promise<DraftChoice[]> {
   try {
     const body = await fetchUpstream<{ choices?: DraftChoice[] }>(
       fplApi.draftChoices(leagueId),
@@ -206,7 +211,8 @@ async function computeSquads(): Promise<SquadsResponse> {
 
   // Ownership is what finally says which elements this page needs, so the
   // completeness check happens here rather than when the lookup was built.
-  const lookup = await ensureCovers(initialLookup, [...owned.values()].flat());
+  const ownedElements = [...owned.values()].flat();
+  const lookup = await ensureCovers(initialLookup, ownedElements);
 
   // Provenance is database first: stored picks drive the join when they cover
   // every owned element, and live choices are read only while the table cannot
@@ -217,7 +223,7 @@ async function computeSquads(): Promise<SquadsResponse> {
   const choiceByElement = await resolveChoices(
     leagueId,
     storedPicks ?? [],
-    new Set<ElementId>([...owned.values()].flat()),
+    new Set<ElementId>(ownedElements),
   );
 
   function toSquadPlayer(element: ElementId, owner: EntryId): SquadPlayer {

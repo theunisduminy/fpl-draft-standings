@@ -101,6 +101,18 @@ export function hasBeenPlayed(liveData: EventLive | null): boolean {
 }
 
 /**
+ * The starting XI: positions 1–11 count, 12–15 are the bench.
+ *
+ * One place for the rule `scoreGameweek` sums by and the live tower counts
+ * by, so the done/to-play counts describe the XI the points came from.
+ */
+export function startingXI(
+  picks: readonly EntryPick[] | undefined,
+): EntryPick[] {
+  return (picks ?? []).filter((pick) => pick.position <= 11);
+}
+
+/**
  * Score one gameweek from its live feed and every manager's picks.
  *
  * Returns an **empty array** when the gameweek cannot be scored, and the caller
@@ -135,9 +147,7 @@ export function scoreGameweek(
   if (scoredEntries.length === 0) return [];
 
   const gameweekScores = scoredEntries.map((playerData) => {
-    const startingPlayers = playerData.picks.filter(
-      (pick) => pick.position <= 11,
-    );
+    const startingPlayers = startingXI(playerData.picks);
 
     const totalPoints = startingPlayers.reduce((sum, pick) => {
       // Draft element IDs, resolved against the draft API's own live feed —

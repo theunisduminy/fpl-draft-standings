@@ -6,6 +6,10 @@ import { getDb } from '@/server/db/client';
 import { finalisationCandidates } from '@/server/db/schema';
 import type { FinalisationCandidateRow } from '@/server/db/schema';
 import { getLeagueId } from '@/utils/fpl-api';
+import {
+  truncateText,
+  TRIPWIRE_EVIDENCE_MAX_CHARS,
+} from '@/utils/shape-tripwires';
 
 /**
  * Persistence for finalisation candidates.
@@ -20,13 +24,6 @@ import { getLeagueId } from '@/utils/fpl-api';
  * The insert is conflict-ignoring, so two instances recording the same
  * payload converge instead of competing.
  */
-
-/**
- * Evidence is truncated to this many characters before it touches the row, so
- * logs and the database stay readable. Upstream payloads carry no credentials,
- * but a full payload still does not belong in a text column.
- */
-export const BLOCK_REASON_MAX_LENGTH = 500;
 
 /** Every held candidate for the current league, oldest gameweek first. */
 export async function readCandidates(): Promise<FinalisationCandidateRow[]> {
@@ -126,7 +123,9 @@ export async function noteBlocked(
 ): Promise<void> {
   const leagueId = getLeagueId();
   const now = new Date();
-  const blockReason = reason.slice(0, BLOCK_REASON_MAX_LENGTH);
+  // Bounded like probe evidence, so logs and the row stay readable. No
+  // suffix: the column holds the reason, not a log line.
+  const blockReason = truncateText(reason, TRIPWIRE_EVIDENCE_MAX_CHARS, '');
 
   await getDb()
     .insert(finalisationCandidates)

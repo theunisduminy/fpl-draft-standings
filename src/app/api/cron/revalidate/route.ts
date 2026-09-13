@@ -5,7 +5,6 @@ import { NextResponse } from 'next/server';
 
 import type {
   DraftBootstrap,
-  DraftChoice,
   ElementCode,
   ElementId,
   ElementStatus,
@@ -21,6 +20,7 @@ import {
 } from '@/server/data/lineage';
 import { upsertTeams } from '@/server/data/pl-teams';
 import {
+  buildCodeByElement,
   draftForGameweek,
   toDraftPickRows,
   toOwnershipSnapshotRows,
@@ -37,7 +37,7 @@ import { toElementRows, toTeamRows } from '@/utils/reference-mapping';
 import { clearCache } from '@/utils/cache';
 import { computeSeasonUncached, getGameweekData } from '@/utils/gameweek-data';
 import type { FinalisationGateReport } from '@/utils/gameweek-data';
-import { getSquads } from '@/utils/squads';
+import { fetchDraftChoices, getSquads } from '@/utils/squads';
 import { getPremierLeagueTeams } from '@/utils/pl-teams';
 
 /**
@@ -576,11 +576,10 @@ async function seedUnseededDrafts(
     return `choices empty; ${unseeded.length} draft(s) left unseeded`;
   }
 
-  const codeByElement = new Map<number, ElementCode>();
-  for (const choice of choices) {
-    const code = codeOf(choice.element);
-    if (code !== null) codeByElement.set(choice.element, code);
-  }
+  const codeByElement = buildCodeByElement(
+    choices.map((choice) => choice.element),
+    codeOf,
+  );
 
   let written = 0;
 
@@ -641,11 +640,10 @@ async function snapshotNewlyFinalised(
   // One read, resolved once: every snapshotted gameweek shares the same
   // present-tense ownership, which is exactly why only newly-finalised ones
   // may be stored.
-  const codeByElement = new Map<number, ElementCode>();
-  for (const status of ownership.element_status) {
-    const code = codeOf(status.element);
-    if (code !== null) codeByElement.set(status.element, code);
-  }
+  const codeByElement = buildCodeByElement(
+    ownership.element_status.map((status) => status.element),
+    codeOf,
+  );
   const leagueEntryByEntry = new Map<number, LeagueEntryId>(
     details.league_entries.map((entry) => [entry.entry_id, entry.id]),
   );
@@ -663,23 +661,6 @@ async function snapshotNewlyFinalised(
   }
 
   return `snapshotted GW${attributable.join(', GW')} (${stored} row(s))`;
-}
-
-/**
- * The draft choices, or `[]` when they cannot be read.
- *
- * Lenient like the squads read path: pre-draft there is nothing to seed yet,
- * and mid-season a blip must not fail the step — the next run retries.
- */
-async function fetchDraftChoices(leagueId: number): Promise<DraftChoice[]> {
-  try {
-    const body = await fetchUpstream<{ choices?: DraftChoice[] }>(
-      fplApi.draftChoices(leagueId),
-    );
-    return body.choices ?? [];
-  } catch {
-    return [];
-  }
 }
 
 async function step(

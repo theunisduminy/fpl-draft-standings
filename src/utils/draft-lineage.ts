@@ -2,6 +2,7 @@ import type {
   DraftChoice,
   DraftInfo,
   ElementCode,
+  ElementId,
   ElementStatus,
   LeagueEntryId,
 } from '@/interfaces/fpl';
@@ -174,6 +175,29 @@ export function toOwnershipSnapshotRow(
     ownerLeagueEntry:
       status.owner === null ? null : (context.ownerLeagueEntry ?? null),
   };
+}
+
+/**
+ * Resolve a payload's elements to their stable codes, dropping whatever the
+ * lookup cannot name.
+ *
+ * One place for the loop both cron lineage steps ran inline: the seed step
+ * over choices and the snapshot step over element-status build the same map
+ * from the same callback, and an unresolvable element is dropped from the
+ * seed set in both rather than stored with a null code.
+ */
+export function buildCodeByElement(
+  elements: readonly ElementId[],
+  codeOf: (element: ElementId) => ElementCode | null,
+): Map<number, ElementCode> {
+  const codeByElement = new Map<number, ElementCode>();
+
+  for (const element of elements) {
+    const code = codeOf(element);
+    if (code !== null) codeByElement.set(element, code);
+  }
+
+  return codeByElement;
 }
 
 /**

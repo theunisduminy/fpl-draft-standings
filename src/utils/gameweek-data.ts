@@ -66,7 +66,7 @@ import {
  * the shape probe sees `{ status: [] }` there while the rows probe still
  * reads every row.
  */
-import { runDraftProbes } from './shape-tripwires';
+import { runDraftProbes, truncateText } from './shape-tripwires';
 import { fplApi, getLeagueId, upstreamFetch } from './fpl-api';
 import { fetchEntryPicks } from './gameweek-squad';
 import { fetchLeagueDetails } from './league';
@@ -92,8 +92,11 @@ const BATCH_SIZE = 5; // fetch 5 gameweeks at a time to avoid flooding the API
  * "Game not started" — not the usual `{ status: [...] }` object. Treat that as
  * "no gameweeks have been played yet" so the app renders an empty season
  * instead of failing.
+ *
+ * Shared with the live slice, which reads the same endpoint for the same
+ * reason rather than restating the 404 mapping.
  */
-async function fetchEventStatus(): Promise<GameWeekStatus[]> {
+export async function fetchEventStatus(): Promise<GameWeekStatus[]> {
   const res = await upstreamFetch(fplApi.eventStatus());
 
   if (res.status === 404) {
@@ -222,6 +225,7 @@ async function fetchMissingGameweeks(
 }> {
   const fetched: GameweekPerformance[] = [];
   const liveByGameweek = new Map<number, EventLive | null>();
+  const missingSet = new Set(missing);
 
   for (let i = 0; i < missing.length; i += BATCH_SIZE) {
     const batch = missing.slice(i, i + BATCH_SIZE);
@@ -238,7 +242,7 @@ async function fetchMissingGameweeks(
       liveByGameweek.set(gameweek, live);
     });
     fetched.push(
-      ...batchData.performances.filter((p) => missing.includes(p.event)),
+      ...batchData.performances.filter((p) => missingSet.has(p.event)),
     );
   }
 
@@ -517,7 +521,7 @@ async function finaliseGatedGameweeks(args: {
     });
     if (failed.length > 0) {
       const probes = failed.map((result) => result.name);
-      const evidence = truncateEvidence(
+      const evidence = truncateText(
         failed
           .map((result) => `${result.name}: ${result.evidence}`)
           .join(' | '),
@@ -530,7 +534,7 @@ async function finaliseGatedGameweeks(args: {
         await noteBlocked(
           gameweek,
           fingerprint,
-          truncateEvidence(`blocked by ${probes.join(', ')}: ${evidence}`),
+          truncateText(`blocked by ${probes.join(', ')}: ${evidence}`),
         );
       } catch (error) {
         console.error(
@@ -664,7 +668,7 @@ function probeGameweekFailures(args: {
       {
         name: 'probe-runner',
         pass: false,
-        evidence: truncateEvidence(
+        evidence: truncateText(
           error instanceof Error ? error.message : String(error),
         ),
       },
@@ -681,19 +685,6 @@ function toEpochMs(value: Date | number | string): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') return Date.parse(value);
   return value.getTime();
-}
-
-/**
- * Bound probe evidence to a readable snippet. Logs carry the offending
- * fields, never the payload: upstream responses hold no credentials, but they
- * are kilobytes long and a refusal needs one line, not one dump.
- */
-const EVIDENCE_LIMIT = 500;
-
-function truncateEvidence(evidence: string): string {
-  return evidence.length > EVIDENCE_LIMIT
-    ? `${evidence.slice(0, EVIDENCE_LIMIT)}...`
-    : evidence;
 }
 
 /**

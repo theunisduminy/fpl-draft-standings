@@ -5,7 +5,14 @@ import {
   LiveGameweekBadge,
   LiveGameweekNote,
 } from '@/components/LiveGameweekBadge';
-import { LIVE_TOWER_COLUMN_SHAPES } from '@/components/shapes';
+import {
+  LIVE_TOWER_COLUMN_SHAPES,
+  liveTowerHiddenClass,
+  rankBadgeClasses,
+  TOWER_CELL_CLASS,
+  TOWER_HEAD_CLASS,
+  TOWER_ROW_CLASS,
+} from '@/components/shapes';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -62,14 +69,17 @@ export interface LiveTowerData {
  * badge above the board, a provisional tag on every points value, and the note
  * beside the freshness stamp. No provisional figure renders unlabeled.
  */
+/** UK-time stamp for the freshness line, built once. */
+const UPDATED_AT_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/London',
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 export function LiveTower({ data }: { data: LiveTowerData }) {
-  const updatedAt = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(data.computedAt));
+  const updatedAt = UPDATED_AT_FORMAT.format(new Date(data.computedAt));
 
   return (
     <div className='space-y-4'>
@@ -105,7 +115,7 @@ export function LiveTower({ data }: { data: LiveTowerData }) {
                     TOWER_HEAD_CLASS,
                     LIVE_TOWER_COLUMN_SHAPES[2].width,
                     'text-center',
-                    hiddenBelowMd(LIVE_TOWER_COLUMN_SHAPES[2].hideBelow),
+                    liveTowerHiddenClass(2),
                   )}
                 >
                   Interval
@@ -115,7 +125,7 @@ export function LiveTower({ data }: { data: LiveTowerData }) {
                     TOWER_HEAD_CLASS,
                     LIVE_TOWER_COLUMN_SHAPES[3].width,
                     'text-center',
-                    hiddenBelowMd(LIVE_TOWER_COLUMN_SHAPES[3].hideBelow),
+                    liveTowerHiddenClass(3),
                   )}
                 >
                   Cushion
@@ -173,7 +183,7 @@ export function LiveTower({ data }: { data: LiveTowerData }) {
                     className={cn(
                       TOWER_CELL_CLASS,
                       'text-center',
-                      hiddenBelowMd(LIVE_TOWER_COLUMN_SHAPES[2].hideBelow),
+                      liveTowerHiddenClass(2),
                     )}
                   >
                     {row.interval}
@@ -185,7 +195,7 @@ export function LiveTower({ data }: { data: LiveTowerData }) {
                     className={cn(
                       TOWER_CELL_CLASS,
                       'text-center',
-                      hiddenBelowMd(LIVE_TOWER_COLUMN_SHAPES[3].hideBelow),
+                      liveTowerHiddenClass(3),
                     )}
                   >
                     {row.cushion}
@@ -216,60 +226,13 @@ export function LiveTower({ data }: { data: LiveTowerData }) {
   );
 }
 
-/**
- * Header and cell rhythm for the tower.
- *
- * Restated here rather than imported from `base-table.tsx`: that module is
- * `'use client'`, and a server component reading strings out of it resolves
- * them through the client reference machinery (see `shapes.ts`). Same values
- * by construction, kept in step by the eye check, with semantic tokens rather
- * than the board's hard coded purples.
- */
-const TOWER_HEAD_CLASS =
-  'px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap text-muted-foreground md:px-4';
-
-const TOWER_CELL_CLASS = 'px-3 py-3 text-sm text-foreground md:px-4';
-
-/** Row floor without dividers or hover: tower rows are not clickable. */
-const TOWER_ROW_CLASS = 'h-14 border-0';
-
-/**
- * The column the real table hides below `md`, or nothing.
- *
- * A literal lookup, because Tailwind reads the source: a class assembled at
- * runtime generates no rule (see `base-table.tsx`). Only `md` is used today;
- * anything else renders visible rather than guessing a breakpoint.
- */
-function hiddenBelowMd(hideBelow: 'sm' | 'md' | 'lg' | undefined): string {
-  if (hideBelow === 'md') return 'hidden md:table-cell';
-  return '';
-}
-
-/**
- * The league's rank palette, mirrored from `getRankBadgeClasses` in
- * `table-configs.tsx`.
- *
- * Local rather than imported: that module sits beside a `'use client'` table
- * and pulls the button primitive with it, which is exactly the drag
- * `shapes.ts` exists to stop. Five literal lines, kept in step with the
- * canonical helper by review.
- */
-function liveRankBadgeClasses(rank: number): string {
-  if (rank === 1)
-    return 'bg-yellow-400/20 text-yellow-400 border-yellow-400/30';
-  if (rank === 2) return 'bg-gray-300/20 text-gray-300 border-gray-300/30';
-  if (rank === 3) return 'bg-amber-600/20 text-amber-500 border-amber-600/30';
-  if (rank === 8) return 'bg-red-600/20 text-red-400 border-red-600/30';
-  return 'bg-white/10 text-white/70 border-white/20';
-}
-
 function LiveRankBadge({ rank }: { rank: number }) {
   return (
     <Badge
       variant='outline'
       className={cn(
         'inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border p-0 text-sm font-bold',
-        liveRankBadgeClasses(rank),
+        rankBadgeClasses(rank),
       )}
     >
       {rank}
