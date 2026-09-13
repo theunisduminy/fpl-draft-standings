@@ -861,13 +861,13 @@ plus observed field values: the offending snippet, never the payload.
 
 | Probe                      | Trap it catches                                                                                              | Evidence attached                                       |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| `event-status-bare-string` | `event-status` 404s with the bare string `"Game not started"`, not `{ status: [...] }`                       | the response body snippet                               |
-| `event-status-every-row`   | one row per date, not per gameweek: `leagues_updated` going true on opening night is not a finished gameweek | the rows seen for the gameweek and which dates disagree |
+| `event-status-shape`       | `event-status` 404s with the bare string `"Game not started"`, not `{ status: [...] }`                       | `expected { status: [...] }, saw` plus the body snippet                    |
+| `event-status-rows`        | one row per date, not per gameweek: `leagues_updated` going true on opening night is not a finished gameweek | the failing row index and the offending row snippet                       |
 | `live-elements-present`    | `elements: {}` is truthy but means nothing is scored yet                                                     | the element key count                                   |
 | `live-elements-played`     | a full elements map with every element on zero minutes is the pre kickoff shape, not a scored week           | the played signal from `hasBeenPlayed()`                |
 | `standings-identity`       | `standings[].league_entry` values must resolve to known `league_entries[].id` values, not `entry_id` values  | the unresolvable values                                 |
-| `pulse-season-unstarted`   | out of season Pulse returns all 20 clubs on zero with `tables[0].gameWeek` at 0                              | the `gameWeek` value plus the entry count               |
-| `pulse-season-selection`   | season labels are mixed formats, so only the highest `id` is current                                         | the selected `id` and the labels compared               |
+| `pulse-season-started`     | out of season Pulse returns all 20 clubs on zero with `tables[0].gameWeek` at 0                              | the `gameWeek` value plus the entry count               |
+| `pulse-season-selectable`  | season labels are mixed formats, so only the highest `id` is current                                         | the selected `id` and how many seasons were listed      |
 | `probe-runner`             | the probe harness itself threw, which proves nothing about the payload                                       | the thrown message                                      |
 
 The Pulse probes annotate rather than block. Pulse has no fallback by design: if Pulse

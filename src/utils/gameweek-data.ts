@@ -15,15 +15,14 @@ import {
   storeFinalisedGameweeks,
 } from '@/server/data/gameweeks';
 /**
- * Candidate persistence (U3 lands in a sibling branch in parallel, behind a
- * hand applied migration).
+ * Candidate persistence behind a hand applied migration.
  *
- * Assumed contract, reconciled post-merge: `readCandidates` resolves the
- * current league's candidate rows (`{ gameweek, fingerprint, firstSeenAt,
- * lastCheckedAt, blockReason }`); `recordCandidate(gameweek, fingerprint)`
- * creates or resets one; `confirmCandidate(gameweek)` deletes one (used for
- * both confirm and drop); `noteBlocked(gameweek, reason)` records or updates
- * the truncated block reason without confirming.
+ * `readCandidates` resolves the current league's candidate rows
+ * (`FinalisationCandidateRow`: gameweek, fingerprint, firstSeen, lastChecked,
+ * blockReason); `recordCandidate(gameweek, fingerprint)` creates or resets
+ * one; `confirmCandidate(gameweek)` deletes one (used for both confirm and
+ * drop); `noteBlocked(gameweek, fingerprint, reason)` records or updates the
+ * truncated block reason without confirming.
  */
 import {
   confirmCandidate,
@@ -40,27 +39,32 @@ import {
 } from './scoring';
 import { deriveSeasonState } from './season-state';
 /**
- * Two-phase finalise gate (U1 lands in a sibling branch in parallel).
+ * Two-phase finalise gate.
  *
- * Assumed contract, reconciled post-merge: `fingerprintPerformances` stably
- * serialises one gameweek's scored content; `evaluateCandidate` maps
- * `{ candidate, fingerprint, now, stillFinal }` to `{ action }` with `action`
- * one of `record`, `hold`, `confirm`, `reset` or `drop`; and
- * `CANDIDATE_HOLD_SECONDS` (7200, two hours against the three hour cron) is
- * the minimum age of a candidate before it may confirm.
+ * `fingerprintPerformances` stably serialises one gameweek's scored content
+ * plus the played signal; `evaluateCandidate` maps
+ * `{ existing, fingerprint, deciderFinal, nowSeconds, isEmpty }` to
+ * `{ outcome, candidate }` with `outcome` one of `record`, `hold`, `confirm`,
+ * `reset` or `drop`; and `CANDIDATE_HOLD_SECONDS` (7200, two hours against
+ * the three hour cron) is the minimum age of a candidate before it may
+ * confirm.
  */
 import {
   CANDIDATE_HOLD_SECONDS,
   evaluateCandidate,
   fingerprintPerformances,
+  type CandidateRecord,
 } from './finalisation';
 /**
- * Draft shape-tripwire probes (U2 lands in a sibling branch in parallel).
+ * Draft shape-tripwire probes.
  *
- * Assumed contract, reconciled post-merge: `runDraftProbes` is pure and
- * synchronous, taking the freshly fetched inputs for one gameweek and
- * returning one `{ name, pass, evidence }` result per probe, failing closed on
- * unknown shapes.
+ * `runDraftProbes` is pure and synchronous, taking the raw upstream bodies
+ * (`{ eventStatusBody, liveData, leagueDetails }`) and returning one
+ * `{ name, pass, evidence }` result per probe, failing closed on unknown
+ * shapes. The already parsed reads are wrapped back into those bodies at the
+ * call site; `fetchEventStatus` already maps the pre-season 404 to `[]`, so
+ * the shape probe sees `{ status: [] }` there while the rows probe still
+ * reads every row.
  */
 import { runDraftProbes } from './shape-tripwires';
 import { fplApi, getLeagueId, upstreamFetch } from './fpl-api';
@@ -304,7 +308,6 @@ export async function computeSeasonUncached(
     performances: freshPerformances,
     liveByGameweek,
     status,
-    game,
     leagueEntries: league_entries,
     standings,
     finalisedThrough,
@@ -403,7 +406,6 @@ async function finaliseGatedGameweeks(args: {
   performances: GameweekPerformance[];
   liveByGameweek: Map<number, EventLive | null>;
   status: GameWeekStatus[];
-  game: GameState | null;
   leagueEntries: LeagueEntry[];
   standings: LeagueStanding[];
   finalisedThrough: number;
@@ -415,7 +417,6 @@ async function finaliseGatedGameweeks(args: {
     performances,
     liveByGameweek,
     status,
-    game,
     leagueEntries,
     standings,
     finalisedThrough,
@@ -433,16 +434,13 @@ async function finaliseGatedGameweeks(args: {
   // (before the hand applied production migration lands) there is no proof, so
   // every write waits. That is the safe direction: finalisation holds rather
   // than confirms.
-  const candidates = new Map<
-    number,
-    { fingerprint: string; firstSeenAt: number }
-  >();
+  const candidates = new Map<number, CandidateRecord>();
   try {
     const rows = await readCandidates();
     rows.forEach((row) => {
       candidates.set(row.gameweek, {
         fingerprint: row.fingerprint,
-        firstSeenAt: toEpochMs(row.firstSeenAt),
+        firstSeenSeconds: Math.floor(toEpochMs(row.firstSeen) / 1000),
       });
     });
   } catch (error) {
@@ -502,15 +500,18 @@ async function finaliseGatedGameweeks(args: {
       continue;
     }
 
+    // The fingerprint is the scored content the confirming read must
+    // reproduce exactly, mixed with the played signal so an unscored feed
+    // wearing the shape of a scored one cannot agree with the real thing.
+    const liveData = liveByGameweek.get(gameweek) ?? null;
+    const fingerprint = fingerprintPerformances(week, liveData);
+
     // Gate one: draft probes run before anything is stored. A failure drops
     // the week from the writable set, records the block reason on the
     // candidate, and leaves the week absent for retry.
     const failed = probeGameweekFailures({
-      gameweek,
-      week,
-      liveByGameweek,
       status,
-      game,
+      liveData,
       leagueEntries,
       standings,
     });
@@ -528,6 +529,7 @@ async function finaliseGatedGameweeks(args: {
       try {
         await noteBlocked(
           gameweek,
+          fingerprint,
           truncateEvidence(`blocked by ${probes.join(', ')}: ${evidence}`),
         );
       } catch (error) {
@@ -544,19 +546,21 @@ async function finaliseGatedGameweeks(args: {
     // agreeing read past the hold interval confirms; a changed fingerprint
     // resets the hold; a decider reversal drops (unreachable for a missing
     // week, which is still final by construction, but handled all the same).
-    const fingerprint = fingerprintPerformances(week);
-    const now = Date.now();
+    // The week is non-empty here, so isEmpty is false: the empty list never
+    // reaches the decider.
+    const nowSeconds = Math.floor(Date.now() / 1000);
     const decision = evaluateCandidate({
-      candidate: candidates.get(gameweek) ?? null,
+      existing: candidates.get(gameweek) ?? null,
       fingerprint,
-      now,
-      stillFinal: true,
+      deciderFinal: true,
+      nowSeconds,
+      isEmpty: false,
     });
 
-    if (decision.action === 'confirm') {
+    if (decision.outcome === 'confirm') {
       writable.push(...week);
       confirmPending.push(gameweek);
-    } else if (decision.action === 'drop') {
+    } else if (decision.outcome === 'drop') {
       try {
         await confirmCandidate(gameweek);
       } catch (error) {
@@ -576,7 +580,7 @@ async function finaliseGatedGameweeks(args: {
         `[season] GW${gameweek} candidate dropped (no longer final).`,
       );
     } else {
-      if (decision.action !== 'hold') {
+      if (decision.outcome !== 'hold') {
         try {
           await recordCandidate(gameweek, fingerprint);
         } catch (error) {
@@ -585,14 +589,14 @@ async function finaliseGatedGameweeks(args: {
             error,
           );
         }
-        candidates.set(gameweek, { fingerprint, firstSeenAt: now });
+        candidates.set(gameweek, { fingerprint, firstSeenSeconds: nowSeconds });
       }
       gate.held.push({
         gameweek,
         reason:
-          decision.action === 'reset'
+          decision.outcome === 'reset'
             ? 'fingerprint changed; hold restarted'
-            : decision.action === 'record'
+            : decision.outcome === 'record'
               ? `first sighting; held at least ${CANDIDATE_HOLD_SECONDS}s for a second agreeing read`
               : 'agreeing read inside the hold window',
       });
@@ -641,23 +645,19 @@ async function finaliseGatedGameweeks(args: {
  * evidence. Follows rejectUnfinalisable: never throws.
  */
 function probeGameweekFailures(args: {
-  gameweek: number;
-  week: GameweekPerformance[];
-  liveByGameweek: Map<number, EventLive | null>;
   status: GameWeekStatus[];
-  game: GameState | null;
+  liveData: EventLive | null;
   leagueEntries: LeagueEntry[];
   standings: LeagueStanding[];
 }): { name: string; pass: boolean; evidence: string }[] {
   try {
     return runDraftProbes({
-      gameweek: args.gameweek,
-      status: args.status,
-      game: args.game,
-      leagueEntries: args.leagueEntries,
-      standings: args.standings,
-      performances: args.week,
-      liveData: args.liveByGameweek.get(args.gameweek) ?? null,
+      eventStatusBody: { status: args.status },
+      liveData: args.liveData,
+      leagueDetails: {
+        league_entries: args.leagueEntries,
+        standings: args.standings,
+      },
     }).filter((result) => !result.pass);
   } catch (error) {
     return [
