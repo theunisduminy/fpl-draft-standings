@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { fetchPulse, pulseApi } from '@/utils/fpl-api';
+import { fetchUpstream, pulseApi } from '@/utils/fpl-api';
 import type {
   GameweekFixtures,
   LeagueTableRow,
@@ -60,7 +60,7 @@ const readCompSeasonId = cachedRead(
   SEASON_KEY,
   SEASON_TTL_SECONDS,
   async (): Promise<number> => {
-    const response = await fetchPulse<PulseCompSeasonsResponse>(
+    const response = await fetchUpstream<PulseCompSeasonsResponse>(
       pulseApi.compSeasons(),
     );
 
@@ -149,8 +149,8 @@ const readSeason = cachedRead(
 
     // Two independent reads of the same season — no reason to serialise them.
     const [standings, fixtures] = await Promise.all([
-      fetchPulse<PulseStandingsResponse>(pulseApi.standings(compSeasonId)),
-      fetchPulse<PulseFixturesResponse>(pulseApi.fixtures(compSeasonId)),
+      fetchUpstream<PulseStandingsResponse>(pulseApi.standings(compSeasonId)),
+      fetchUpstream<PulseFixturesResponse>(pulseApi.fixtures(compSeasonId)),
     ]);
 
     const table: LeagueTableRow[] = toLeagueTable(standings);
