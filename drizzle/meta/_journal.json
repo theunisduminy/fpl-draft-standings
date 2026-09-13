@@ -43,6 +43,13 @@
       "when": 1787901133950,
       "tag": "0005_drop_profile_bio",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789313579360,
+      "tag": "0006_quiet_talon",
+      "breakpoints": true
     }
   ]
 }
