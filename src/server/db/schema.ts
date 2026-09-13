@@ -261,6 +261,54 @@ export const plTeams = pgTable(
 
 export type GameweekScoreRow = typeof gameweekScores.$inferSelect;
 export type NewGameweekScoreRow = typeof gameweekScores.$inferInsert;
+
+/**
+ * Gameweeks held as finalisation candidates, waiting for a second agreeing read.
+ *
+ * Ephemeral proposal state, not facts: a row here claims only that one read
+ * found the gameweek finished, and it is deleted on confirm or drop — never
+ * promoted in place. It holds no scores and no derived values, so it stays on
+ * the persistence line's safe side.
+ *
+ * Why it exists: GW1 of 2026/27 was stored from a single agreeing-but-wrong
+ * read (unscored live feed shaped like a scored one) and, the insert being
+ * `onConflictDoNothing`, stayed wrong for three days. A candidate is written
+ * only after two consecutive reads agree on identical content across a cron
+ * boundary, which instance memory cannot prove — hence a row, keyed like every
+ * other gameweek fact by (league_id, gameweek).
+ */
+export const finalisationCandidates = pgTable(
+  'finalisation_candidates',
+  {
+    leagueId: integer('league_id').notNull(),
+    gameweek: integer('gameweek').notNull(),
+    /**
+     * Stable serialisation of the scored content the first read saw. The
+     * confirming read must reproduce it exactly; a differing payload resets
+     * the row instead of confirming.
+     */
+    fingerprint: text('fingerprint').notNull(),
+    /** When the candidate was first recorded. The hold interval counts from here. */
+    firstSeen: timestamp('first_seen', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** When the candidate was last re-observed, so stale rows stay visible. */
+    lastChecked: timestamp('last_checked', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /**
+     * Why the write is currently refused, truncated to 500 characters. Null
+     * while the candidate is merely held for its second read.
+     */
+    blockReason: text('block_reason'),
+  },
+  (table) => [primaryKey({ columns: [table.leagueId, table.gameweek] })],
+);
+
+export type FinalisationCandidateRow =
+  typeof finalisationCandidates.$inferSelect;
+export type NewFinalisationCandidateRow =
+  typeof finalisationCandidates.$inferInsert;
 export type LeagueMemberRow = typeof leagueMembers.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;
 export type DraftElementRow = typeof draftElements.$inferSelect;
