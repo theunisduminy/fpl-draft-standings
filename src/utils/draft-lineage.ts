@@ -202,6 +202,57 @@ export function buildCodeByElement(
 }
 
 /**
+ * How far behind the live gameweek auto-retry still reaches.
+ *
+ * A coinciding lineage failure — the writes succeeded but the snapshots did
+ * not — leaves the next run an empty diff, so coverage derives from stored
+ * minus snapshotted rather than from one run's diff. The window bounds that
+ * derivation, and the bound is correctness, not preference: `element-status`
+ * reflects the present, so snapshotting a long-settled week would freeze
+ * today's ownership as its settlement fact. Pre-feature weeks (finalised
+ * before snapshots existed) are therefore never due — their absence is
+ * honest. Two gameweeks is roughly two weeks of element-status outage while
+ * the rest of the sync succeeds; past that the gap stays visible instead of
+ * going wrong quietly. Tune here, not at the call site.
+ */
+export const SNAPSHOT_RETRY_WINDOW_GAMEWEEKS = 2;
+
+/**
+ * Which finalised gameweeks still need an ownership snapshot.
+ *
+ * Always the weeks this run newly stored (fresh, present-tense ownership
+ * applies), plus any finalised-but-unsnapshotted week inside the retry
+ * window above. Weeks already snapshotted are never due — snapshot writes
+ * are first-write-wins, so re-covering one stores nothing and must not read
+ * as a failure.
+ */
+export function snapshotDueGameweeks(args: {
+  finalised: readonly number[];
+  snapshotted: readonly number[];
+  newlyStored: readonly number[];
+  currentGameweek: number;
+}): number[] {
+  const snapshottedSet = new Set(args.snapshotted);
+  const due = new Set<number>();
+
+  for (const gameweek of args.newlyStored) {
+    if (!snapshottedSet.has(gameweek)) due.add(gameweek);
+  }
+
+  for (const gameweek of args.finalised) {
+    if (
+      !snapshottedSet.has(gameweek) &&
+      gameweek <= args.currentGameweek &&
+      args.currentGameweek - gameweek <= SNAPSHOT_RETRY_WINDOW_GAMEWEEKS
+    ) {
+      due.add(gameweek);
+    }
+  }
+
+  return [...due].sort((a, b) => a - b);
+}
+
+/**
  * An element-status payload to its snapshot rows for one gameweek.
  *
  * Owner resolution is a lookup against the same run's league entries, passed

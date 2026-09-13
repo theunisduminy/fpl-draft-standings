@@ -380,15 +380,20 @@ not this endpoint, is what the squads page reads once seeded:
 
 - The guard keys on the upstream **draft id**, not on row count: a populated table is
   never re-synced, while a newly started draft (the GW24 re-draft) still seeds when its
-  id appears.
+  id appears. Two unseeded drafts at once refuse loudly instead of guessing: the
+  choices payload is league-scoped, so nothing says which draft it belongs to,
+  and the seed is first-write-wins permanent.
 - An empty choices response seeds nothing and **deletes nothing**. Against a populated
   table that is the draft board surviving an upstream wipe; against an empty one the
   next run simply retries.
 - Choices whose element resolves to no stable `code` are dropped from the seed set
   rather than stored with a null code.
 - Ownership snapshots are the sibling write in the same step: one ~581-row snapshot per
-  **newly-finalised** gameweek only, from a fresh `element-status` read in the same run.
-  Older gameweeks are unrecoverable from present-tense ownership and stay absent.
+  **newly-finalised** gameweek, from a fresh `element-status` read in the same run —
+  plus recent misses inside the retry window (`SNAPSHOT_RETRY_WINDOW_GAMEWEEKS` in
+  `draft-lineage.ts`), so a coinciding lineage failure delays a snapshot instead of
+  deleting it. Older gameweeks are unrecoverable from present-tense ownership and
+  stay absent.
 
 ### `GET /api/bootstrap-static` (draft)
 
@@ -750,8 +755,9 @@ returns a different club or a different footballer.
 `/api/cron/revalidate` is the sync job: every three hours it refreshes
 `draft_elements` and `pl_teams` from the draft bootstrap, writes any newly
 finalised gameweek, then — in a sequential `lineage` step — seeds `draft_picks`
-for started drafts with no rows yet and snapshots ownership for exactly the
-gameweeks just finalised, before expiring the cache tags, clearing the in-memory map and
+for started drafts with no rows yet and snapshots ownership for the gameweeks
+due one (the newly stored weeks plus recent misses inside the retry window —
+see Finalisation safety below), before expiring the cache tags, clearing the in-memory map and
 re-warming. A newly finalised gameweek is held for a second agreeing read first,
 so it is stored up to about one cycle later than it settles (see Finalisation
 safety below). Its caller is Vercel Cron rather than a person, so it authenticates
@@ -901,7 +907,12 @@ where each keyword means:
 - `finalised`: confirmed by two agreeing reads and written by this run.
 - `held`: read as final but not yet writable. Either a first sighting inside the hold
   window, an agreeing read that arrived too soon, a restarted hold after a fingerprint
-  change, or a week with nothing scorable fetched yet.
+  change, a week with nothing scorable fetched yet, incomplete picks, or an
+  unreachable candidate store. Each held week names its reason inline, so a
+  blind gate reads as one rather than as routine holding. Held weeks stay out
+  of the displayed standings until a later run confirms them — the tables show
+  written facts plus the labelled in-flight week, never an unconfirmed rank
+  as settled.
 - `blocked`: a probe refused the write. The gameweek and the failing probe names are
   named inline; the payload evidence is in the log. Blocked writes never persist.
 - `dropped`: the candidate was removed without a write, because the decider no longer
@@ -913,8 +924,8 @@ the opposite case, a write that should not have happened.
 ### Undo: reversing a mistaken finalisation
 
 `scripts/forget-gameweek.mjs` is the guarded undo. It runs dry by default, deletes only
-the `league_id` plus gameweek slice (scores, marker, and candidate row), and its help
-text documents the sandbox default, the explicit prod flag, and the revalidate run that
+the `league_id` plus gameweek slice (scores, marker, snapshot, and candidate row) in one
+transaction, and its help text documents the sandbox default, the explicit prod flag, and the revalidate run that
 requeues the fetch. Deleting the slice is sufficient: the next read refetches the
 gameweek through the two-phase path above, held first and finalised on agreement.
 

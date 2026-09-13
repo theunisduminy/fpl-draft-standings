@@ -83,6 +83,17 @@ export function LiveTowerSkeleton() {
                             <SkeletonText size='label' width='sm' />
                           </div>
                         </div>
+                      ) : col === 1 ? (
+                        // Mirrors the points cell's two-line stack (value plus
+                        // provisional pill) so the handover does not grow a row.
+                        <span className='inline-flex flex-col items-center gap-1'>
+                          <SkeletonText
+                            size='body'
+                            width={cellWidth(row, col)}
+                            className='mx-auto'
+                          />
+                          <Skeleton className='h-4 w-16 rounded-full' />
+                        </span>
                       ) : (
                         <SkeletonText
                           size='body'

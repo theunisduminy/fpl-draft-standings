@@ -16,6 +16,7 @@ import {
 import {
   buildCodeByElement,
   draftForGameweek,
+  snapshotDueGameweeks,
   toDraftPickRow,
   toDraftPickRows,
   toOwnershipSnapshotRow,
@@ -320,5 +321,68 @@ describe('buildCodeByElement', () => {
     );
 
     expect(map.size).toBe(1);
+  });
+});
+
+describe('snapshotDueGameweeks', () => {
+  it('covers this run’s newly stored weeks', () => {
+    expect(
+      snapshotDueGameweeks({
+        finalised: [7],
+        snapshotted: [],
+        newlyStored: [7],
+        currentGameweek: 8,
+      }),
+    ).toEqual([7]);
+  });
+
+  it('retries a missed week inside the window', () => {
+    // Stored by an earlier run whose lineage step failed; the next diff is
+    // empty, so without the retry the gap would be permanent.
+    expect(
+      snapshotDueGameweeks({
+        finalised: [7],
+        snapshotted: [],
+        newlyStored: [],
+        currentGameweek: 8,
+      }),
+    ).toEqual([7]);
+  });
+
+  it('never backfills a pre-feature week far behind', () => {
+    // Weeks finalised before snapshots existed stay absent: present-tense
+    // ownership cannot speak for them.
+    expect(
+      snapshotDueGameweeks({
+        finalised: [1, 2, 3, 4, 5, 6, 7],
+        snapshotted: [],
+        newlyStored: [],
+        currentGameweek: 20,
+      }),
+    ).toEqual([]);
+  });
+
+  it('skips weeks already snapshotted, even if newly stored', () => {
+    // Re-covering one stores nothing (first-write-wins) and must not read
+    // as a lineage failure.
+    expect(
+      snapshotDueGameweeks({
+        finalised: [7],
+        snapshotted: [7],
+        newlyStored: [7],
+        currentGameweek: 8,
+      }),
+    ).toEqual([]);
+  });
+
+  it('closes the window two gameweeks back', () => {
+    expect(
+      snapshotDueGameweeks({
+        finalised: [5, 6],
+        snapshotted: [],
+        newlyStored: [],
+        currentGameweek: 8,
+      }),
+    ).toEqual([6]);
   });
 });

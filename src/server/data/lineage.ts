@@ -42,11 +42,28 @@ import {
 
 /** One seeded draft fact, exactly as the pure mapping helper produces it. */
 export type DraftPickSeedRow = ReturnType<typeof toDraftPickRows>[number];
-
 /** One ownership fact, exactly as the pure mapping helper produces it. */
 export type OwnershipSnapshotSeedRow = ReturnType<
   typeof toOwnershipSnapshotRows
 >[number];
+
+/**
+ * Which gameweeks already hold an ownership snapshot, for the current league.
+ *
+ * The retry half of the never-backfill rule: the cron derives snapshot
+ * coverage from stored-minus-snapshotted rather than from one run's diff, so
+ * a coinciding lineage failure delays a snapshot instead of deleting it.
+ */
+export async function readSnapshottedGameweeks(): Promise<number[]> {
+  const leagueId = getLeagueId();
+
+  const rows = await getDb()
+    .selectDistinct({ gameweek: ownershipSnapshots.gameweek })
+    .from(ownershipSnapshots)
+    .where(eq(ownershipSnapshots.leagueId, leagueId));
+
+  return rows.map((row) => row.gameweek);
+}
 
 /**
  * Every stored draft pick for the current league, in draft-board order.

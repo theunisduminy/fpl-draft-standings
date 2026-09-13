@@ -16,6 +16,7 @@ import { upsertElements } from '@/server/data/elements';
 import { getFinalisedGameweeks } from '@/server/data/gameweeks';
 import {
   readDraftPicks,
+  readSnapshottedGameweeks,
   seedDraftPicks,
   storeOwnershipSnapshots,
 } from '@/server/data/lineage';
@@ -23,6 +24,7 @@ import { upsertTeams } from '@/server/data/pl-teams';
 import {
   buildCodeByElement,
   draftForGameweek,
+  snapshotDueGameweeks,
   toDraftPickRows,
   toOwnershipSnapshotRows,
 } from '@/utils/draft-lineage';
@@ -205,27 +207,32 @@ async function runSync(): Promise<StepResult[]> {
   // is safe here only because `step` catches — it returns a failed `StepResult`
   // rather than rejecting, so neither branch can abort the other.
   //
-  // `newlyFinalised` is captured out of the finalise closure: the lineage step
-  // below snapshots exactly those gameweeks, so it needs the list, not just
-  // the display string.
+  // `newlyFinalised` and `currentGameweek` are captured out of the finalise
+  // closure: the lineage step snapshots the newly stored weeks plus recent
+  // misses (see snapshotDueGameweeks), so it needs both, not just the
+  // display string.
   let newlyFinalised: number[] = [];
+  let currentGameweek = 0;
 
   const [reference, finalisation] = await Promise.all([
     step('reference', syncReferenceTables),
     step('finalise', async () => {
       const result = await finaliseGameweeks();
       newlyFinalised = result.newlyStored;
+      currentGameweek = result.currentGameweek;
       return result.detail;
     }),
   ]);
 
   // Sequential, after finalisation. Ownership snapshots must read the present —
-  // `element-status` reflects now, not the gameweek — so they cover exactly the
-  // gameweeks this run newly finalised: never older ones, whose ownership is
-  // unrecoverable, and never the in-flight one. The draft seed lives here too,
-  // guarded on draft id. A failure fails only this step; reference and
-  // finalise still report honestly through `step`.
-  const lineage = await step('lineage', () => syncLineage(newlyFinalised));
+  // `element-status` reflects now, not the gameweek — so they cover the newly
+  // stored weeks plus recent misses inside the retry window: never pre-feature
+  // weeks, whose ownership is unrecoverable, and never the in-flight one. The
+  // draft seed lives here too, guarded on draft id. A failure fails only this
+  // step; reference and finalise still report honestly through `step`.
+  const lineage = await step('lineage', () =>
+    syncLineage(newlyFinalised, currentGameweek),
+  );
 
   // Expire, then clear, then warm. Both halves are easy to get wrong in ways
   // that report success:
@@ -429,6 +436,7 @@ async function attemptBootstrapFetch(): Promise<BootstrapAttempt> {
 async function finaliseGameweeks(): Promise<{
   detail: string;
   newlyStored: number[];
+  currentGameweek: number;
 }> {
   // The before-image for the newly-stored diff below. A read failure here must
   // not fail finalisation — it only means lineage snapshots nothing this run,
@@ -509,19 +517,22 @@ async function finaliseGameweeks(): Promise<{
           .sort((a, b) => a - b)
       : [];
 
-  return { detail, newlyStored };
+  return { detail, newlyStored, currentGameweek: season.currentGameweek };
 }
 
 /**
  * Persist the draft-to-waiver lineage: the frozen draft record and one
- * ownership snapshot per newly-finalised gameweek.
+ * ownership snapshot per due gameweek.
  *
  * Runs sequentially after finalisation in the same invocation, so "newly
  * finalised" and "present ownership" are minutes apart at most. Everything
  * throws into the `step` wrapper: a failed `element-status` read fails only
  * this step while reference and finalise still report honestly.
  */
-async function syncLineage(newlyFinalised: number[]): Promise<string> {
+async function syncLineage(
+  newlyStored: number[],
+  currentGameweek: number,
+): Promise<string> {
   const leagueId = getLeagueId();
   const details = await fetchLeagueDetails(leagueId);
   const lookup = await getElementLookup();
@@ -533,14 +544,56 @@ async function syncLineage(newlyFinalised: number[]): Promise<string> {
     lookup.describe(element).code;
 
   const seeded = await seedUnseededDrafts(details, codeOf, leagueId);
-  const snapshotted = await snapshotNewlyFinalised(
-    newlyFinalised,
+
+  // Coverage beyond this run's diff: a coinciding lineage failure — the
+  // writes succeeded but the snapshots did not — leaves the next run an
+  // empty diff and, without this, a permanent gap. Stored-minus-snapshotted
+  // inside the retry window (see snapshotDueGameweeks) delays the snapshot
+  // instead of deleting it. Either coverage read failing falls back to the
+  // diff, which is today's behavior and always safe for fresh weeks.
+  const [finalised, snapshotted] = await Promise.all([
+    getFinalisedGameweeks().catch((error) => {
+      console.error(
+        '[cron] could not read finalised gameweeks for snapshot coverage; lineage covers this run only.',
+        error,
+      );
+      return null;
+    }),
+    readSnapshottedGameweeks().catch((error) => {
+      console.error(
+        '[cron] could not read snapshotted gameweeks for snapshot coverage; lineage covers this run only.',
+        error,
+      );
+      return null;
+    }),
+  ]);
+
+  const due =
+    finalised !== null && snapshotted !== null
+      ? snapshotDueGameweeks({
+          finalised: [...finalised],
+          snapshotted,
+          newlyStored,
+          currentGameweek,
+        })
+      : newlyStored;
+
+  const retried = due.filter((gameweek) => !newlyStored.includes(gameweek));
+
+  if (retried.length > 0) {
+    console.error(
+      `[cron] retrying ownership snapshots for GW${retried.join(', GW')} missed by an earlier run.`,
+    );
+  }
+
+  const snapshottedResult = await snapshotNewlyFinalised(
+    due,
     details,
     codeOf,
     leagueId,
   );
 
-  return `${seeded}; ${snapshotted}`;
+  return `${seeded}; ${snapshottedResult}`;
 }
 
 /**
@@ -567,6 +620,22 @@ async function seedUnseededDrafts(
 
   if (unseeded.length === 0) {
     return `${started.length} started draft(s) already seeded`;
+  }
+
+  if (unseeded.length > 1) {
+    // Ambiguous, so refused: the choices endpoint is league-scoped, and with
+    // two unseeded drafts nothing says which draft the payload belongs to.
+    // The seed is first-write-wins permanent, so guessing wrong freezes one
+    // draft's record under the other's picks forever. An operator seeds by
+    // hand once the payload's draft is known; the drafts stay unseeded and
+    // retry (into this same refusal) until then.
+    console.error(
+      `[cron] ${unseeded.length} unseeded drafts ` +
+        `(${unseeded.map((draft) => `#${draft.id}@GW${draft.event}`).join(', ')}); ` +
+        'refusing to seed from one league-scoped choices payload.',
+    );
+
+    return `${unseeded.length} draft(s) left unseeded (ambiguous choices payload)`;
   }
 
   // Once: the choices endpoint is league scoped, not draft scoped, so every
@@ -603,24 +672,25 @@ async function seedUnseededDrafts(
 }
 
 /**
- * Snapshot ownership for exactly the gameweeks this run newly finalised.
+ * Snapshot ownership for exactly the gameweeks due one.
  *
  * `element-status` reflects the present, so snapshotting any other gameweek
- * would misattribute it: older ones are unrecoverable and stay absent, and the
- * in-flight one is never in the list. A gameweek no draft covers is
- * unattributable rather than an error, so it is skipped and named.
+ * would misattribute it: older ones outside the retry window are
+ * unrecoverable and stay absent, and the in-flight one is never due. A
+ * gameweek no draft covers is unattributable rather than an error, so it is
+ * skipped and named.
  */
 async function snapshotNewlyFinalised(
-  newlyFinalised: number[],
+  dueGameweeks: number[],
   details: LeagueDetails,
   codeOf: (element: ElementId) => ElementCode | null,
   leagueId: number,
 ): Promise<string> {
-  if (newlyFinalised.length === 0) {
-    return 'no newly-finalised gameweeks to snapshot';
+  if (dueGameweeks.length === 0) {
+    return 'no gameweeks due to snapshot';
   }
 
-  const attributable = newlyFinalised.filter((gameweek) => {
+  const attributable = dueGameweeks.filter((gameweek) => {
     if (draftForGameweek(details.league.drafts, gameweek)) return true;
 
     console.error(

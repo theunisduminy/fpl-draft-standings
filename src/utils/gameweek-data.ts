@@ -305,8 +305,16 @@ export async function computeSeasonUncached(
   // renders and the sync job: draft shape-tripwire probes first, then
   // candidate agreement across two reads. Either gate refuses by leaving the
   // gameweek absent for retry, never by throwing. `storeFinalisedGameweeks`
-  // below is untouched as the last line of defence, and what is shown this run
-  // is unchanged: held and blocked weeks still render from `freshPerformances`.
+  // below is untouched as the last line of defence.
+  //
+  // The gate is owned here rather than inside finaliseGatedGameweeks so the
+  // display filter below reads the same object the sync job reports through.
+  const gate: FinalisationGateReport = report ?? {
+    finalised: [],
+    held: [],
+    blocked: [],
+    dropped: [],
+  };
   await finaliseGatedGameweeks({
     missing,
     performances: freshPerformances,
@@ -316,7 +324,7 @@ export async function computeSeasonUncached(
     standings,
     finalisedThrough,
     stored: finalised,
-    report,
+    report: gate,
   });
 
   // The gameweek being played right now, scored fresh on every cache miss and
@@ -334,9 +342,19 @@ export async function computeSeasonUncached(
         .performances
     : [];
 
+  // Written facts only. freshPerformances carries every fetched week,
+  // including held and blocked ones whose fingerprints the gate above needs —
+  // but only gate.finalised weeks were actually written this run. An
+  // unconfirmed week must not render as settled history (a provisional rank
+  // shown as settled is worse than a gap), so held and blocked weeks stay
+  // absent until a later tick confirms them. The in-flight week below is the
+  // one provisional surface, with its label intact.
+  const confirmed = new Set(gate.finalised);
   const historicalData = [
     ...withoutInFlight(storedPerformances, inFlight, provisional.length > 0),
-    ...freshPerformances,
+    ...freshPerformances.filter((performance) =>
+      confirmed.has(performance.event),
+    ),
     ...provisional,
   ];
 
