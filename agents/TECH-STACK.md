@@ -4,8 +4,9 @@ Day-one reading for anyone joining the project. Captures what is in the tree rig
 each choice was made, and where to look when it matters.
 
 The short version: **Next.js 16 App Router on Vercel, reading two public Fantasy Premier
-League APIs through a server-only gateway, with Neon Postgres (Drizzle) for what upstream
-cannot provide and Neon Auth for the eight league members. No tests — yet.**
+League APIs through a server-only gateway, with Neon Postgres (Drizzle) for finished-gameweek
+facts, a stale-tolerant reference accelerator, and data with no upstream source — plus Neon
+Auth for the eight league members. Vitest, colocated `*.test.ts`.**
 
 > **Naming convention.** Component, library and framework names are kept canonical
 > (_Next.js_, not _Next.JS_). British English applies to prose only; brand names are not
@@ -18,7 +19,7 @@ cannot provide and Neon Auth for the eight league members. No tests — yet.**
 | Component       | Choice                          | Version                                | Why                                                                                                                                                                               |
 | --------------- | ------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Framework       | Next.js (App Router, Turbopack) | `16.3.0`                               | Route handlers + Server Components on one runtime. Turbopack is the default builder in 16.                                                                                        |
-| Runtime         | Node                            | `22.18.0`                              | Next 16 requires `>=20.9.0`. **Not pinned** — see the gap below.                                                                                                                  |
+| Runtime         | Node                            | `22.18.0`                              | Pinned in `.nvmrc`; CI reads it with `node-version-file`. Next 16 requires `>=20.9.0`.                                                                                            |
 | Language        | TypeScript                      | `5.9.3`                                | Type safety across the server/client boundary. Held at 5.x deliberately: TypeScript 7 (the native port) is out, but `eslint-plugin-react` and the Next plugin have not caught up. |
 | Package manager | pnpm                            | `10.28.2` (pinned in `packageManager`) | Deterministic via `pnpm-lock.yaml`. **Never** npm or yarn. Use `corepack pnpm` if your shell's pnpm is a different major.                                                         |
 | React           | React                           | `19.2.8`                               | Server Components; ref-as-prop removes most `forwardRef` boilerplate.                                                                                                             |
@@ -41,17 +42,17 @@ UI conventions live in [`FRONTEND.md`](./FRONTEND.md). Read that before touching
 
 ## Data layer
 
-| Component               | Choice                                                  | Version                            | Why                                                                                                       |
-| ----------------------- | ------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Source of truth         | `draft.premierleague.com` + `fantasy.premierleague.com` | —                                  | Public, unauthenticated, undocumented, unversioned, **season-scoped**. Traps: [`API.md`](./API.md).       |
-| Gateway                 | `src/utils/fpl-api.ts`                                  | —                                  | The only file with upstream URLs or `FPL_LEAGUE_ID`.                                                      |
-| Scoring layer           | `src/utils/gameweek-data.ts`                            | —                                  | Fetch the gap, score, rank, aggregate.                                                                    |
-| Database                | Neon Postgres                                           | 18.4, `eu-central-1`               | Serverless Postgres with branching. Holds only immutable gameweek facts and data with no upstream source. |
-| Driver                  | `@neondatabase/serverless`                              | `1.1.0`                            | HTTP driver — no connection pool to manage on serverless.                                                 |
-| ORM                     | Drizzle                                                 | `0.45.2` (`drizzle-kit` `0.31.10`) | Schema as typed code, SQL-shaped queries, migrations included.                                            |
-| Auth                    | Neon Auth (managed Better Auth)                         | `@neondatabase/auth` `0.5.0-beta`  | Identity in our own database, and it branches with it. Beta — see below.                                  |
-| Cache                   | Postgres + in-memory `Map` + Next `fetch` cache         | forever / 1 h / 300 s              | Finished gameweeks persist; the two in-process layers die with the instance.                              |
-| Server-only enforcement | `server-only`                                           | `0.0.1`                            | Build fails if a `src/server/**` module reaches a client bundle.                                          |
+| Component               | Choice                                                                             | Version                                                                    | Why                                                                                                                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Source of truth         | `draft.premierleague.com` + `fantasy.premierleague.com`                            | —                                                                          | Public, unauthenticated, undocumented, unversioned, **season-scoped**. Traps: [`API.md`](./API.md).                                                                            |
+| Gateway                 | `src/utils/fpl-api.ts`                                                             | —                                                                          | The only file with upstream URLs or `FPL_LEAGUE_ID`.                                                                                                                           |
+| Scoring layer           | `src/utils/gameweek-data.ts`                                                       | —                                                                          | Fetch the gap, score, rank, aggregate.                                                                                                                                         |
+| Database                | Neon Postgres                                                                      | 18.4, `eu-central-1`                                                       | Serverless Postgres with branching. Holds immutable gameweek facts, the stale-tolerant reference accelerator (`draft_elements`, `pl_teams`), and data with no upstream source. |
+| Driver                  | `@neondatabase/serverless`                                                         | `1.1.0`                                                                    | HTTP driver — no connection pool to manage on serverless.                                                                                                                      |
+| ORM                     | Drizzle                                                                            | `0.45.2` (`drizzle-kit` `0.31.10`)                                         | Schema as typed code, SQL-shaped queries, migrations included.                                                                                                                 |
+| Auth                    | Neon Auth (managed Better Auth)                                                    | `@neondatabase/auth` `0.5.0-beta`                                          | Identity in our own database, and it branches with it. Beta — see below.                                                                                                       |
+| Cache                   | Postgres + `cachedRead` (process-local Map + Data Cache tags) + Next `fetch` cache | gameweeks forever / reference 6 h + revalidated every 3 h by the cron sync | Finished gameweeks and reference rows persist; the in-process layers die with the instance.                                                                                    |
+| Server-only enforcement | `server-only`                                                                      | `0.0.1`                                                                    | Build fails if a `src/server/**` module reaches a client bundle.                                                                                                               |
 
 **The boundary is the law.** The browser never calls the FPL APIs or the database
 directly; `src/server/db/client.ts` is the only file that builds a db client. Full rules:
@@ -79,13 +80,13 @@ directly; `src/server/db/client.ts` is the only file that builds a db client. Fu
 
 ## Quality
 
-| Component    | Choice               | Version                                         | Why                                                                                    |
-| ------------ | -------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Linter       | ESLint (flat config) | `9.39.5`                                        | `eslint.config.mjs`. **Held at 9 deliberately** — see below.                           |
-| Lint config  | `eslint-config-next` | `16.3.0`                                        | Ships native flat configs (`/core-web-vitals`, `/typescript`); no `FlatCompat` needed. |
-| Formatter    | Prettier             | `3.9.6` + `prettier-plugin-tailwindcss` `0.8.1` | `tailwindStylesheet` points at `src/app/globals.css` so v4 class sorting works.        |
-| Type checker | `tsc --noEmit`       | bundled                                         | `pnpm typecheck`.                                                                      |
-| Tests        | **None**             | The biggest gap in the repo.                    |
+| Component    | Choice               | Version                                         | Why                                                                                                    |
+| ------------ | -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Linter       | ESLint (flat config) | `9.39.5`                                        | `eslint.config.mjs`. **Held at 9 deliberately** — see below.                                           |
+| Lint config  | `eslint-config-next` | `16.3.0`                                        | Ships native flat configs (`/core-web-vitals`, `/typescript`); no `FlatCompat` needed.                 |
+| Formatter    | Prettier             | `3.9.6` + `prettier-plugin-tailwindcss` `0.8.1` | `tailwindStylesheet` points at `src/app/globals.css` so v4 class sorting works.                        |
+| Type checker | `tsc --noEmit`       | bundled                                         | `pnpm typecheck`.                                                                                      |
+| Tests        | Vitest               | colocated `*.test.ts`                           | `pnpm test`. Pure rules only — scoring, season-state, reference-mapping, premier-league, chart-scales. |
 
 ---
 
@@ -113,9 +114,11 @@ work under v4. The latter is the shadcn-recommended replacement and is a plain C
 used as a React key. The wrapper uses recharts' public `TooltipContentProps` and
 `LegendPayload` types and React 19 ref-as-prop instead of `forwardRef`.
 
-**Neon, and why the database holds so little.** It is deliberately not a mirror of the FPL
+**Neon, and why the database holds facts, an accelerator, and member data.** It is deliberately not a mirror of the FPL
 API. It stores immutable finished-gameweek facts (so a cold start costs one query instead of
-344 upstream calls) and data with no upstream source at all (profiles, later bets). The F1
+344 upstream calls), a stale-tolerant copy of the reference data readers actually use
+(`draft_elements`, `pl_teams` — trusted only for `REFERENCE_STALE_AFTER_SECONDS`, every
+reader falls back to the API), and data with no upstream source at all (profiles, later bets). The F1
 points table stays in code — it is policy, not fact, and persisting derived scores would
 mean a backfill every time it is tuned. Full reasoning:
 [`ARCHITECTURE.md`](./ARCHITECTURE.md#where-to-draw-the-persistence-line).
@@ -139,11 +142,11 @@ drizzle-kit away from the Neon-owned `neon_auth` schema.
 
 > _TODO (owner)_ — none of these are decisions, they are absences:
 >
-> - **No `.nvmrc` / `.tool-versions`.** Node is unpinned; local and Vercel can drift.
-> - **No CI.** `pnpm lint`, `pnpm typecheck` and `pnpm build` are run by hand.
-> - **No test framework.** Vitest is the house default. The scoring logic in
->   `gameweek-data.ts` is pure and is the obvious first target.
 > - **No email provider** — needed for the weekly results track.
+>
+> Closed since this list was written: `.nvmrc` pins Node `22.18.0`, CI runs
+> `lint`/`typecheck`/`test`/`format:check` (`.github/workflows/ci.yml`), and Vitest covers
+> the pure rules (scoring first).
 
 ---
 

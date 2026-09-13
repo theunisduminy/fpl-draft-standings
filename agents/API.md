@@ -1,6 +1,6 @@
 ---
 name: Better Draft — API reference
-last_updated: 2026-08-24
+last_updated: 2026-09-13
 ---
 
 # API.md — Every API We Call, and What Comes Back
@@ -521,8 +521,10 @@ with the official table by a few points in exactly the season where that matters
 would do it silently. **There is deliberately no fallback.** If Pulse is unreachable,
 `/premier-league` says so.
 
-URLs are built by `pulseApi` in [`src/utils/fpl-api.ts`](../src/utils/fpl-api.ts), and read
-through `fetchPulse` — not `fetchUpstream`.
+URLs are built by `pulseApi` in [`src/utils/fpl-api.ts`](../src/utils/fpl-api.ts).
+Each builder returns a request descriptor carrying the `Origin` header below,
+and every Pulse read goes through the same `fetchUpstream` as the two FPL
+games — there is no separate Pulse reader to remember.
 
 ### Every request needs an `Origin` header
 
@@ -531,8 +533,8 @@ Origin: https://www.premierleague.com
 ```
 
 No key, no cookie, nothing else. Without it the response is a `403`, which reads as "the
-Premier League page is down" rather than as a missing header — hence `fetchPulse` existing
-at all, so no call site can forget.
+Premier League page is down" rather than as a missing header — hence the header living
+on the endpoint descriptor, so no call site can forget it.
 
 > **Unverified from a laptop:** whether Pulse serves Vercel's egress IPs. It works from a
 > development machine and from CI. Check the deployed page after the first production
@@ -796,13 +798,15 @@ whole history is recomputed from scratch:
 | 38                  | 342            |
 
 Plus three fixed calls, and nine more for the gameweek in flight, which is recomputed on
-every cache miss rather than stored. Two caches sit in front of this — a 5-minute TTL
-`Map` in `src/utils/cache.ts` with promise deduplication, and Next's own `fetch` cache
-(`revalidate: 300`) — but **the `Map` is module scope, so it dies with every
-serverless instance.** On Vercel, a cold request late in the season pays the full
-344-call bill.
+every cache miss rather than stored. Two layers sit in front of this — `cachedRead` in
+`src/utils/cache.ts` (a process-local Map in front of tagged Data Cache entries, with
+in-flight sharing scoped to one request so a discarded prefetch can never wedge a later
+render) and upstream reads via `upstreamFetch` (`cache: 'no-store'`, one fresh connection
+per read). **The process-local Map dies with every serverless instance**, so without the
+database a cold request late in the season would pay the full 344-call bill — which is why
+finished gameweeks persist and steady state is 9 calls a week, not 344.
 
-The TTL matches the `revalidate` on the calls beneath it. It was an hour, on the
+The TTL matches the inputs beneath it. It was an hour, on the
 reasoning that FPL data changes once per gameweek; that stopped being true when the
 season started including the gameweek in progress, and caching an aggregate for longer
 than its own inputs froze a live score at whatever it was an hour ago.

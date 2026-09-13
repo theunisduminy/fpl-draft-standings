@@ -80,8 +80,11 @@ needs the season calls `getGameweekData()` directly and hands the result down as
 `/api/*` route is now only justified by an _external_ consumer.
 
 - **`src/utils/fpl-api.ts` is the single gateway.** It is the only file allowed to contain
-  an upstream URL, and the only file that reads `FPL_LEAGUE_ID`. It starts with
-  `import 'server-only'`, so it fails the build if pulled into a client bundle.
+  an upstream URL or header, and the only file that reads `FPL_LEAGUE_ID`. It starts with
+  `import 'server-only'`, so it fails the build if pulled into a client bundle. Builders
+  return `{ url, headers, label }` descriptors rather than bare URLs, so an endpoint's
+  requirements (Pulse's `Origin` header) travel with the endpoint and no call site can
+  forget them.
 - **`FPL_LEAGUE_ID` is never `NEXT_PUBLIC_`.** Read it through `getLeagueId()`, lazily, so a
   missing value fails the request rather than `next build`.
 - **API routes never build URLs themselves.** They call `fplApi.*` or `getGameweekData()`.
@@ -346,7 +349,11 @@ out the full timeout — which, by aborting, destroys the corpse and hands the r
 fresh connection the click should have had. A TCP connection is request-scoped state
 exactly like a promise, so upstream reads no longer keep any: `upstreamFetch` in
 `src/utils/fpl-api.ts` dispatches every one through an undici agent with
-`pipelining: 0`, one fresh connection per read, closed when the response lands. A TLS
+`pipelining: 0` **and `allowH2: false`**, one fresh connection per read, closed
+when the response lands. The second flag is load-bearing: Pulse negotiates HTTP/2,
+and undici documents that `pipelining` has no effect once H2 is negotiated, so the
+H2 session stayed pooled across requests and froze exactly like the H1 socket before
+it. `allowH2: false` holds ALPN to `http/1.1` only. A TLS
 handshake per read is nothing against caches measured in minutes.
 
 The rules that come out of it apply to any cache, memo, dedup slot — or pool:
@@ -357,9 +364,9 @@ The rules that come out of it apply to any cache, memo, dedup slot — or pool:
 - **Scope any sharing of in-flight work to one request.** `requestToken` in
   [`src/utils/cache.ts`](../src/utils/cache.ts) is how, and `cachedRead` is the only thing
   that needs it. A deadline is not a substitute: it bounds the wait, not the mistake.
-- **Every upstream read goes through `upstreamFetch`** (or `fetchUpstream`/`fetchPulse`
-  over it), which applies both `upstreamSignal()` and the fresh-connection dispatcher so
-  no call site can forget either. `fetch` has no timeout of its own, so a connection that
+- **Every upstream read goes through `upstreamFetch`** (or `fetchUpstream`
+  over it), which applies the timeout, the fresh-connection dispatcher and one
+  immediate retry on a network throw, so no call site can forget any of them. `fetch` has no timeout of its own, so a connection that
   never answers is the same never-settling promise one layer down; the timeout is what
   turns a silent hang into a loud failure — worth having, and not a fix. The dispatcher
   is what stops the hang happening at all.
@@ -446,7 +453,7 @@ makes sense inside one.
 
 ### Never
 
-- Never write an upstream **API** URL outside `src/utils/fpl-api.ts`. The one exception is
+- Never write an upstream **API** URL or header outside `src/utils/fpl-api.ts`. The one exception is
   the asset host `resources.premierleague.com` (crests and headshots), whose builders live
   in `src/utils/pl-assets.ts` — the browser loads those images directly, and `fpl-api.ts`
   is `server-only`, so they cannot live there. That file builds URLs and nothing else: no

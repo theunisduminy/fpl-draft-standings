@@ -32,8 +32,29 @@ const PULSE_API = 'https://footballapi.pulselive.com/football';
  * Pulse rejects a request with no `Origin` it recognises. Nothing else is
  * needed — no key, no cookie — and the header is only meaningful server-side,
  * which this module already is.
+ *
+ * It lives on the Pulse builders below rather than at any call site, so a
+ * Pulse read without it is unrepresentable. A call that forgets the header
+ * does not fail loudly — it comes back `403` and reads as "the Premier League
+ * page is down".
  */
-const PULSE_HEADERS = { Origin: 'https://www.premierleague.com' } as const;
+const PULSE_HEADERS: Record<string, string> = {
+  Origin: 'https://www.premierleague.com',
+};
+
+/**
+ * One upstream request: where it goes, what it carries, what to call it.
+ *
+ * Every builder in `fplApi` and `pulseApi` returns one of these rather than a
+ * bare URL, so anything an endpoint requires travels with the endpoint. The
+ * `label` is the short name failures log under — a failure names its endpoint
+ * instead of printing a URL with a league ID in it.
+ */
+export interface UpstreamRequest {
+  url: string;
+  headers?: Record<string, string>;
+  label: string;
+}
 
 const LEAGUE_ID_VAR = 'FPL_LEAGUE_ID';
 
@@ -66,27 +87,39 @@ export function upstreamSignal(): AbortSignal {
 /**
  * One fresh connection per upstream read, closed when the response lands.
  *
- * `pipelining: 0` is undici's "no keep-alive": nothing about a finished read
- * outlives it, and that is the entire point. The default pool keeps idle
- * sockets to reuse, which is exactly the state a serverless pause corrupts.
- * The sign-in burst prefetches every page in the nav, one of those renders
- * opens a connection to Pulse, and the instance is then paused with that
- * socket in its pool. The far end gives up on it during the pause — but the
- * FIN or RST arrives while nothing is listening, so on resume undici still
- * believes the socket is alive, writes the next request into the void, and
- * waits. That was `/premier-league` timing out after exactly ten seconds on
- * the first click of every session while a reload beside it answered in
- * 300ms: the click reused the corpse (and, by timing out, destroyed it),
- * the reload got the fresh connection the click should have had.
+ * `pipelining: 0` is undici's "no keep-alive" for HTTP/1.1: the request goes
+ * out with `connection: close` and the socket is destroyed once it completes,
+ * so nothing about a finished read outlives it, and that is the entire point.
+ * The default pool keeps idle sockets to reuse, which is exactly the state a
+ * serverless pause corrupts. The sign-in burst prefetches every page in the
+ * nav, one of those renders opens a connection to Pulse, and the instance is
+ * then paused with that socket in its pool. The far end gives up on it during
+ * the pause — but the FIN or RST arrives while nothing is listening, so on
+ * resume undici still believes the socket is alive, writes the next request
+ * into the void, and waits. That was `/premier-league` timing out after
+ * exactly ten seconds on the first click of every session while a reload
+ * beside it answered in 300ms: the click reused the corpse (and, by timing
+ * out, destroyed it), the reload got the fresh connection the click should
+ * have had.
  *
- * This is the third face of the same law — never share state across requests
+ * `pipelining: 0` alone was not enough, and that is why this line also says
+ * `allowH2: false`. Pulse negotiates HTTP/2 — measured `http=2` against
+ * `footballapi.pulselive.com` — and undici documents that `pipelining` "has no
+ * effect once HTTP/2 is negotiated". The H2 session stayed pooled in this
+ * singleton across requests, froze and died exactly like the H1 socket before
+ * it, and the first click per session hung the same ten seconds while a
+ * reload worked. `allowH2: false` holds ALPN to `http/1.1` only, so every read
+ * is H1 with `connection: close`. Measured H1 against Pulse at ~200ms cold,
+ * against ~600ms over H2, so reuse was buying nothing here either.
+ *
+ * This is the fourth face of the same law — never share state across requests
  * that only makes sense inside one. First the memoised promise, then the
- * dedup slot, now the socket pool: each fix moved the sharing down a layer
- * and the pause corrupted the next one. A TCP connection is request-scoped
- * state here, so it is not kept.
+ * dedup slot, then the H1 socket pool, now the H2 session: each fix moved the
+ * sharing down a layer and the pause corrupted the next one. A TCP connection
+ * or session is request-scoped state here, so it is not kept.
  *
  * The price is a TLS handshake per read — one to three reads per page miss,
- * against caches measured in minutes. Pulse answers in ~300ms cold including
+ * against caches measured in minutes. Pulse answers in ~200ms cold including
  * the handshake; reuse was buying nothing and costing the page.
  *
  * `undici`'s own `fetch` rather than the global: Node's bundled fetch rejects
@@ -95,7 +128,7 @@ export function upstreamSignal(): AbortSignal {
  * Next's patched fetch also loses nothing — these reads were `no-store`
  * precisely so that patch would do nothing.
  */
-const freshConnectionAgent = new Agent({ pipelining: 0 });
+const freshConnectionAgent = new Agent({ pipelining: 0, allowH2: false });
 
 /**
  * The one door every upstream read leaves through.
@@ -104,19 +137,46 @@ const freshConnectionAgent = new Agent({ pipelining: 0 });
  * a body — `event-status` 404s with a bare string, `entryEvent` 404s meaning
  * "no picks yet". `fetchUpstream` below is the JSON-or-throw wrapper over it.
  *
- * A caller may bring its own `signal` (the cron job runs a longer deadline);
- * everyone else gets `upstreamSignal()`. Both the fresh connection and the
- * timeout are applied here so no call site can forget either.
+ * A caller may bring its own `signal` (the cron job runs a longer deadline
+ * and owns its own retry); everyone else gets a fresh `upstreamSignal()` per
+ * attempt. Both the fresh connection and the timeout are applied here so no
+ * call site can forget either.
+ *
+ * A throw from `fetch` itself — a timeout, a reset connection, a transient
+ * `fetch failed` of the kind the sync job already retries around — is retried
+ * once, immediately, on a new signal. The first signal may have fired to cause
+ * the throw, so reusing it would reject before touching the network. An HTTP
+ * error status is **not** retried: that is upstream's verdict on the request,
+ * and a second attempt cannot change it. Neither is a caller-provided signal
+ * retried: aborting it was the caller's decision.
  */
-export function upstreamFetch(
-  url: string,
-  init?: { headers?: Record<string, string>; signal?: AbortSignal },
+export async function upstreamFetch(
+  req: UpstreamRequest,
+  init?: { signal?: AbortSignal },
 ): ReturnType<typeof undiciFetch> {
-  return undiciFetch(url, {
-    headers: init?.headers,
-    signal: init?.signal ?? upstreamSignal(),
-    dispatcher: freshConnectionAgent,
-  });
+  if (init?.signal) {
+    return undiciFetch(req.url, {
+      headers: req.headers,
+      signal: init.signal,
+      dispatcher: freshConnectionAgent,
+    });
+  }
+
+  try {
+    return await undiciFetch(req.url, {
+      headers: req.headers,
+      signal: upstreamSignal(),
+      dispatcher: freshConnectionAgent,
+    });
+  } catch (error) {
+    console.error(`[upstream] ${req.label} failed; retrying once.`, error);
+
+    return undiciFetch(req.url, {
+      headers: req.headers,
+      signal: upstreamSignal(),
+      dispatcher: freshConnectionAgent,
+    });
+  }
 }
 
 /**
@@ -178,28 +238,14 @@ export function getLeagueId(): number {
  * `upstreamFetch` sidesteps Next's fetch patching entirely, which is what
  * `cache: 'no-store'` was opting out of, so that option goes with it.
  */
-export async function fetchUpstream<T>(
-  url: string,
-  headers?: Record<string, string>,
-): Promise<T> {
-  const res = await upstreamFetch(url, { headers });
+export async function fetchUpstream<T>(req: UpstreamRequest): Promise<T> {
+  const res = await upstreamFetch(req);
 
   if (!res.ok) {
-    throw new Error(`Request to ${url} failed with ${res.status}`);
+    throw new Error(`${req.label} failed with ${res.status}`);
   }
 
   return (await res.json()) as T;
-}
-
-/**
- * The same read, with the `Origin` Pulse insists on.
- *
- * A separate function rather than a header argument at each call site, because
- * a Pulse call that forgets the header does not fail loudly — it comes back
- * `403` and reads as "the Premier League page is down".
- */
-export async function fetchPulse<T>(url: string): Promise<T> {
-  return fetchUpstream<T>(url, { ...PULSE_HEADERS });
 }
 
 export const fplApi = {
@@ -209,21 +255,32 @@ export const fplApi = {
    * season begins — always go through `fetchEventStatus` rather than calling
    * this directly.
    */
-  eventStatus: () => `${DRAFT_API}/pl/event-status`,
+  eventStatus: (): UpstreamRequest => ({
+    url: `${DRAFT_API}/pl/event-status`,
+    label: 'draft event-status',
+  }),
 
   /**
    * Draft game state (`current_event`, `next_event`, `processing_status`).
    * Available year-round, including pre-season, so it is the reliable way to
    * ask "has the season started?".
    */
-  game: () => `${DRAFT_API}/game`,
+  game: (): UpstreamRequest => ({
+    url: `${DRAFT_API}/game`,
+    label: 'draft game',
+  }),
 
   /** League metadata, its entries, and standings. */
-  leagueDetails: (leagueId: number) =>
-    `${DRAFT_API}/league/${leagueId}/details`,
+  leagueDetails: (leagueId: number): UpstreamRequest => ({
+    url: `${DRAFT_API}/league/${leagueId}/details`,
+    label: 'draft league details',
+  }),
 
   /** Live per-element stats for one gameweek, keyed by element ID. */
-  eventLive: (gameweek: number) => `${DRAFT_API}/event/${gameweek}/live`,
+  eventLive: (gameweek: number): UpstreamRequest => ({
+    url: `${DRAFT_API}/event/${gameweek}/live`,
+    label: `draft event ${gameweek} live`,
+  }),
 
   /**
    * Who currently owns each element: `{ element, owner, status }`.
@@ -232,11 +289,16 @@ export const fplApi = {
    * before GW1, unlike `entryEvent`. **`owner` is an `entry_id`**, not the
    * league entry.
    */
-  elementStatus: (leagueId: number) =>
-    `${DRAFT_API}/league/${leagueId}/element-status`,
+  elementStatus: (leagueId: number): UpstreamRequest => ({
+    url: `${DRAFT_API}/league/${leagueId}/element-status`,
+    label: 'draft element-status',
+  }),
 
   /** Every pick made in the draft, in order. A historical record only. */
-  draftChoices: (leagueId: number) => `${DRAFT_API}/draft/${leagueId}/choices`,
+  draftChoices: (leagueId: number): UpstreamRequest => ({
+    url: `${DRAFT_API}/draft/${leagueId}/choices`,
+    label: 'draft choices',
+  }),
 
   /**
    * The draft game's static dataset: elements, teams, element types.
@@ -245,7 +307,10 @@ export const fplApi = {
    * classic API below. Draft element IDs must be resolved against this, never
    * against the classic bootstrap: the two disagree on ~21 of 581 elements.
    */
-  draftBootstrap: () => `${DRAFT_API}/bootstrap-static`,
+  draftBootstrap: (): UpstreamRequest => ({
+    url: `${DRAFT_API}/bootstrap-static`,
+    label: 'draft bootstrap-static',
+  }),
 
   /**
    * One entry's picks for one gameweek.
@@ -256,26 +321,36 @@ export const fplApi = {
    * swallows as "no picks" — so the gameweek would vanish rather than fail
    * loudly. Hence the branded parameter type.
    */
-  entryEvent: (entryId: EntryId, gameweek: number) =>
-    `${DRAFT_API}/entry/${entryId}/event/${gameweek}`,
+  entryEvent: (entryId: EntryId, gameweek: number): UpstreamRequest => ({
+    url: `${DRAFT_API}/entry/${entryId}/event/${gameweek}`,
+    label: `draft entry event GW${gameweek}`,
+  }),
 
   /**
    * The full classic-FPL static dataset: teams, events, elements.
    * The trailing slash is required — without it the API answers 301.
    */
-  bootstrapStatic: () => `${FANTASY_API}/bootstrap-static/`,
+  bootstrapStatic: (): UpstreamRequest => ({
+    url: `${FANTASY_API}/bootstrap-static/`,
+    label: 'classic bootstrap-static',
+  }),
 
   /**
    * All 380 Premier League fixtures for the season.
    * The trailing slash is required — without it the API answers 301.
    */
-  fixtures: () => `${FANTASY_API}/fixtures/`,
+  fixtures: (): UpstreamRequest => ({
+    url: `${FANTASY_API}/fixtures/`,
+    label: 'classic fixtures',
+  }),
 } as const;
 
 /**
  * The Pulse API — the real Premier League, as premierleague.com renders it.
  *
- * Every one of these needs the `Origin` header: go through `fetchPulse`.
+ * Each builder carries the `Origin` header Pulse insists on, so every Pulse
+ * read goes through the same `fetchUpstream` as the two FPL games — there is
+ * no separate Pulse reader to remember.
  *
  * **`compSeasonId` is season-scoped, exactly like the draft league ID**, so it
  * is never written down. `pulseApi.compSeasons()` lists them and
@@ -289,7 +364,11 @@ export const pulseApi = {
    * Every Premier League season Pulse knows, newest first, as `{ id, label }`.
    * Competition `1` is the Premier League.
    */
-  compSeasons: () => `${PULSE_API}/competitions/1/compseasons?pageSize=50`,
+  compSeasons: (): UpstreamRequest => ({
+    url: `${PULSE_API}/competitions/1/compseasons?pageSize=50`,
+    headers: PULSE_HEADERS,
+    label: 'Pulse seasons',
+  }),
 
   /**
    * The league table. `detail=2` is what adds `form`, `annotations` and the
@@ -298,15 +377,22 @@ export const pulseApi = {
    * Out of season this returns all 20 clubs on zero with `tables[0].gameWeek`
    * of `0` — **not** an empty array. Guard on `gameWeek`, never on length.
    */
-  standings: (compSeasonId: number) =>
-    `${PULSE_API}/standings?compSeasons=${compSeasonId}&altIds=true&detail=2`,
+  standings: (compSeasonId: number): UpstreamRequest => ({
+    url: `${PULSE_API}/standings?compSeasons=${compSeasonId}&altIds=true&detail=2`,
+    headers: PULSE_HEADERS,
+    label: 'Pulse standings',
+  }),
 
   /**
    * All 380 fixtures in one response — `pageSize` of 400 returns `numPages: 1`,
    * so this never needs paging. `statuses=U,L,C` asks for upcoming, live and
    * complete, which is everything.
    */
-  fixtures: (compSeasonId: number) =>
-    `${PULSE_API}/fixtures?comps=1&compSeasons=${compSeasonId}` +
-    '&pageSize=400&page=0&sort=asc&statuses=U,L,C&altIds=true',
+  fixtures: (compSeasonId: number): UpstreamRequest => ({
+    url:
+      `${PULSE_API}/fixtures?comps=1&compSeasons=${compSeasonId}` +
+      '&pageSize=400&page=0&sort=asc&statuses=U,L,C&altIds=true',
+    headers: PULSE_HEADERS,
+    label: 'Pulse fixtures',
+  }),
 } as const;
