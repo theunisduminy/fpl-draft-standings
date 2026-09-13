@@ -2,17 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, BarChart3, Beer, Users, Shield, User } from 'lucide-react';
+import {
+  Trophy,
+  Radio,
+  BarChart3,
+  Beer,
+  Users,
+  Shield,
+  User,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
 /**
- * Six here against `MobileNav`'s five: this rail has vertical room, so it
+ * Seven here against `MobileNav`'s six: this rail has vertical room, so it
  * carries Profile as well and spells "Premier League" out in full where the
  * bottom bar has to say "Prem".
  */
 const navigation = [
   { name: 'Standings', href: '/', icon: Trophy },
+  { name: 'Live', href: '/live', icon: Radio },
   { name: 'Results', href: '/results', icon: BarChart3 },
   { name: 'Rumblers', href: '/rumblers', icon: Beer },
   { name: 'Squads', href: '/squads', icon: Users },

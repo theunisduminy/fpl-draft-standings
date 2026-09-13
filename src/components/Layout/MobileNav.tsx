@@ -1,28 +1,25 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, BarChart3, Beer, Users, Shield } from 'lucide-react';
+import { Trophy, Radio, BarChart3, Beer, Users, Shield } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
 /**
- * **Five is the ceiling, and this is the fifth.** Do not add a sixth.
- *
- * At 375px the bar has ~339px of usable width, so five items are ~68px each —
- * enough for a 20px icon and a 10px label, and nothing spare. A sixth drops
- * each to ~56px, which is under the 44px tap target once the gaps are taken
- * out and narrower than the word "Standings" at any legible size.
- *
- * So the next destination after Premier League is not a nav change, it is an
- * information-architecture decision: either it belongs inside one of these
- * five, or this becomes four items and a "More" sheet. Squeezing a sixth in is
- * the one option that is already ruled out.
+ * **Six is the ceiling, and this is the sixth.** At 375px the bar has ~339px
+ * of usable width, so six items are ~56px each — tighter than the five this
+ * bar was drawn for (~68px each: a 20px icon and a 10px label, and nothing
+ * spare). The Sunday live room plan accepted that squeeze deliberately: the
+ * room is a matchday destination opened every gameweek, so it belongs in the
+ * bar rather than inside one of these five or behind a "More" sheet. Do not
+ * add a seventh.
  *
  * "Prem" rather than "Premier League" for the same reason — it is the longest
  * label the slot takes. `SideNav` has the room and spells it out.
  */
 const navigation = [
   { name: 'Standings', href: '/', icon: Trophy },
+  { name: 'Live', href: '/live', icon: Radio },
   { name: 'Results', href: '/results', icon: BarChart3 },
   { name: 'Rumblers', href: '/rumblers', icon: Beer },
   { name: 'Squads', href: '/squads', icon: Users },
