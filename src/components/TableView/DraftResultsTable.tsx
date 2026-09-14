@@ -5,6 +5,7 @@ import { BaseTable } from './base-table';
 import { draftResultsColumns, GameweekResult } from './table-configs';
 import { GameweekDataResponse } from '@/interfaces/players';
 import { GameweekSelector } from '@/components/GameweekSelector';
+import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 import { useViewTeam, ViewTeamDrawer } from './ViewTeamDrawer';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -142,12 +143,7 @@ export default function DraftResultsTable({
         onSelectGameweek={selectGameweek}
       />
 
-      {isProvisional && (
-        <p className='text-sm text-muted-foreground'>
-          Gameweek {activeGameweek} is still being played — these positions are
-          provisional and will change.
-        </p>
-      )}
+      {isProvisional && <LiveGameweekBadge gameweek={activeGameweek} />}
 
       <BaseTable
         title=''
