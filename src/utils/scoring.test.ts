@@ -22,6 +22,7 @@ import {
   buildPointsSpread,
   buildRumblerData,
   hasBeenPlayed,
+  hasPlayedElement,
   rankByPoints,
   scoreGameweek,
   standingsByGameweek,
@@ -245,6 +246,28 @@ describe('hasBeenPlayed', () => {
     expect(
       hasBeenPlayed({ elements: { '1': { stats: { total_points: -1 } } } }),
     ).toBe(true);
+  });
+});
+
+describe('hasPlayedElement', () => {
+  it('agrees with hasBeenPlayed on well-formed values', () => {
+    const played = { stats: { total_points: 8, minutes: 90 } };
+    const unplayed = { stats: { total_points: 0, minutes: 0 } };
+
+    expect(hasPlayedElement(played)).toBe(
+      hasBeenPlayed({ elements: { '1': played } }),
+    );
+    expect(hasPlayedElement(unplayed)).toBe(
+      hasBeenPlayed({ elements: { '1': unplayed } }),
+    );
+  });
+
+  it('reads malformed values as unplayed rather than coercing them', () => {
+    expect(hasPlayedElement(null)).toBe(false);
+    expect(hasPlayedElement('90')).toBe(false);
+    expect(hasPlayedElement({ stats: null })).toBe(false);
+    expect(hasPlayedElement({ stats: { minutes: '90' } })).toBe(false);
+    expect(hasPlayedElement({ stats: { total_points: '6' } })).toBe(false);
   });
 });
 

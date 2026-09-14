@@ -1,7 +1,7 @@
 /**
  * Delete a stored gameweek so the app refetches and re-scores it.
  *
- *   node --env-file=.env.local scripts/forget-gameweek.mjs <gameweek> [--prod]
+ *   node --env-file=.env.local scripts/forget-gameweek.mjs <gameweek> [--apply] [--prod]
  *
  * A gameweek in `gameweeks` is a claim that its result will never change again,
  * and the insert behind it is `onConflictDoNothing` — so a gameweek stored
@@ -19,43 +19,60 @@
  * `rejectUnfinalisable` now refuses the write — but the row already written had
  * to be removed by hand.
  *
- * Defaults to the **sandbox** branch. `--prod` is required to touch production,
- * and the script prints what it is about to delete either way.
+ * Guarded by default: a dry run prints the slice and row counts and deletes
+ * nothing. Pass `--apply` to delete, and `--prod` to target production —
+ * without it the script only ever touches the sandbox branch.
  */
 
 import { neon } from '@neondatabase/serverless';
 
-const args = process.argv.slice(2);
-const useProd = args.includes('--prod');
-const gameweek = Number(args.find((arg) => !arg.startsWith('--')));
+import {
+  parseArgs,
+  parseLeagueId,
+  resolveTarget,
+  sliceDescriptor,
+  usage,
+  UsageError,
+} from './forget-gameweek.lib.mjs';
 
-if (!Number.isInteger(gameweek) || gameweek < 1 || gameweek > 38) {
-  console.error(
-    'Usage: node --env-file=.env.local scripts/forget-gameweek.mjs <gameweek> [--prod]',
-  );
+function fail(error) {
+  console.error(error instanceof UsageError ? error.message : error);
+  console.error(usage());
   process.exit(1);
 }
 
-const url = useProd
-  ? process.env.NEON_CONNECTION_STRING_PROD
-  : process.env.NEON_CONNECTION_STRING_SANDBOX;
-
-const leagueId = Number(process.env.FPL_LEAGUE_ID);
-
-if (!url) {
-  console.error(
-    `${useProd ? 'NEON_CONNECTION_STRING_PROD' : 'NEON_CONNECTION_STRING_SANDBOX'} is not set.`,
-  );
-  process.exit(1);
+let options;
+try {
+  options = parseArgs(process.argv.slice(2));
+} catch (error) {
+  fail(error);
 }
 
-if (!Number.isInteger(leagueId) || leagueId <= 0) {
-  console.error('FPL_LEAGUE_ID is not set to a positive integer.');
-  process.exit(1);
+if (options.help) {
+  console.log(usage());
+  process.exit(0);
 }
 
-const sql = neon(url);
-const target = useProd ? 'PRODUCTION' : 'sandbox';
+let leagueId;
+try {
+  leagueId = parseLeagueId(process.env.FPL_LEAGUE_ID);
+} catch (error) {
+  fail(error);
+}
+
+let target;
+try {
+  target = resolveTarget({
+    prodFlag: options.useProd,
+    sandboxUrl: process.env.NEON_CONNECTION_STRING_SANDBOX,
+    prodUrl: process.env.NEON_CONNECTION_STRING_PROD,
+  });
+} catch (error) {
+  fail(error);
+}
+
+const sql = neon(target.url);
+const slice = sliceDescriptor(leagueId, options.gameweek);
 
 // Printed before deleting, not after. The rows are the only record of what was
 // there, so a run that turns out to have been aimed at the wrong gameweek at
@@ -63,35 +80,94 @@ const target = useProd ? 'PRODUCTION' : 'sandbox';
 const rows = await sql`
   select league_entry, points, rank
   from gameweek_scores
-  where league_id = ${leagueId} and gameweek = ${gameweek}
+  where league_id = ${leagueId} and gameweek = ${options.gameweek}
   order by rank
 `;
 
-if (rows.length === 0) {
+const markers = await sql`
+  select gameweek, finalised_at
+  from gameweeks
+  where league_id = ${leagueId} and gameweek = ${options.gameweek}
+`;
+
+const candidates = await sql`
+  select gameweek, fingerprint, first_seen, last_checked, block_reason
+  from finalisation_candidates
+  where league_id = ${leagueId} and gameweek = ${options.gameweek}
+`;
+
+// Counted, never printed: a snapshot is ~581 narrow rows, and the dry run
+// exists to confirm the slice, not to dump it.
+const snapshots = await sql`
+  select element_code
+  from ownership_snapshots
+  where league_id = ${leagueId} and gameweek = ${options.gameweek}
+`;
+
+if (
+  rows.length === 0 &&
+  markers.length === 0 &&
+  candidates.length === 0 &&
+  snapshots.length === 0
+) {
   console.log(
-    `No stored scores for GW${gameweek} in league ${leagueId} on ${target}. Nothing to do.`,
+    `No stored rows for ${slice.label} on ${target.name}. Nothing to do.`,
   );
   process.exit(0);
 }
 
+console.log(`Target: ${target.name} (${target.connectionVar}).`);
 console.log(
-  `About to delete GW${gameweek} for league ${leagueId} on ${target}:`,
+  `${slice.label}: ${rows.length} score row(s), ` +
+    `${markers.length} finalised marker(s), ` +
+    `${snapshots.length} snapshot row(s), ` +
+    `${candidates.length} candidate row(s).`,
 );
-console.table(rows);
 
-await sql`
-  delete from gameweek_scores
-  where league_id = ${leagueId} and gameweek = ${gameweek}
-`;
+if (rows.length > 0) {
+  console.table(rows);
+}
 
-await sql`
-  delete from gameweeks
-  where league_id = ${leagueId} and gameweek = ${gameweek}
-`;
+if (candidates.length > 0) {
+  console.table(candidates);
+}
+
+if (!options.apply) {
+  console.log('Dry run: nothing deleted. Re-run with --apply to delete.');
+  process.exit(0);
+}
+
+// One non-interactive transaction: a crash between deletes must not leave
+// scores deleted with the finalised marker kept, or vice versa. Re-running
+// the script converges a half-applied delete.
+await sql.transaction([
+  sql`
+    delete from gameweek_scores
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+  sql`
+    delete from gameweeks
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+  sql`
+    delete from ownership_snapshots
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+  sql`
+    delete from finalisation_candidates
+    where league_id = ${leagueId} and gameweek = ${options.gameweek}
+  `,
+]);
 
 console.log(
-  `Deleted ${rows.length} score row(s) and unmarked GW${gameweek} as finalised.`,
+  `Deleted ${slice.label} from ${slice.tables.join(', ')}. ` +
+    'The next read recomputes it through the two-phase path.',
 );
 console.log(
-  'The next read recomputes it. Trigger one now with /api/cron/revalidate, or just load the site.',
+  'Trigger one revalidate run now with the CRON_SECRET bearer token:',
 );
+console.log(
+  '  curl -X POST -H "Authorization: Bearer $CRON_SECRET" ' +
+    '<site>/api/cron/revalidate',
+);
+console.log('or just load the site.');

@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils';
 /**
  * Six here against `MobileNav`'s five: this rail has vertical room, so it
  * carries Profile as well and spells "Premier League" out in full where the
- * bottom bar has to say "Prem".
+ * bottom bar has to say "Prem". (Live is a standings tab while a gameweek is
+ * in flight, not a destination.)
  */
 const navigation = [
   { name: 'Standings', href: '/', icon: Trophy },

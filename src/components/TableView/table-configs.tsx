@@ -2,20 +2,10 @@ import React from 'react';
 import { TableColumn } from './base-table';
 import { PlayerDetails } from '@/interfaces/players';
 import type { LeagueEntryId } from '@/interfaces/fpl';
-import { STANDINGS_COLUMN_SHAPES } from '@/components/shapes';
+import { STANDINGS_COLUMN_SHAPES, rankBadgeClasses } from '@/components/shapes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowUp, ArrowDown, Eye, Minus } from 'lucide-react';
-
-// Utility function for rank badge styling
-export const getRankBadgeClasses = (rank: number): string => {
-  if (rank === 1)
-    return 'bg-yellow-400/20 text-yellow-400 border-yellow-400/30';
-  if (rank === 2) return 'bg-gray-300/20 text-gray-300 border-gray-300/30';
-  if (rank === 3) return 'bg-amber-600/20 text-amber-500 border-amber-600/30';
-  if (rank === 8) return 'bg-red-600/20 text-red-400 border-red-600/30';
-  return 'bg-white/10 text-white/70 border-white/20';
-};
 
 /**
  * A rank badge.
@@ -30,7 +20,7 @@ export const getRankBadgeClasses = (rank: number): string => {
 export const renderRankBadge = (rank: number) => (
   <Badge
     variant='outline'
-    className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border p-0 text-sm font-bold ${getRankBadgeClasses(rank)}`}
+    className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border p-0 text-sm font-bold ${rankBadgeClasses(rank)}`}
   >
     {rank}
   </Badge>

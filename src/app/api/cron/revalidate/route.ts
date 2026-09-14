@@ -3,14 +3,44 @@ import { timingSafeEqual } from 'node:crypto';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
-import type { DraftBootstrap } from '@/interfaces/fpl';
+import type {
+  DraftBootstrap,
+  ElementCode,
+  ElementId,
+  ElementStatus,
+  EntryId,
+  LeagueDetails,
+  LeagueEntryId,
+} from '@/interfaces/fpl';
 import { upsertElements } from '@/server/data/elements';
+import { getFinalisedGameweeks } from '@/server/data/gameweeks';
+import {
+  readDraftPicks,
+  readSnapshottedGameweeks,
+  seedDraftPicks,
+  storeOwnershipSnapshots,
+} from '@/server/data/lineage';
 import { upsertTeams } from '@/server/data/pl-teams';
-import { fplApi, getLeagueId, upstreamFetch } from '@/utils/fpl-api';
+import {
+  buildCodeByElement,
+  draftForGameweek,
+  snapshotDueGameweeks,
+  toDraftPickRows,
+  toOwnershipSnapshotRows,
+} from '@/utils/draft-lineage';
+import { getElementLookup } from '@/utils/draft-elements';
+import {
+  fetchUpstream,
+  fplApi,
+  getLeagueId,
+  upstreamFetch,
+} from '@/utils/fpl-api';
+import { fetchLeagueDetails } from '@/utils/league';
 import { toElementRows, toTeamRows } from '@/utils/reference-mapping';
 import { clearCache } from '@/utils/cache';
 import { computeSeasonUncached, getGameweekData } from '@/utils/gameweek-data';
-import { getSquads } from '@/utils/squads';
+import type { FinalisationGateReport } from '@/utils/gameweek-data';
+import { fetchDraftChoices, getSquads } from '@/utils/squads';
 import { getPremierLeagueTeams } from '@/utils/pl-teams';
 
 /**
@@ -41,9 +71,10 @@ import { getPremierLeagueTeams } from '@/utils/pl-teams';
  *
  * Checked against the `cachedRead` call sites rather than maintained by hand:
  * `gameweek-data.ts`, `squads.ts`, `draft-elements.ts`, `pl-teams.ts` and
- * `premier-league-data.ts`. A tag nobody registers is a silent no-op that reads
- * as coverage — and the reverse is worse: adding a `cachedRead` without adding
- * it here leaves a cache this job claims to clear and does not.
+ * `premier-league-data.ts`. A tag nobody registers is a silent no-op that
+ * reads as coverage — and the reverse is worse: adding a `cachedRead`
+ * without adding it here leaves a cache this job claims to clear and does
+ * not.
  *
  * The two Pulse caches are here for that invariant rather than out of need.
  * `premier-league` expires on its own every five minutes, well inside the
@@ -169,10 +200,33 @@ async function runSync(): Promise<StepResult[]> {
   // 500s must not cost us a finalised gameweek, and vice versa. `Promise.all`
   // is safe here only because `step` catches — it returns a failed `StepResult`
   // rather than rejecting, so neither branch can abort the other.
+  //
+  // `newlyFinalised` and `currentGameweek` are captured out of the finalise
+  // closure: the lineage step snapshots the newly stored weeks plus recent
+  // misses (see snapshotDueGameweeks), so it needs both, not just the
+  // display string.
+  let newlyFinalised: number[] = [];
+  let currentGameweek = 0;
+
   const [reference, finalisation] = await Promise.all([
     step('reference', syncReferenceTables),
-    step('finalise', finaliseGameweeks),
+    step('finalise', async () => {
+      const result = await finaliseGameweeks();
+      newlyFinalised = result.newlyStored;
+      currentGameweek = result.currentGameweek;
+      return result.detail;
+    }),
   ]);
+
+  // Sequential, after finalisation. Ownership snapshots must read the present —
+  // `element-status` reflects now, not the gameweek — so they cover the newly
+  // stored weeks plus recent misses inside the retry window: never pre-feature
+  // weeks, whose ownership is unrecoverable, and never the in-flight one. The
+  // draft seed lives here too, guarded on draft id. A failure fails only this
+  // step; reference and finalise still report honestly through `step`.
+  const lineage = await step('lineage', () =>
+    syncLineage(newlyFinalised, currentGameweek),
+  );
 
   // Expire, then clear, then warm. Both halves are easy to get wrong in ways
   // that report success:
@@ -234,7 +288,7 @@ async function runSync(): Promise<StepResult[]> {
     return summary;
   });
 
-  return [reference, finalisation, invalidate, warm];
+  return [reference, finalisation, lineage, invalidate, warm];
 }
 
 /**
@@ -357,25 +411,330 @@ async function attemptBootstrapFetch(): Promise<BootstrapAttempt> {
  * Write any newly finalised gameweek, by the robot rather than by whichever
  * visitor arrives first.
  *
- * `getGameweekData()` already does the work and already stores what it finds;
- * calling it here just moves *when*. A gameweek that produced no performances
- * is still not recorded, so it is retried next run — that rule lives in
- * `storeFinalisedGameweeks` and this route does not second-guess it.
+ * Two-phase since the 2026-08-21 incident: a gameweek that newly reads as
+ * final is held as a candidate and only written after a second agreeing read
+ * at least CANDIDATE_HOLD_SECONDS later, with draft shape-tripwire probes
+ * gating every write. So a genuinely finished gameweek is stored up to about
+ * one three hour cron cycle later than it settles, and the in-flight display
+ * covers the gap with provisional labelling. The detail below names every
+ * gameweek that was finalised, held for agreement, blocked by a probe, or
+ * dropped without a write; held and blocked weeks stay absent and are retried
+ * next run. A gameweek that produced no performances is still not recorded, so
+ * it is retried next run — that rule lives in `storeFinalisedGameweeks` and
+ * this route does not second-guess it.
+ *
+ * Returns the display detail plus the gameweeks this run newly stored, so the
+ * lineage step can snapshot exactly those. The outward `StepResult` shape is
+ * unchanged — `runSync` unwraps `detail` for the step.
  */
-async function finaliseGameweeks(): Promise<string> {
+async function finaliseGameweeks(): Promise<{
+  detail: string;
+  newlyStored: number[];
+  currentGameweek: number;
+}> {
+  // The before-image for the newly-stored diff below. A read failure here must
+  // not fail finalisation — it only means lineage snapshots nothing this run,
+  // which is the safe direction (absence over misattribution).
+  const before = await getFinalisedGameweeks().catch((error) => {
+    console.error(
+      '[cron] could not read finalised gameweeks before finalising; lineage will snapshot nothing.',
+      error,
+    );
+    return null;
+  });
+
   // Deliberately **not** `getGameweekData()`. That wrapper would answer from
   // the process-local map on a warm instance and return a count without doing
   // any work — reporting `ok: true` while the write this step exists for never
   // happened. Writing is the point, so it goes straight to the computation.
-  const season = await computeSeasonUncached();
+  const gate: FinalisationGateReport = {
+    finalised: [],
+    held: [],
+    blocked: [],
+    dropped: [],
+  };
+  const season = await computeSeasonUncached(gate);
 
-  const finalised = season.scoredGameweeks.filter(
-    (gameweek) => gameweek !== season.provisionalGameweek,
+  // finalised: confirmed by two agreeing reads and written. held: read as
+  // final but awaiting a second agreeing read (or scored data). blocked: a
+  // probe refused the write, with the failing probe names and payload
+  // evidence in the log. dropped: the candidate was removed without a write
+  // (decider reversal, or the week was already stored).
+  const parts = [`${gate.finalised.length} finalised gameweek(s)`];
+  parts.push(
+    gate.held.length > 0
+      ? `${gate.held.length} held (${gate.held.map((h) => `GW${h.gameweek}: ${h.reason}`).join(', ')})`
+      : '0 held',
+  );
+  parts.push(
+    gate.blocked.length > 0
+      ? `${gate.blocked.length} blocked (${gate.blocked.map((b) => `GW${b.gameweek}: ${b.probes.join('+')}`).join(', ')})`
+      : '0 blocked',
+  );
+  parts.push(
+    gate.dropped.length > 0
+      ? `${gate.dropped.length} dropped (${gate.dropped.map((gameweek) => `GW${gameweek}`).join(', ')})`
+      : '0 dropped',
   );
 
-  return season.provisionalGameweek
-    ? `${finalised.length} finalised gameweek(s), GW${season.provisionalGameweek} in flight`
-    : `${finalised.length} finalised gameweek(s)`;
+  if (season.provisionalGameweek) {
+    parts.push(`GW${season.provisionalGameweek} in flight`);
+  }
+
+  if (gate.blocked.length > 0) {
+    // A blocked write never persists, so this points at the log evidence, not
+    // at a repair: the undo below is for the opposite case, a write that
+    // should not have happened.
+    parts.push(
+      'blocked writes never persist (see the log evidence); reverse a bad write with scripts/forget-gameweek.mjs',
+    );
+  }
+
+  const detail = parts.join(', ');
+
+  // The diff, not the store's own return: `storeFinalisedGameweeks` reports
+  // every storable gameweek including ones already held, while snapshots must
+  // cover exactly what this run added — `onConflictDoNothing` means re-stored
+  // rows are not new facts.
+  const after = await getFinalisedGameweeks().catch((error) => {
+    console.error(
+      '[cron] could not read finalised gameweeks after finalising; lineage will snapshot nothing.',
+      error,
+    );
+    return null;
+  });
+
+  const newlyStored =
+    before && after
+      ? [...after]
+          .filter((gameweek) => !before.has(gameweek))
+          .sort((a, b) => a - b)
+      : [];
+
+  return { detail, newlyStored, currentGameweek: season.currentGameweek };
+}
+
+/**
+ * Persist the draft-to-waiver lineage: the frozen draft record and one
+ * ownership snapshot per due gameweek.
+ *
+ * Runs sequentially after finalisation in the same invocation, so "newly
+ * finalised" and "present ownership" are minutes apart at most. Everything
+ * throws into the `step` wrapper: a failed `element-status` read fails only
+ * this step while reference and finalise still report honestly.
+ */
+async function syncLineage(
+  newlyStored: number[],
+  currentGameweek: number,
+): Promise<string> {
+  const leagueId = getLeagueId();
+  const details = await fetchLeagueDetails(leagueId);
+  const lookup = await getElementLookup();
+
+  // Stable codes are the join key everywhere lineage persists. The lookup
+  // resolves them, and anything it cannot resolve is dropped by the mapping
+  // helpers rather than stored with a null code.
+  const codeOf = (element: ElementId): ElementCode | null =>
+    lookup.describe(element).code;
+
+  const seeded = await seedUnseededDrafts(details, codeOf, leagueId);
+
+  // Coverage beyond this run's diff: a coinciding lineage failure — the
+  // writes succeeded but the snapshots did not — leaves the next run an
+  // empty diff and, without this, a permanent gap. Stored-minus-snapshotted
+  // inside the retry window (see snapshotDueGameweeks) delays the snapshot
+  // instead of deleting it. Either coverage read failing falls back to the
+  // diff, which is today's behavior and always safe for fresh weeks.
+  const [finalised, snapshotted] = await Promise.all([
+    getFinalisedGameweeks().catch((error) => {
+      console.error(
+        '[cron] could not read finalised gameweeks for snapshot coverage; lineage covers this run only.',
+        error,
+      );
+      return null;
+    }),
+    readSnapshottedGameweeks().catch((error) => {
+      console.error(
+        '[cron] could not read snapshotted gameweeks for snapshot coverage; lineage covers this run only.',
+        error,
+      );
+      return null;
+    }),
+  ]);
+
+  const due =
+    finalised !== null && snapshotted !== null
+      ? snapshotDueGameweeks({
+          finalised: [...finalised],
+          snapshotted,
+          newlyStored,
+          currentGameweek,
+        })
+      : newlyStored;
+
+  const retried = due.filter((gameweek) => !newlyStored.includes(gameweek));
+
+  if (retried.length > 0) {
+    console.error(
+      `[cron] retrying ownership snapshots for GW${retried.join(', GW')} missed by an earlier run.`,
+    );
+  }
+
+  const snapshottedResult = await snapshotNewlyFinalised(
+    due,
+    details,
+    codeOf,
+    leagueId,
+  );
+
+  return `${seeded}; ${snapshottedResult}`;
+}
+
+/**
+ * Seed the frozen draft record, once per draft id.
+ *
+ * The guard keys on the upstream draft id, not on row count: a populated table
+ * is never re-synced, while a newly started draft (the GW24 re-draft) still
+ * seeds when its id appears. An empty choices response seeds nothing and
+ * deletes nothing — against a populated table that is the draft board surviving
+ * an upstream wipe; against an empty one the next run simply retries.
+ */
+async function seedUnseededDrafts(
+  details: LeagueDetails,
+  codeOf: (element: ElementId) => ElementCode | null,
+  leagueId: number,
+): Promise<string> {
+  const started = details.league.drafts.filter((draft) => draft.draft_started);
+
+  if (started.length === 0) return 'no started drafts to seed';
+
+  const stored = await readDraftPicks();
+  const seededIds = new Set(stored.map((pick) => pick.draftId));
+  const unseeded = started.filter((draft) => !seededIds.has(draft.id));
+
+  if (unseeded.length === 0) {
+    return `${started.length} started draft(s) already seeded`;
+  }
+
+  if (unseeded.length > 1) {
+    // Ambiguous, so refused: the choices endpoint is league-scoped, and with
+    // two unseeded drafts nothing says which draft the payload belongs to.
+    // The seed is first-write-wins permanent, so guessing wrong freezes one
+    // draft's record under the other's picks forever. An operator seeds by
+    // hand once the payload's draft is known; the drafts stay unseeded and
+    // retry (into this same refusal) until then.
+    console.error(
+      `[cron] ${unseeded.length} unseeded drafts ` +
+        `(${unseeded.map((draft) => `#${draft.id}@GW${draft.event}`).join(', ')}); ` +
+        'refusing to seed from one league-scoped choices payload.',
+    );
+
+    return `${unseeded.length} draft(s) left unseeded (ambiguous choices payload)`;
+  }
+
+  // Once: the choices endpoint is league scoped, not draft scoped, so every
+  // unseeded draft is attributed the same list.
+  const choices = await fetchDraftChoices(leagueId);
+
+  if (choices.length === 0) {
+    return `choices empty; ${unseeded.length} draft(s) left unseeded`;
+  }
+
+  const codeByElement = buildCodeByElement(
+    choices.map((choice) => choice.element),
+    codeOf,
+  );
+
+  let written = 0;
+
+  for (const draft of unseeded) {
+    const rows = toDraftPickRows(choices, {
+      leagueId,
+      draftId: draft.id,
+      draftEvent: draft.event,
+      codeByElement,
+    });
+
+    // Nothing resolvable (no codes): inserting an empty set would write
+    // nothing anyway, and the draft stays unseeded for the next run.
+    if (rows.length === 0) continue;
+
+    written += await seedDraftPicks(rows);
+  }
+
+  return `seeded ${written} pick(s) across ${unseeded.length} draft(s)`;
+}
+
+/**
+ * Snapshot ownership for exactly the gameweeks due one.
+ *
+ * `element-status` reflects the present, so snapshotting any other gameweek
+ * would misattribute it: older ones outside the retry window are
+ * unrecoverable and stay absent, and the in-flight one is never due. A
+ * gameweek no draft covers is unattributable rather than an error, so it is
+ * skipped and named.
+ */
+async function snapshotNewlyFinalised(
+  dueGameweeks: number[],
+  details: LeagueDetails,
+  codeOf: (element: ElementId) => ElementCode | null,
+  leagueId: number,
+): Promise<string> {
+  if (dueGameweeks.length === 0) {
+    return 'no gameweeks due to snapshot';
+  }
+
+  const attributable = dueGameweeks.filter((gameweek) => {
+    if (draftForGameweek(details.league.drafts, gameweek)) return true;
+
+    console.error(
+      `[cron] GW${gameweek} is finalised but no draft covers it; leaving it unsnapshotted.`,
+    );
+
+    return false;
+  });
+
+  if (attributable.length === 0) {
+    return 'no attributable gameweeks to snapshot';
+  }
+
+  const ownership = await fetchUpstream<{ element_status: ElementStatus[] }>(
+    fplApi.elementStatus(leagueId),
+  );
+
+  // One read, resolved once: every snapshotted gameweek shares the same
+  // present-tense ownership, which is exactly why only newly-finalised ones
+  // may be stored.
+  const codeByElement = buildCodeByElement(
+    ownership.element_status.map((status) => status.element),
+    codeOf,
+  );
+  const leagueEntryByEntry = new Map<EntryId, LeagueEntryId>(
+    details.league_entries.map((entry) => [entry.entry_id, entry.id]),
+  );
+
+  let stored = 0;
+
+  for (const gameweek of attributable) {
+    const rows = toOwnershipSnapshotRows(ownership.element_status, {
+      leagueId,
+      gameweek,
+      codeByElement,
+      leagueEntryByEntry,
+    });
+    stored += await storeOwnershipSnapshots(gameweek, rows);
+  }
+
+  // Zero rows stored for attributable gameweeks is a failure, not a quiet
+  // success: it means the ownership read was refused or nothing resolved,
+  // and reporting ok would retire the gameweeks from every future diff.
+  if (stored === 0) {
+    throw new Error(
+      `snapshotted 0 row(s) for GW${attributable.join(', GW')}; failing the step so it retries`,
+    );
+  }
+
+  return `snapshotted GW${attributable.join(', GW')} (${stored} row(s))`;
 }
 
 async function step(

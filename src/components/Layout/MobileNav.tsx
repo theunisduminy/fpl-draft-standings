@@ -6,17 +6,10 @@ import { Trophy, BarChart3, Beer, Users, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * **Five is the ceiling, and this is the fifth.** Do not add a sixth.
- *
- * At 375px the bar has ~339px of usable width, so five items are ~68px each —
- * enough for a 20px icon and a 10px label, and nothing spare. A sixth drops
- * each to ~56px, which is under the 44px tap target once the gaps are taken
- * out and narrower than the word "Standings" at any legible size.
- *
- * So the next destination after Premier League is not a nav change, it is an
- * information-architecture decision: either it belongs inside one of these
- * five, or this becomes four items and a "More" sheet. Squeezing a sixth in is
- * the one option that is already ruled out.
+ * **Five is the ceiling, and this is all five.** At 375px the bar has ~339px
+ * of usable width, so five items are ~68px each: a 20px icon and a 10px
+ * label, and nothing spare. (Live used to be a sixth here; it is now a
+ * standings tab while a gameweek is in flight.) Do not add a sixth.
  *
  * "Prem" rather than "Premier League" for the same reason — it is the longest
  * label the slot takes. `SideNav` has the room and spells it out.

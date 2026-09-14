@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgTable,
   primaryKey,
@@ -259,11 +260,167 @@ export const plTeams = pgTable(
   (table) => [primaryKey({ columns: [table.leagueId, table.code] })],
 );
 
+/**
+ * Who owned whom when each gameweek settled.
+ *
+ * **Immutable facts, written once.** A snapshot row records what
+ * `element-status` said in the cron run that finalised its gameweek, and
+ * first write wins (`onConflictDoNothing`): re-reading present ownership
+ * against an old gameweek would misattribute, so only newly finalised
+ * gameweeks are ever snapshotted and a stored row is never re-synced.
+ * Gameweeks finalised before this feature launched stay absent rather than
+ * reconstructed — `element-status` only reflects the present.
+ *
+ * Keyed by the stable `element_code`, never the season-minted `element_id`,
+ * so a row still names the right footballer next August. The scoped ids ride
+ * along as audit columns: `element_id` is what `element-status` actually
+ * handed over, and the owner is stored twice — the `entry_id` upstream gave
+ * (`owner_entry`, null for a free agent) plus the `league_entry` resolved
+ * against the same run's entries list (`owner_league_entry`) — so a past
+ * owner answers without any upstream call, entries list included.
+ */
+export const ownershipSnapshots = pgTable(
+  'ownership_snapshots',
+  {
+    /**
+     * The season, identified by its league. Both the element id and the
+     * owner ids below are re-minted every August — see `league_members` —
+     * so without this column last season's rows would answer this season's
+     * questions, with other footballers and other managers.
+     */
+    leagueId: integer('league_id').notNull(),
+    gameweek: integer('gameweek').notNull(),
+    /** `elements[].code` — the season-stable identity. See `ElementCode`. */
+    elementCode: integer('element_code').notNull(),
+    /**
+     * `element_status[].element` from the **draft** API. Season-scoped, which
+     * is exactly why it sits beside `league_id` and never keys the row.
+     */
+    elementId: integer('element_id').notNull(),
+    /**
+     * `element_status[].owner` — an `entry_id`, **not** a `league_entry`.
+     * Null means the element was a free agent, which is a fact, not a gap.
+     */
+    ownerEntry: integer('owner_entry'),
+    /**
+     * The owner's `league_entries[].id`, resolved against the same run's
+     * league details. Null for a free agent, and for an owner the entries
+     * list did not name — where the row keeps `owner_entry` and resolves
+     * nothing rather than dropping the fact.
+     */
+    ownerLeagueEntry: integer('owner_league_entry'),
+    recordedAt: timestamp('recorded_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.leagueId, table.gameweek, table.elementCode],
+    }),
+  ],
+);
+
+/**
+ * The frozen draft record: every pick of every draft, as chosen.
+ *
+ * **A record, never re-synced.** Seeded once per draft id from the choices
+ * endpoint while the table holds no rows for that draft; a populated table
+ * is never written again, and an empty choices response against one keeps
+ * the table — that is the point, the board renders from here after upstream
+ * wipes the endpoint. Keyed by the upstream draft id alongside the draft
+ * `event`, with `league_id` keeping both season-scoped values safe.
+ *
+ * Joins key on stable `element_code`, with the season-scoped `element_id`
+ * and `entry` retained as audit columns, following the `draft_elements`
+ * precedent of carrying both.
+ */
+export const draftPicks = pgTable(
+  'draft_picks',
+  {
+    /** The season, identified by its league. See `ownershipSnapshots`. */
+    leagueId: integer('league_id').notNull(),
+    /** `drafts[].id` upstream — which draft this pick belongs to. */
+    draftId: integer('draft_id').notNull(),
+    /** `choices[].index` — the pick's position in its draft. */
+    draftIndex: integer('draft_index').notNull(),
+    /** `drafts[].event` — the gameweek the draft belongs to. */
+    draftEvent: integer('draft_event').notNull(),
+    round: integer('round').notNull(),
+    pick: integer('pick').notNull(),
+    /** `choices[].entry` — an `entry_id`, not a `league_entry`. */
+    entry: integer('entry').notNull(),
+    /** `choices[].element` from the draft API. Season-scoped; audit only. */
+    elementId: integer('element_id').notNull(),
+    /** `elements[].code` — the season-stable identity. The join key. */
+    elementCode: integer('element_code').notNull(),
+    wasAuto: boolean('was_auto').notNull(),
+    /** Null when upstream sends null; stored as-is for the later views. */
+    secondsToPick: integer('seconds_to_pick'),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.leagueId, table.draftId, table.draftIndex],
+    }),
+  ],
+);
+
 export type GameweekScoreRow = typeof gameweekScores.$inferSelect;
 export type NewGameweekScoreRow = typeof gameweekScores.$inferInsert;
+
+/**
+ * Gameweeks held as finalisation candidates, waiting for a second agreeing read.
+ *
+ * Ephemeral proposal state, not facts: a row here claims only that one read
+ * found the gameweek finished, and it is deleted on confirm or drop — never
+ * promoted in place. It holds no scores and no derived values, so it stays on
+ * the persistence line's safe side.
+ *
+ * Why it exists: GW1 of 2026/27 was stored from a single agreeing-but-wrong
+ * read (unscored live feed shaped like a scored one) and, the insert being
+ * `onConflictDoNothing`, stayed wrong for three days. A candidate is written
+ * only after two consecutive reads agree on identical content across a cron
+ * boundary, which instance memory cannot prove — hence a row, keyed like every
+ * other gameweek fact by (league_id, gameweek).
+ */
+export const finalisationCandidates = pgTable(
+  'finalisation_candidates',
+  {
+    leagueId: integer('league_id').notNull(),
+    gameweek: integer('gameweek').notNull(),
+    /**
+     * Stable serialisation of the scored content the first read saw. The
+     * confirming read must reproduce it exactly; a differing payload resets
+     * the row instead of confirming.
+     */
+    fingerprint: text('fingerprint').notNull(),
+    /** When the candidate was first recorded. The hold interval counts from here. */
+    firstSeen: timestamp('first_seen', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** When the candidate was last re-observed, so stale rows stay visible. */
+    lastChecked: timestamp('last_checked', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /**
+     * Why the write is currently refused, truncated to 500 characters. Null
+     * while the candidate is merely held for its second read.
+     */
+    blockReason: text('block_reason'),
+  },
+  (table) => [primaryKey({ columns: [table.leagueId, table.gameweek] })],
+);
+
+export type FinalisationCandidateRow =
+  typeof finalisationCandidates.$inferSelect;
+export type NewFinalisationCandidateRow =
+  typeof finalisationCandidates.$inferInsert;
 export type LeagueMemberRow = typeof leagueMembers.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;
 export type DraftElementRow = typeof draftElements.$inferSelect;
 export type NewDraftElementRow = typeof draftElements.$inferInsert;
 export type PlTeamRow = typeof plTeams.$inferSelect;
 export type NewPlTeamRow = typeof plTeams.$inferInsert;
+export type OwnershipSnapshotRow = typeof ownershipSnapshots.$inferSelect;
+export type NewOwnershipSnapshotRow = typeof ownershipSnapshots.$inferInsert;
+export type DraftPickRow = typeof draftPicks.$inferSelect;
+export type NewDraftPickRow = typeof draftPicks.$inferInsert;

@@ -1,7 +1,7 @@
 'use client';
 import { Trophy, LineChart, Swords } from 'lucide-react';
 
-import { SectionTabs } from '@/components/SectionTabs';
+import { SectionTabs, type SectionTab } from '@/components/SectionTabs';
 import StandingsTable from './StandingsTable';
 import SeasonInsights from './SeasonInsights';
 import RivalsInsights from './RivalsInsights';
@@ -35,44 +35,41 @@ export function StandingsTabs({
   data: GameweekDataResponse;
   snapshots: SeasonSnapshot[];
 } & StandingsContext) {
-  return (
-    <SectionTabs
-      defaultValue='standings'
-      tabs={[
-        {
-          value: 'standings',
-          label: 'Standings',
-          icon: Trophy,
-          // The ledger sits with the board rather than with the charts: it is
-          // six answers, not a thing to study, and the tab someone lands on is
-          // where answers belong.
-          className: 'space-y-4',
-          content: (
-            <>
-              <StandingsTable players={data.players} movement={movement} />
-              <LeagueLedger
-                players={data.players}
-                performances={data.gameweekPerformances}
-              />
-            </>
-          ),
-        },
-        {
-          value: 'season',
-          label: 'Season',
-          icon: LineChart,
-          content: <SeasonInsights data={data} snapshots={snapshots} />,
-        },
-        // Season is the story over time; rivals is the season collapsed into
-        // comparisons. Splitting them keeps either tab to three cards, which is
-        // roughly a screen — six on one tab was a scroll nobody would finish.
-        {
-          value: 'rivals',
-          label: 'Rivals',
-          icon: Swords,
-          content: <RivalsInsights data={data} />,
-        },
-      ]}
-    />
-  );
+  const tabs: SectionTab[] = [
+    {
+      value: 'standings',
+      label: 'Standings',
+      icon: Trophy,
+      // The ledger sits with the board rather than with the charts: it is
+      // six answers, not a thing to study, and the tab someone lands on is
+      // where answers belong.
+      className: 'space-y-4',
+      content: (
+        <>
+          <StandingsTable players={data.players} movement={movement} />
+          <LeagueLedger
+            players={data.players}
+            performances={data.gameweekPerformances}
+          />
+        </>
+      ),
+    },
+    {
+      value: 'season',
+      label: 'Season',
+      icon: LineChart,
+      content: <SeasonInsights data={data} snapshots={snapshots} />,
+    },
+    // Season is the story over time; rivals is the season collapsed into
+    // comparisons. Splitting them keeps either tab to three cards, which is
+    // roughly a screen — six on one tab was a scroll nobody would finish.
+    {
+      value: 'rivals',
+      label: 'Rivals',
+      icon: Swords,
+      content: <RivalsInsights data={data} />,
+    },
+  ];
+
+  return <SectionTabs defaultValue='standings' tabs={tabs} />;
 }

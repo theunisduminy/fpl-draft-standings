@@ -34,6 +34,18 @@ export interface ColumnShape {
 }
 
 /**
+ * The indexes hidden below `md`, for a skeleton that works in positions.
+ *
+ * One derivation for every column list, so the board and its placeholder
+ * cannot disagree about which columns a phone hides.
+ */
+function hiddenBelowMdIndexes(shapes: ColumnShape[]): number[] {
+  return shapes.flatMap((column, index) =>
+    column.hideBelow === 'md' ? [index] : [],
+  );
+}
+
+/**
  * The standings board's five columns, in order: manager, team, move, F1,
  * points.
  *
@@ -56,9 +68,27 @@ export const STANDINGS_COLUMN_SHAPES: ColumnShape[] = [
 ];
 
 /** The indexes a phone hides, for a skeleton that works in positions. */
-export const STANDINGS_HIDDEN_BELOW_MD = STANDINGS_COLUMN_SHAPES.flatMap(
-  (column, index) => (column.hideBelow === 'md' ? [index] : []),
+export const STANDINGS_HIDDEN_BELOW_MD = hiddenBelowMdIndexes(
+  STANDINGS_COLUMN_SHAPES,
 );
+
+/**
+ * The league's rank palette, first through eighth.
+ *
+ * Lives here rather than in `table-configs.tsx`: that module sits beside a
+ * `'use client'` table and pulls the button primitive with it, which is
+ * exactly the drag this file exists to stop. A pure function of string
+ * literals, so Tailwind still sees every class and the standings board keeps
+ * no copy of its own.
+ */
+export function rankBadgeClasses(rank: number): string {
+  if (rank === 1)
+    return 'bg-yellow-400/20 text-yellow-400 border-yellow-400/30';
+  if (rank === 2) return 'bg-gray-300/20 text-gray-300 border-gray-300/30';
+  if (rank === 3) return 'bg-amber-600/20 text-amber-500 border-amber-600/30';
+  if (rank === 8) return 'bg-red-600/20 text-red-400 border-red-600/30';
+  return 'bg-white/10 text-white/70 border-white/20';
+}
 
 /**
  * The row grammar the standings cards share.

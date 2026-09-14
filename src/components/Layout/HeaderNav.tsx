@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 /**
  * The same five as `MobileNav`, in the same order. This strip only shows at
  * `md`, where there is room for the full name rather than the bar's "Prem".
+ * (Live is a standings tab while a gameweek is in flight, not a destination.)
  */
 const navigation = [
   { name: 'Standings', href: '/' },

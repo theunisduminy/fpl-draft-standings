@@ -13,7 +13,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // Scripts carry pure, tested validation beside the script itself (see
+    // scripts/forget-gameweek.lib.test.ts), so the runner covers them too.
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
   },
   resolve: {
     alias: {

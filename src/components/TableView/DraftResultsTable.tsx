@@ -8,7 +8,6 @@ import { GameweekSelector } from '@/components/GameweekSelector';
 import { useViewTeam, ViewTeamDrawer } from './ViewTeamDrawer';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 import { TrendingUp, TrendingDown, BarChart3, Minus } from 'lucide-react';
 
 export default function DraftResultsTable({
@@ -52,8 +51,8 @@ export default function DraftResultsTable({
 
     // No `finished` filter. The gameweek in progress is the one worth looking
     // at on a Sunday, and hiding it left this table showing last week while the
-    // standings above it had already moved on. `isProvisional` below is how the
-    // reader is told the difference.
+    // standings above it had already moved on. The summary title's "so far"
+    // below is how the reader is told the difference.
     const gameweekResults = data.gameweekPerformances
       .filter((gw) => gw.event === activeGameweek)
       .sort((a, b) => a.rank - b.rank);
@@ -143,7 +142,12 @@ export default function DraftResultsTable({
         onSelectGameweek={selectGameweek}
       />
 
-      {isProvisional && <LiveGameweekBadge gameweek={activeGameweek} />}
+      {isProvisional && (
+        <p className='text-sm text-muted-foreground'>
+          Gameweek {activeGameweek} is still being played — these positions are
+          provisional and will change.
+        </p>
+      )}
 
       <BaseTable
         title=''
