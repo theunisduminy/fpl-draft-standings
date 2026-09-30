@@ -22,31 +22,31 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
   const statItems = [
     {
       icon: <Trophy className='h-5 w-5 text-yellow-400' />,
-      label: 'F1 Score',
+      label: 'F1 score',
       value: player.f1_score || 0,
       color: 'text-yellow-400',
     },
     {
       icon: <Target className='h-5 w-5 text-[#00edfd]' />,
-      label: 'F1 Ranking',
+      label: 'F1 ranking',
       value: `#${player.f1_ranking || 'N/A'}`,
       color: 'text-[#00edfd]',
     },
     {
       icon: <Zap className='h-5 w-5 text-[#75fa95]' />,
-      label: 'Avg. Points',
+      label: 'Average points',
       value: stats.averagePoints,
       color: 'text-[#75fa95]',
     },
     {
       icon: <Award className='h-5 w-5 text-emerald-400' />,
-      label: 'Best GW',
+      label: 'Best gameweek',
       value: `GW${stats.bestGameweek.gameweek}: ${stats.bestGameweek.points}pts`,
       color: 'text-emerald-400',
     },
     {
       icon: <Frown className='h-5 w-5 text-red-400' />,
-      label: 'Worst GW',
+      label: 'Worst gameweek',
       value: `GW${stats.worstGameweek.gameweek}: ${stats.worstGameweek.points}pts`,
       color: 'text-red-400',
     },
@@ -58,7 +58,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
     },
     {
       icon: <BarChart3 className='h-5 w-5 text-purple-400' />,
-      label: 'Total Points',
+      label: 'Total points',
       value: stats.totalPoints,
       color: 'text-purple-400',
     },
@@ -68,7 +68,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
     <Card className='h-full border-white/10 bg-[#2a0d33]'>
       <CardHeader className='pb-3'>
         <CardTitle className='text-base text-white md:text-lg'>
-          Player Stats
+          Player stats
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -76,13 +76,15 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
           {statItems.map((item) => (
             <div
               key={item.label}
-              className='rounded-lg bg-[#1a0520] p-3 transition-colors hover:bg-[#1a0520]/80'
+              className='rounded-md bg-[#1a0520] p-3 transition-colors hover:bg-[#1a0520]/80'
             >
               <div className='mb-2 flex items-center gap-2'>
                 {item.icon}
                 <p className='text-xs text-white/50'>{item.label}</p>
               </div>
-              <p className={`text-sm font-bold md:text-base ${item.color}`}>
+              <p
+                className={`text-sm font-bold tabular-nums md:text-base ${item.color}`}
+              >
                 {item.value}
               </p>
             </div>

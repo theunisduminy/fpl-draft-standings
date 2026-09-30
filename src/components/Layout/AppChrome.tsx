@@ -18,6 +18,12 @@ import { SideNav } from '@/components/Layout/SideNav';
 export function AppChrome({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <a
+        href='#main-content'
+        className='sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground'
+      >
+        Skip to main content
+      </a>
       {/* Three navigation surfaces, each owning one breakpoint band:
           HeaderNav is the brand bar below `lg` and carries Profile at every
           width it is on screen, MobileNav the bottom bar below `md`, and
@@ -28,7 +34,10 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
       {/* `pb-24` below `md` clears `MobileNav`: 64px of bar plus its padding.
           The bar sits flush on the bottom edge and carries the iOS safe-area
           inset itself, so nothing extra is owed here. */}
-      <main className='flex-1 pt-4 pb-24 md:pt-8 md:pb-8 lg:pt-4 lg:pl-64'>
+      <main
+        id='main-content'
+        className='flex-1 pt-4 pb-24 md:pt-8 md:pb-8 lg:pt-4 lg:pl-64'
+      >
         <div className='mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'>
           {children}
         </div>

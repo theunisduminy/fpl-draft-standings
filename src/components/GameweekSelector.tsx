@@ -76,6 +76,9 @@ export function GameweekSelector({
 
   return (
     <div className='w-full'>
+      <p aria-live='polite' className='sr-only'>
+        Showing gameweek {selectedGameweek} of {gameweeks.length}
+      </p>
       <ScrollArea className='w-full rounded-lg whitespace-nowrap'>
         <ToggleGroup
           type='single'
@@ -91,7 +94,7 @@ export function GameweekSelector({
               key={gameweek}
               ref={gameweek === selectedGameweek ? selectedRef : undefined}
               value={String(gameweek)}
-              className='min-w-[70px] rounded-lg border border-white/20 bg-[#2a0d33] px-3 py-2 text-xs font-semibold text-white transition-all hover:border-[#00edfd]/50 hover:bg-[#3d1a4d] hover:text-[#00edfd] data-[state=on]:border-[#00edfd] data-[state=on]:bg-[#00edfd]/20 data-[state=on]:text-[#00edfd] md:text-sm'
+              className='min-h-11 min-w-[70px] rounded-lg border border-white/20 bg-[#2a0d33] px-3 py-2 text-xs font-semibold text-white tabular-nums transition-colors duration-150 hover:border-[#00edfd]/50 hover:bg-[#3d1a4d] hover:text-[#00edfd] data-[state=on]:border-[#00edfd] data-[state=on]:bg-[#00edfd]/20 data-[state=on]:text-[#00edfd] md:text-sm'
             >
               GW {gameweek}
             </ToggleGroupItem>

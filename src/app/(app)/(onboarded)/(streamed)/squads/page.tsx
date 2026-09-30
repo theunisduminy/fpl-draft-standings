@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 // Heading above the boundary, skeleton below — see `src/app/(app)/(onboarded)/(home)/page.tsx`.
 export default function SquadsPage() {
   return (
-    <PageShell title='Squads' subtitle='Who drafted whom'>
+    <PageShell title='Squads' subtitle='Who drafted whom.'>
       <Suspense
         fallback={
           <SkeletonRegion>
@@ -48,13 +48,13 @@ async function Squads() {
   }
 
   return (
-    <>
+    <div className='space-y-4'>
       <SquadPicker squads={squads} initialLeagueEntry={user?.leagueEntry} />
 
-      <p className='text-xs text-white/30'>
-        {freeAgentCount} players unowned. Ownership is live: it follows trades
-        and waivers, so it will drift from the draft as the season runs.
+      <p className='text-xs text-muted-foreground'>
+        {freeAgentCount} players unowned. Ownership is live and follows trades
+        and waivers, so squads change after the draft.
       </p>
-    </>
+    </div>
   );
 }

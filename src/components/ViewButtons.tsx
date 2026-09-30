@@ -30,7 +30,7 @@ export default function ViewButtons({
         <ToggleGroupItem
           key={option.value}
           value={option.value}
-          className='rounded-lg border border-white/20 bg-[#2a0d33] px-4 py-2 text-sm font-medium text-white/70 transition-all hover:border-[#00edfd]/50 hover:bg-[#3d1a4d] hover:text-white data-[state=on]:border-[#00edfd] data-[state=on]:bg-[#00edfd]/20 data-[state=on]:text-[#00edfd]'
+          className='min-h-11 rounded-lg border border-white/20 bg-[#2a0d33] px-4 py-2 text-sm font-medium text-white/70 transition-colors duration-150 hover:border-[#00edfd]/50 hover:bg-[#3d1a4d] hover:text-white data-[state=on]:border-[#00edfd] data-[state=on]:bg-[#00edfd]/20 data-[state=on]:text-[#00edfd]'
         >
           {option.label}
         </ToggleGroupItem>

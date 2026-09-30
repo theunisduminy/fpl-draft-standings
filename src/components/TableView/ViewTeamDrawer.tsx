@@ -4,12 +4,15 @@ import { useState, useTransition } from 'react';
 
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -106,13 +109,23 @@ export function ViewTeamDrawer({ view }: { view: ViewTeam }) {
       direction={isDesktop ? 'right' : 'bottom'}
     >
       <DrawerContent className='border-white/10 bg-[#1a0520] md:max-h-none'>
-        <DrawerHeader className='border-b border-white/10 px-6 pt-2 pb-4 text-left md:pt-4'>
+        <DrawerHeader className='relative border-b border-white/10 px-6 pt-2 pb-4 text-left md:pt-4'>
           <DrawerTitle className='text-white'>
             {view.target?.playerName ?? 'Team sheet'}
           </DrawerTitle>
           <DrawerDescription className='text-white/60'>
             Gameweek {view.gameweek} team sheet
           </DrawerDescription>
+          <DrawerClose asChild>
+            <Button
+              variant='ghost'
+              size='icon'
+              aria-label='Close team sheet'
+              className='absolute top-2 right-4 h-8 w-8 text-white/60 hover:text-white focus-visible:ring-2 focus-visible:ring-ring'
+            >
+              <X className='h-4 w-4' />
+            </Button>
+          </DrawerClose>
         </DrawerHeader>
 
         {/* A plain scroll container, not a Radix `ScrollArea`. The primitive
@@ -152,14 +165,18 @@ function Body({ view }: { view: ViewTeam }) {
 
   return (
     <>
-      <div className='flex items-center justify-between rounded-lg bg-white/5 p-3'>
+      <div className='flex items-center justify-between rounded-md bg-white/5 p-3'>
         <div>
           <p className='text-xs text-white/50'>Starting XI</p>
-          <p className='text-lg font-bold text-white'>{total} pts</p>
+          <p className='text-lg font-bold text-white tabular-nums'>
+            {total} pts
+          </p>
         </div>
         <div className='text-right'>
-          <p className='text-xs text-white/50'>On the bench</p>
-          <p className='text-lg font-bold text-white/60'>{benchTotal} pts</p>
+          <p className='text-xs text-white/50'>Bench</p>
+          <p className='text-lg font-bold text-white/60 tabular-nums'>
+            {benchTotal} pts
+          </p>
         </div>
       </div>
 
@@ -216,7 +233,7 @@ function SquadList({
             </div>
             <span
               className={cn(
-                'shrink-0 text-sm font-bold',
+                'shrink-0 text-sm font-bold tabular-nums',
                 muted ? 'text-white/40' : 'text-white',
               )}
             >

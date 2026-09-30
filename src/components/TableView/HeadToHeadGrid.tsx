@@ -106,20 +106,30 @@ export function HeadToHeadGrid({
   return (
     <ChartCard
       title='Head to head'
-      caption='Gameweeks each manager has outscored each other, won to drawn to lost'
+      caption='Gameweeks each manager has outscored each other: won, drawn, lost'
     >
       <CellTooltipProvider>
         {/* No horizontal padding on the scroll container: `left-0` pins to its
             content edge, so padding here would leave a gap the columns slide
             through beside the frozen name. */}
-        <div className='overflow-x-auto'>
-          <div className='w-max space-y-1.5 lg:w-full'>
-            <div className='flex items-end'>
+        <div
+          className='relative overflow-x-auto'
+          role='region'
+          aria-label='Scroll sideways for all managers'
+          tabIndex={0}
+        >
+          <div
+            className='w-max space-y-1.5 lg:w-full'
+            role='table'
+            aria-label='Head to head results'
+          >
+            <div className='flex items-end' role='row'>
               <span className={H2H_GUTTER} aria-hidden />
               <div className='flex gap-1 lg:flex-1'>
                 {columns.map((entry) => (
                   <CellTooltip key={entry} label={nameFor(names, entry)}>
                     <span
+                      role='columnheader'
                       className={cn(
                         H2H_CELL,
                         'truncate text-center text-[10px] whitespace-nowrap text-muted-foreground md:text-xs',
@@ -138,10 +148,17 @@ export function HeadToHeadGrid({
               );
 
               return (
-                <div key={row.league_entry} className='flex items-center'>
+                <div
+                  key={row.league_entry}
+                  className='flex items-center'
+                  role='row'
+                >
                   {/* Pinned, and opaque: the cells scroll underneath it. */}
                   <span className={H2H_GUTTER}>
-                    <span className='truncate text-xs font-medium text-muted-foreground md:text-sm'>
+                    <span
+                      className='truncate text-xs font-medium text-muted-foreground md:text-sm'
+                      role='rowheader'
+                    >
                       {nameFor(names, row.league_entry)}
                     </span>
                   </span>
@@ -155,6 +172,7 @@ export function HeadToHeadGrid({
                         return (
                           <span
                             key={opponent}
+                            role='cell'
                             className={cn(
                               H2H_CELL,
                               'h-8 rounded-md border border-dashed border-border/60 md:h-9',
@@ -174,6 +192,7 @@ export function HeadToHeadGrid({
                           } lost`}
                         >
                           <span
+                            role='cell'
                             className={cn(
                               H2H_CELL,
                               'flex h-8 items-center justify-center rounded-md text-[10px] font-semibold whitespace-nowrap text-foreground tabular-nums md:h-9 md:text-xs',
@@ -196,6 +215,11 @@ export function HeadToHeadGrid({
               );
             })}
           </div>
+          {/* Edge fade: the cue that the grid continues sideways. */}
+          <span
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent'
+          />
         </div>
       </CellTooltipProvider>
     </ChartCard>

@@ -15,11 +15,11 @@ import type { Squad, SquadPlayer } from '@/utils/squads';
  * than an unstyled badge in the UI.
  */
 const POSITION_CLASSES: Record<Position, string> = {
-  GKP: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
-  DEF: 'border-[#00edfd]/30 bg-[#00edfd]/10 text-[#00edfd]',
-  MID: 'border-[#75fa95]/30 bg-[#75fa95]/10 text-[#75fa95]',
-  FWD: 'border-rose-400/30 bg-rose-400/10 text-rose-300',
-  UNK: 'border-white/20 bg-white/5 text-white/60',
+  GKP: 'border-rank-3/30 bg-rank-3/10 text-rank-3',
+  DEF: 'border-primary/30 bg-primary/10 text-primary',
+  MID: 'border-positive/30 bg-positive/10 text-positive',
+  FWD: 'border-negative/30 bg-negative/10 text-negative',
+  UNK: 'border-border bg-muted text-muted-foreground',
 };
 
 export function SquadCard({ squad }: { squad: Squad }) {
@@ -28,12 +28,15 @@ export function SquadCard({ squad }: { squad: Squad }) {
       <CardHeader className='pb-3'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0'>
-            <CardTitle className='truncate text-base text-white md:text-lg'>
+            <CardTitle
+              className='truncate text-base text-white md:text-lg'
+              title={squad.teamName}
+            >
               {squad.teamName}
             </CardTitle>
             <Link
               href={`/players/${squad.leagueEntry}`}
-              className='text-sm text-white/50 transition-colors hover:text-[#00edfd]'
+              className='rounded-sm text-sm text-white/50 transition-colors hover:text-[#00edfd] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none'
             >
               {squad.managerName}
             </Link>
@@ -80,7 +83,10 @@ function PlayerRow({ player }: { player: SquadPlayer }) {
         {player.position}
       </Badge>
 
-      <p className='min-w-0 flex-1 truncate text-sm font-medium text-white'>
+      <p
+        className='min-w-0 flex-1 truncate text-sm font-medium text-white'
+        title={player.name}
+      >
         {player.name}
       </p>
 
@@ -94,7 +100,9 @@ function PlayerRow({ player }: { player: SquadPlayer }) {
             className='h-4 w-4'
           />
         )}
-        {player.club}
+        <span className='min-w-0 truncate' title={player.club}>
+          {player.club}
+        </span>
       </span>
 
       <span className='shrink-0 text-sm font-bold text-white tabular-nums'>

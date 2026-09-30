@@ -18,8 +18,8 @@
   --popover-foreground: 0 0% 100%;
   --primary: 186 100% 50%;
   --primary-foreground: 280 80% 12%;
-  --secondary: 170 90% 45%;
-  --secondary-foreground: 280 80% 12%;
+  --secondary: 262 70% 60%;
+  --secondary-foreground: 0 0% 100%;
   --muted: 280 30% 20%;
   --muted-foreground: 210 20% 70%;
   --accent: 186 100% 50%;
@@ -35,10 +35,19 @@
   --border: 280 30% 22%;
   --input: 280 30% 22%;
   --ring: 186 100% 50%;
+  --rank-1: 48 96% 53%;
+  --rank-2: 220 14% 84%;
+  --rank-3: 38 92% 50%;
+  --rank-4: 217 91% 60%;
+  --rank-5: 142 69% 58%;
+  --rank-6: 27 96% 61%;
+  --rank-7: 270 95% 75%;
+  --rank-8: 0 91% 71%;
+  --rank-ink: 288 73% 7%;
   --radius: 0.75rem;
   --chart-1: 170 90% 55%;
-  --chart-2: 186 100% 50%;
-  --chart-3: 280 80% 20%;
+  --chart-2: 210 90% 60%;
+  --chart-3: 280 70% 65%;
   --chart-4: 43 90% 60%;
   --chart-5: 0 70% 55%;
 }
@@ -52,8 +61,8 @@
   --popover-foreground: 0 0% 100%;
   --primary: 186 100% 50%;
   --primary-foreground: 280 80% 12%;
-  --secondary: 170 90% 45%;
-  --secondary-foreground: 280 80% 12%;
+  --secondary: 262 70% 60%;
+  --secondary-foreground: 0 0% 100%;
   --muted: 280 30% 18%;
   --muted-foreground: 210 20% 60%;
   --accent: 186 100% 50%;
@@ -65,9 +74,18 @@
   --border: 280 30% 18%;
   --input: 280 30% 18%;
   --ring: 186 100% 50%;
+  --rank-1: 48 96% 53%;
+  --rank-2: 220 14% 84%;
+  --rank-3: 38 92% 50%;
+  --rank-4: 217 91% 60%;
+  --rank-5: 142 69% 58%;
+  --rank-6: 27 96% 61%;
+  --rank-7: 270 95% 75%;
+  --rank-8: 0 91% 71%;
+  --rank-ink: 288 73% 7%;
   --chart-1: 170 90% 55%;
-  --chart-2: 186 100% 50%;
-  --chart-3: 280 80% 25%;
+  --chart-2: 210 90% 60%;
+  --chart-3: 280 70% 65%;
   --chart-4: 43 90% 60%;
   --chart-5: 0 70% 55%;
 }
@@ -143,20 +161,36 @@
      two encode a magnitude and a balance, and are ramps. This is an identity
      palette — eight positions a reader tells apart, not eight degrees of one
      thing. */
-  --color-rank-1: #facc15;
-  --color-rank-2: #d1d5db;
-  --color-rank-3: #f59e0b;
-  --color-rank-4: #60a5fa;
-  --color-rank-5: #4ade80;
-  --color-rank-6: #fb923c;
-  --color-rank-7: #c084fc;
-  --color-rank-8: #f87171;
-  --color-rank-ink: #1a0520;
+  --color-rank-1: hsl(var(--rank-1));
+  --color-rank-2: hsl(var(--rank-2));
+  --color-rank-3: hsl(var(--rank-3));
+  --color-rank-4: hsl(var(--rank-4));
+  --color-rank-5: hsl(var(--rank-5));
+  --color-rank-6: hsl(var(--rank-6));
+  --color-rank-7: hsl(var(--rank-7));
+  --color-rank-8: hsl(var(--rank-8));
+  --color-rank-ink: hsl(var(--rank-ink));
+
+  /* Categorical series palette, for identity rather than magnitude. Hues sit
+     in the gaps the rank set leaves alone: lime 65 and 100 clear of amber 38
+     and green 142, teal 165 and cyan 185 clear of green 142 and blue 217,
+     indigo 240 between blue 217 and purple 270, then magenta 295, pink 315
+     and rose 335 above purple 270 and clear of red 0. Nothing here lands
+     within 15 degrees of a rank hue, so a series colour never reads as a
+     finishing position. */
+  --color-series-1: hsl(65 70% 60%);
+  --color-series-2: hsl(100 65% 60%);
+  --color-series-3: hsl(165 70% 55%);
+  --color-series-4: hsl(185 90% 55%);
+  --color-series-5: hsl(240 70% 70%);
+  --color-series-6: hsl(295 70% 68%);
+  --color-series-7: hsl(315 75% 65%);
+  --color-series-8: hsl(335 80% 65%);
 
   --color-versus-strong: hsl(var(--positive) / 0.8);
-  --color-versus-good: hsl(var(--positive) / 0.38);
+  --color-versus-good: hsl(var(--positive) / 0.55);
   --color-versus-even: hsl(var(--muted) / 0.5);
-  --color-versus-poor: hsl(var(--negative) / 0.38);
+  --color-versus-poor: hsl(var(--negative) / 0.55);
   --color-versus-weak: hsl(var(--negative) / 0.8);
 
   /* `layout.tsx` loads Inter and puts it on `--font-inter`, but nothing mapped
@@ -239,7 +273,7 @@ html {
 
 /* Glassmorphism utility */
 .glass {
-  background: rgba(26, 5, 32, 0.85);
+  background: hsl(var(--card) / 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -283,13 +317,13 @@ html {
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background: rgba(26, 5, 32, 0.85);
+  background: hsl(var(--card) / 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .glass-light {
-  background: rgba(49, 6, 57, 0.6);
+  background: hsl(var(--card) / 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }

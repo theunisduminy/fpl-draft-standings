@@ -143,6 +143,8 @@ export interface BaseTableProps<T> {
   onRowClick?: (item: T) => void;
   children?: React.ReactNode;
   getRowKey?: (item: T, index: number) => string | number;
+  /** Names the row's destination for the clickable-row aria-label. */
+  getRowLabel?: (item: T, index: number) => string;
 }
 
 export function BaseTable<T extends Record<string, any>>({
@@ -157,6 +159,7 @@ export function BaseTable<T extends Record<string, any>>({
   onRowClick,
   children,
   getRowKey,
+  getRowLabel,
 }: BaseTableProps<T>) {
   // No loading or error branch: the page owns those now, through its Suspense
   // boundary and src/app/error.tsx. See agents/FRONTEND.md.
@@ -228,10 +231,31 @@ export function BaseTable<T extends Record<string, any>>({
                   className={cn(
                     TABLE_ROW_CLASS,
                     TABLE_ROW_HOVER_CLASS,
-                    onRowClick && 'cursor-pointer',
+                    onRowClick &&
+                      'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring',
                     rowClassName?.(item, index),
                   )}
                   onClick={() => onRowClick?.(item)}
+                  // A clickable row is a link the keyboard can also follow:
+                  // focusable, announced as a link to its destination, and
+                  // activated on Enter or Space like a native control.
+                  tabIndex={onRowClick ? 0 : undefined}
+                  role={onRowClick ? 'link' : undefined}
+                  aria-label={
+                    onRowClick && getRowLabel
+                      ? getRowLabel(item, index)
+                      : undefined
+                  }
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onRowClick(item);
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   {columns.map((column, colIndex) => (
                     <TableCell

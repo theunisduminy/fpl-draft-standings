@@ -88,8 +88,8 @@ function FeedUnavailable() {
           The Premier League feed could not be reached
         </p>
         <p className='text-sm text-white/60'>
-          The table and fixtures come straight from the Premier League. Try
-          again in a few minutes.
+          The table and fixtures come straight from the Premier League. Check
+          your connection, then reload the page to try again.
         </p>
       </div>
     </div>

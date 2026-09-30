@@ -26,7 +26,7 @@ export default function Error({
   return (
     <div className='w-full py-8'>
       <ErrorDisplay
-        message='We could not load the league data. This is usually the FPL API being unavailable.'
+        message='Unable to load league data. Check your connection and try again.'
         onRetry={reset}
       />
     </div>

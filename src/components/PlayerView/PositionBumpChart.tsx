@@ -26,8 +26,8 @@ import type { LeagueEntryId } from '@/interfaces/fpl';
 /**
  * One colour per manager, by their position in the league entry list.
  *
- * Hex rather than theme tokens because these are series colours read by SVG
- * attributes, not utilities — the same reason `ChartConfig` takes hex. Eight
+ * Series tokens rather than hex, read through `var()` because these are
+ * series colours consumed by SVG attributes, not utilities. Eight
  * distinguishable hues rather than a ramp of the brand purple: the reader has
  * to tell managers apart, not rank them.
  *
@@ -38,14 +38,14 @@ import type { LeagueEntryId } from '@/interfaces/fpl';
  * Move it back out the day a second chart genuinely needs it.
  */
 const PLAYER_COLOURS = [
-  '#facc15',
-  '#00edfd',
-  '#75fa95',
-  '#f87171',
-  '#c084fc',
-  '#fb923c',
-  '#60a5fa',
-  '#4ade80',
+  'var(--color-series-1)',
+  'var(--color-series-2)',
+  'var(--color-series-3)',
+  'var(--color-series-4)',
+  'var(--color-series-5)',
+  'var(--color-series-6)',
+  'var(--color-series-7)',
+  'var(--color-series-8)',
 ] as const;
 
 function playerColour(index: number): string {
@@ -144,6 +144,13 @@ export function PositionBumpChart({
     ]),
   ) satisfies ChartConfig;
 
+  // The table as it stands in the latest snapshot, best first, for the
+  // accessible name and the screen-reader list below.
+  const tableOrder = [...(snapshots.at(-1)?.places ?? [])]
+    .sort((a, b) => a.rank - b.rank)
+    .map((place) => nameFor(playerNames, place.league_entry));
+  const leader = tableOrder[0] ?? 'no one';
+
   return (
     <ChartCard
       title={gap ? 'Gap to the leader' : 'Position by gameweek'}
@@ -184,98 +191,110 @@ export function PositionBumpChart({
         </ToggleGroup>
       }
     >
-      <ChartContainer
-        config={chartConfig}
-        className='aspect-[4/3] w-full sm:aspect-[2/1] md:aspect-[16/6] md:min-h-[320px]'
+      <div
+        role='img'
+        aria-label={`${gap ? 'Gap to the leader' : 'Position by gameweek'}, ${mode} mode, led by ${leader}`}
       >
-        <LineChart
-          data={chartData}
-          margin={{ top: 10, right: gap ? 12 : 76, left: 0, bottom: 10 }}
+        <ChartContainer
+          config={chartConfig}
+          className='aspect-[4/3] w-full sm:aspect-[2/1] md:aspect-[16/6] md:min-h-[320px]'
         >
-          <CartesianGrid vertical={false} stroke='rgba(255,255,255,0.06)' />
-          <XAxis
-            dataKey='event'
-            tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
-            tickMargin={8}
-            axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-            interval='preserveStartEnd'
-          />
-          {/* Position mode counts down, so the axis is reversed and ticked to
+          <LineChart
+            data={chartData}
+            margin={{ top: 10, right: gap ? 12 : 76, left: 0, bottom: 10 }}
+          >
+            <CartesianGrid vertical={false} stroke='rgba(255,255,255,0.06)' />
+            <XAxis
+              dataKey='event'
+              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+              tickMargin={8}
+              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              interval='preserveStartEnd'
+            />
+            {/* Position mode counts down, so the axis is reversed and ticked to
               the integers a league table uses. Gap mode is already negative
               below a leader pinned at zero, so a plain axis puts the leader on
               top without reversing anything. */}
-          {gap ? (
-            <YAxis
-              domain={[deepest, 0]}
-              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
-              width={38}
-              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-            />
-          ) : (
-            <YAxis
-              reversed
-              domain={[1, Math.max(managers.length, 1)]}
-              ticks={managers.map((_, index) => index + 1)}
-              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
-              width={28}
-              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-            />
-          )}
-          {/* Sorted into that gameweek's order, so the tooltip reads as the
+            {gap ? (
+              <YAxis
+                domain={[deepest, 0]}
+                tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+                width={38}
+                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              />
+            ) : (
+              <YAxis
+                reversed
+                domain={[1, Math.max(managers.length, 1)]}
+                ticks={managers.map((_, index) => index + 1)}
+                tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+                width={28}
+                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              />
+            )}
+            {/* Sorted into that gameweek's order, so the tooltip reads as the
               table stood that week rather than in whatever order the lines
               happen to be declared. Recharts' own `itemSorter` cannot do this:
               it is applied inside `DefaultTooltipContent`, so a custom
               `content` never sees it. */}
-          <Tooltip
-            content={({ active, label, payload }) => (
-              // Named props rather than a spread: recharts' own `content`
-              // prop would collide with the `content` attribute on the div
-              // props `ChartTooltipContent` also accepts.
-              <ChartTooltipContent
-                active={active}
-                label={label}
-                // Best first in both modes, which means opposite sorts: rank 1
-                // is the smallest number, but the smallest gap is the one
-                // closest to zero, and every gap is negative.
-                payload={[...(payload ?? [])].sort((a, b) =>
-                  gap
-                    ? Number(b.value) - Number(a.value)
-                    : Number(a.value) - Number(b.value),
-                )}
-              />
-            )}
-          />
-          {managers.map((manager, index) => (
-            <Line
-              key={manager.id}
-              type='monotone'
-              dataKey={manager.key}
-              stroke={playerColour(index)}
-              strokeWidth={focused === manager.key ? 3.5 : 2.5}
-              strokeOpacity={
-                focused === null || focused === manager.key ? 1 : 0.15
-              }
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0 }}
-              isAnimationActive={false}
-            >
-              {!gap && (
-                <LabelList
-                  dataKey={manager.key}
-                  content={(props) => (
-                    <EndLabel
-                      {...props}
-                      name={manager.name}
-                      lastIndex={chartData.length - 1}
-                      dimmed={focused !== null && focused !== manager.key}
-                    />
+            <Tooltip
+              content={({ active, label, payload }) => (
+                // Named props rather than a spread: recharts' own `content`
+                // prop would collide with the `content` attribute on the div
+                // props `ChartTooltipContent` also accepts.
+                <ChartTooltipContent
+                  active={active}
+                  label={label}
+                  // Best first in both modes, which means opposite sorts: rank 1
+                  // is the smallest number, but the smallest gap is the one
+                  // closest to zero, and every gap is negative.
+                  payload={[...(payload ?? [])].sort((a, b) =>
+                    gap
+                      ? Number(b.value) - Number(a.value)
+                      : Number(a.value) - Number(b.value),
                   )}
                 />
               )}
-            </Line>
+            />
+            {managers.map((manager, index) => (
+              <Line
+                key={manager.id}
+                type='monotone'
+                dataKey={manager.key}
+                stroke={playerColour(index)}
+                strokeWidth={focused === manager.key ? 3.5 : 2.5}
+                strokeOpacity={
+                  focused === null || focused === manager.key ? 1 : 0.15
+                }
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0 }}
+                isAnimationActive={false}
+              >
+                {!gap && (
+                  <LabelList
+                    dataKey={manager.key}
+                    content={(props) => (
+                      <EndLabel
+                        {...props}
+                        name={manager.name}
+                        lastIndex={chartData.length - 1}
+                        dimmed={focused !== null && focused !== manager.key}
+                      />
+                    )}
+                  />
+                )}
+              </Line>
+            ))}
+          </LineChart>
+        </ChartContainer>
+        <ol className='sr-only'>
+          {tableOrder.map((name, index) => (
+            <li key={name}>
+              {index + 1}. {name}
+            </li>
           ))}
-        </LineChart>
-      </ChartContainer>
+        </ol>
+      </div>
 
       <div className='mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-3'>
         {managers.map((manager, index) => (

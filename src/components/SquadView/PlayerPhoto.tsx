@@ -31,7 +31,7 @@ export function PlayerPhoto({
   const [failed, setFailed] = useState(false);
 
   const shape = cn(
-    'h-8 w-8 shrink-0 rounded-full bg-white/5 object-cover',
+    'h-8 w-8 shrink-0 rounded-full bg-white/5 object-cover ring-1 ring-white/10',
     className,
   );
 
@@ -40,7 +40,7 @@ export function PlayerPhoto({
       <span
         className={cn(
           shape,
-          'flex items-center justify-center text-[10px] font-bold text-white/40',
+          'flex items-center justify-center bg-muted text-[10px] font-bold text-muted-foreground',
         )}
         aria-hidden
       >

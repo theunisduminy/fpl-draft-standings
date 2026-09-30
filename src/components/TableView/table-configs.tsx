@@ -68,10 +68,16 @@ export function standingsColumns({
         <div className='flex min-w-0 items-center gap-3'>
           {renderRankBadge(player.f1_ranking)}
           <div className='min-w-0'>
-            <div className='truncate font-medium text-foreground'>
+            <div
+              className='truncate font-medium text-foreground'
+              title={player.player_name}
+            >
               {player.player_name}
             </div>
-            <div className='truncate text-xs text-muted-foreground md:hidden'>
+            <div
+              className='truncate text-xs text-muted-foreground md:hidden'
+              title={player.team_name}
+            >
               {player.team_name}
             </div>
           </div>
@@ -82,7 +88,12 @@ export function standingsColumns({
     {
       header: 'Team',
       key: (player: PlayerDetails) => (
-        <div className='truncate text-muted-foreground'>{player.team_name}</div>
+        <div
+          className='truncate text-muted-foreground'
+          title={player.team_name}
+        >
+          {player.team_name}
+        </div>
       ),
       ...STANDINGS_COLUMN_SHAPES[1],
     },
@@ -94,9 +105,9 @@ export function standingsColumns({
       ...STANDINGS_COLUMN_SHAPES[2],
     },
     {
-      header: 'F1',
+      header: 'F1 score',
       key: (player: PlayerDetails) => (
-        <span className='text-base font-bold text-primary'>
+        <span className='text-base font-bold text-primary tabular-nums'>
           {player.f1_score}
         </span>
       ),
@@ -106,7 +117,7 @@ export function standingsColumns({
     {
       header: 'Points',
       key: (player: PlayerDetails) => (
-        <span className='text-base font-bold text-positive'>
+        <span className='text-base font-bold text-positive tabular-nums'>
           {player.total_points || 0}
         </span>
       ),
@@ -148,7 +159,7 @@ export const renderPositionMovement = (movement?: number) => {
 
   if (movement > 0)
     return (
-      <span className='inline-flex items-center gap-1 text-xs font-medium text-positive'>
+      <span className='inline-flex items-center gap-1 text-xs font-medium text-positive tabular-nums'>
         <ArrowUp className='h-3 w-3' />
         {movement}
         <span className='sr-only'>places gained</span>
@@ -156,7 +167,7 @@ export const renderPositionMovement = (movement?: number) => {
     );
 
   return (
-    <span className='inline-flex items-center gap-1 text-xs font-medium text-negative'>
+    <span className='inline-flex items-center gap-1 text-xs font-medium text-negative tabular-nums'>
       <ArrowDown className='h-3 w-3' />
       {Math.abs(movement)}
       <span className='sr-only'>places lost</span>
@@ -185,10 +196,16 @@ export function draftResultsColumns(
         <div className='flex min-w-0 items-center gap-3'>
           {renderRankBadge(result.rank)}
           <div className='min-w-0'>
-            <div className='truncate font-medium text-white'>
+            <div
+              className='truncate font-medium text-foreground'
+              title={result.player_name}
+            >
               {result.player_name}
             </div>
-            <div className='truncate text-xs text-white/50 md:hidden'>
+            <div
+              className='truncate text-xs text-muted-foreground md:hidden'
+              title={result.team_name}
+            >
               {result.team_name}
             </div>
           </div>
@@ -199,7 +216,12 @@ export function draftResultsColumns(
     {
       header: 'Team',
       key: (result: GameweekResult) => (
-        <div className='truncate text-white/70'>{result.team_name}</div>
+        <div
+          className='truncate text-muted-foreground'
+          title={result.team_name}
+        >
+          {result.team_name}
+        </div>
       ),
       width: 'md:w-[24%]',
       hideBelow: 'md',
@@ -215,12 +237,12 @@ export function draftResultsColumns(
       header: 'Points',
       key: (result: GameweekResult) => (
         <span
-          className={`text-base font-bold ${
+          className={`text-base font-bold tabular-nums ${
             result.rank === 1
-              ? 'text-yellow-400'
+              ? 'text-rank-1'
               : result.rank === 8
-                ? 'text-red-400'
-                : 'text-white'
+                ? 'text-rank-8'
+                : 'text-foreground'
           }`}
         >
           {result.points}
@@ -245,10 +267,10 @@ export function draftResultsColumns(
           onClick={() => onViewTeam(result)}
         >
           <Eye className='h-3.5 w-3.5' />
-          <span className='hidden md:inline'>View team</span>
-          <span className='sr-only md:hidden'>
-            View {result.player_name}&apos;s team
-          </span>
+          {/* Visible at every width; the hidden suffix names the manager so
+              the accessible name is always `View {name}'s team`. */}
+          <span aria-hidden='true'>View team</span>
+          <span className='sr-only'>View {result.player_name}&apos;s team</span>
         </Button>
       ),
       align: 'right',

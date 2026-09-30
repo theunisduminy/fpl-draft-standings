@@ -16,7 +16,7 @@ export function RumblerSkeleton() {
     <div className='w-full'>
       <Skeleton className={SECTION_TABS_STRIP_CLASS} />
 
-      <div className='mt-6 w-full space-y-4'>
+      <div className='mt-4 w-full space-y-4'>
         <GameweekSelectorSkeleton />
 
         <Card className='w-full overflow-hidden border-white/10 bg-[#2a0d33]'>
