@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 import { cn } from '@/lib/utils';
 
 /**
@@ -22,6 +23,7 @@ export function ChartCard({
   title,
   caption,
   action,
+  provisionalGameweek,
   contentClassName,
   children,
 }: {
@@ -37,6 +39,12 @@ export function ChartCard({
    * furniture, not inside the heading of one chart.
    */
   action?: React.ReactNode;
+  /**
+   * The gameweek still being played, when anything in the chart is drawn from
+   * it. Renders the same badge the results table carries, so a provisional rank
+   * never reads as a settled one.
+   */
+  provisionalGameweek?: number | null;
   /** Body padding, where the real per-chart variation lives. */
   contentClassName?: string;
   children: React.ReactNode;
@@ -57,6 +65,12 @@ export function ChartCard({
             <p className='text-xs leading-relaxed text-pretty text-muted-foreground'>
               {caption}
             </p>
+          )}
+          {provisionalGameweek != null && (
+            <LiveGameweekBadge
+              gameweek={provisionalGameweek}
+              className='mt-2'
+            />
           )}
         </div>
         {action}

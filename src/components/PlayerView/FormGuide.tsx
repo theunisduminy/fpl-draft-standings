@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 interface FormGuideProps {
   performances: GameweekPerformance[];
   playerNames: Record<number, string>;
+  /** The newest column is drawn from it, so the card has to say so. */
+  provisionalGameweek: number | null;
 }
 
 /**
@@ -39,7 +41,11 @@ const RANK_CLASSES: Record<number, string> = {
   8: 'bg-rank-8 text-foreground',
 };
 
-export function FormGuide({ performances, playerNames }: FormGuideProps) {
+export function FormGuide({
+  performances,
+  playerNames,
+  provisionalGameweek,
+}: FormGuideProps) {
   // The five columns are gameweeks, decided once for the whole card rather than
   // per player. Slicing each manager's own last five would let two rows in the
   // same column mean different weeks the moment anyone is missing one, which is
@@ -82,7 +88,11 @@ export function FormGuide({ performances, playerNames }: FormGuideProps) {
     .sort((a, b) => a.avgRank - b.avgRank);
 
   return (
-    <ChartCard title='Form guide' caption='Last 5 gameweeks'>
+    <ChartCard
+      title='Form guide'
+      caption='Last 5 gameweeks'
+      provisionalGameweek={provisionalGameweek}
+    >
       <CellTooltipProvider>
         <div className='space-y-2.5' role='table' aria-label='Form guide'>
           {/* Headings share the row grammar below — same name gutter, same gap,

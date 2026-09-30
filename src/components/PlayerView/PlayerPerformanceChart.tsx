@@ -17,6 +17,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 
 interface PerformanceData {
   gameweek: number;
@@ -26,6 +27,8 @@ interface PerformanceData {
 interface PlayerPerformanceChartProps {
   data: PerformanceData[];
   playerName?: string;
+  /** The gameweek still being played, or `null`; its point is not final. */
+  provisionalGameweek: number | null;
 }
 
 const chartConfig = {
@@ -38,6 +41,7 @@ const chartConfig = {
 export function PlayerPerformanceChart({
   data,
   playerName,
+  provisionalGameweek,
 }: PlayerPerformanceChartProps) {
   const chartData = data.map((item) => ({
     ...item,
@@ -56,6 +60,12 @@ export function PlayerPerformanceChart({
             Average: {averagePoints.toFixed(1)} pts
           </span>
         </CardTitle>
+        {provisionalGameweek != null && (
+          <LiveGameweekBadge
+            gameweek={provisionalGameweek}
+            className='self-start'
+          />
+        )}
       </CardHeader>
       <CardContent className='p-2 md:p-4'>
         <div

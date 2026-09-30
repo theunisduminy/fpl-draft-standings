@@ -20,8 +20,18 @@ export const dynamic = 'force-dynamic';
 
 type PageProps = { params: Promise<{ playerId: string }> };
 
+type ResolvedProfile = {
+  profile: PlayerProfile;
+  /**
+   * Straight from `getGameweekData()`, which takes it from
+   * `deriveSeasonState()`. Not narrowed to "does this manager have a row for
+   * it": their F1 ranking moves with everyone else's provisional score too.
+   */
+  provisionalGameweek: number | null;
+};
+
 /**
- * Resolve the route param to a manager, or `null`.
+ * Resolve the route param to a manager and the gameweek in flight, or `null`.
  *
  * The param is untrusted, so it goes through `parseLeagueEntryId` rather than
  * `parseInt` — which would happily read "39837-nonsense" as 39837.
@@ -31,12 +41,17 @@ type PageProps = { params: Promise<{ playerId: string }> };
  * can disagree about whether the manager exists.
  */
 const resolveProfile = cache(
-  async (playerId: string): Promise<PlayerProfile | null> => {
+  async (playerId: string): Promise<ResolvedProfile | null> => {
     const leagueEntry = parseLeagueEntryId(playerId);
 
     if (!leagueEntry) return null;
 
-    return buildPlayerProfile(await getGameweekData(), leagueEntry);
+    const data = await getGameweekData();
+    const profile = buildPlayerProfile(data, leagueEntry);
+
+    return profile
+      ? { profile, provisionalGameweek: data.provisionalGameweek }
+      : null;
   },
 );
 
@@ -44,16 +59,18 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { playerId } = await params;
-  const profile = await resolveProfile(playerId);
+  const resolved = await resolveProfile(playerId);
 
-  return { title: profile?.player_name ?? 'Player' };
+  return { title: resolved?.profile.player_name ?? 'Player' };
 }
 
 export default async function PlayerStatistics({ params }: PageProps) {
   const { playerId } = await params;
-  const profile = await resolveProfile(playerId);
+  const resolved = await resolveProfile(playerId);
 
-  if (!profile) notFound();
+  if (!resolved) notFound();
+
+  const { profile, provisionalGameweek } = resolved;
 
   return (
     <PageShell
@@ -84,11 +101,18 @@ export default async function PlayerStatistics({ params }: PageProps) {
       <PlayerPerformanceChart
         data={profile.performance}
         playerName={profile.player_name}
+        provisionalGameweek={provisionalGameweek}
       />
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-        <PlayerSummaryCard player={profile} />
-        <PositionStatsCard stats={profile.stats} />
+        <PlayerSummaryCard
+          player={profile}
+          provisionalGameweek={provisionalGameweek}
+        />
+        <PositionStatsCard
+          stats={profile.stats}
+          provisionalGameweek={provisionalGameweek}
+        />
       </div>
     </PageShell>
   );

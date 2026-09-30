@@ -103,9 +103,12 @@ const MODES: { value: Mode; label: string }[] = [
 export function PositionBumpChart({
   snapshots,
   playerNames,
+  provisionalGameweek,
 }: {
   snapshots: SeasonSnapshot[];
   playerNames: Record<number, string>;
+  /** The last snapshot is drawn from it, so the card has to say so. */
+  provisionalGameweek: number | null;
 }) {
   const [focused, setFocused] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('position');
@@ -160,6 +163,7 @@ export function PositionBumpChart({
           : 'Where everyone stood in the table after each gameweek'
       }
       contentClassName='p-2 md:p-4'
+      provisionalGameweek={provisionalGameweek}
       action={
         // `value && setMode(...)` is load-bearing: a single-select ToggleGroup
         // reports an empty string when the pressed item is pressed again, and
