@@ -24,7 +24,7 @@ If `STRATEGY.md` is the destination and `AGENTS.md` is the highway code, this fi
 
 Better Draft is a **Next.js 16 App Router application** backed by **Neon Postgres**
 (accessed with Drizzle) and **Neon Auth**. It is deployed to Vercel at
-[draftrank.vercel.app](https://draftrank.vercel.app).
+[betterdraft.vercel.app](https://betterdraft.vercel.app).
 
 **The whole app is behind sign-in.** `src/proxy.ts` redirects every signed-out request to
 `/auth/sign-in`; there is no public view and no anonymous zone. Three levels of access sit

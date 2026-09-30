@@ -688,5 +688,16 @@ so the matcher excludes `/api/cron`, and the route itself checks a bearer `CRON_
 constant time. The exclusion buys authentication written by hand — it does not make the
 path public, and nothing else may be excluded without the same work.
 
-Production auth configuration is now done: `trusted_origins` on the Neon project contains
-`https://draftrank.vercel.app`, and `allow_localhost` is on for development.
+Production auth configuration: the app is served at **`https://betterdraft.vercel.app`**,
+which must be in `trusted_origins` on the Neon project, and `allow_localhost` is on for
+development. It is the only domain on the Vercel project; the old `draftrank.vercel.app`
+was removed on 2026-09-30.
+
+**Every host that serves the app must be in `trusted_origins`, or sign-out breaks.** Better
+Auth only checks the origin of a request that already carries cookies, so sign-in from an
+untrusted host works and sign-out is refused with 403 `INVALID_ORIGIN`. Both addresses used
+to serve the app while only `draftrank` was trusted: signing out on `betterdraft` did
+nothing, and because cookies are per host, anyone switching between the two had to sign in
+on each. Serve one host and redirect the rest to it. To check a host, POST
+`/api/auth/sign-out` with that `Origin` and a dummy `__Secure-neon-auth.session_token`
+cookie: `{"success":true}` means trusted, `INVALID_ORIGIN` means not.

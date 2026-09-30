@@ -26,15 +26,28 @@ export function AuthPanel({
   className?: string;
 }) {
   const [busy, setBusy] = useState(false);
+  const [signOutFailed, setSignOutFailed] = useState(false);
 
   if (signedIn) {
     return (
       <Button
         variant='outline'
         disabled={busy}
+        aria-live='polite'
         onClick={async () => {
           setBusy(true);
-          await authClient.signOut();
+          // `signOut` reports a refusal in its result rather than throwing.
+          // Reloading regardless is what made a rejected sign-out look like a
+          // button that did nothing: Neon answers 403 `INVALID_ORIGIN` for any
+          // host missing from the project's `trusted_origins`, and the cookie
+          // survives. Only leave the page once the session is really gone.
+          const { error } = await authClient.signOut();
+          if (error) {
+            console.error('Sign-out was refused', error);
+            setSignOutFailed(true);
+            setBusy(false);
+            return;
+          }
           window.location.reload();
         }}
         // Resting state is quiet — signing out is not the point of any page it
@@ -47,7 +60,7 @@ export function AuthPanel({
         )}
       >
         <LogOut className='mr-2 h-4 w-4' />
-        Sign out
+        {signOutFailed ? 'Sign-out failed. Try again' : 'Sign out'}
       </Button>
     );
   }
