@@ -71,12 +71,12 @@ directly; `src/server/db/client.ts` is the only file that builds a db client. Fu
 
 ## Infrastructure
 
-| Component   | Choice                                                         | Why                                                                                                              |
-| ----------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Hosting     | Vercel ([draftrank.vercel.app](https://draftrank.vercel.app))  | First-party Next.js hosting; push-to-deploy.                                                                     |
-| Analytics   | `@vercel/analytics` `2.0.1` + `@vercel/speed-insights` `2.0.0` | Already wired in `layout.tsx`. Not yet used to answer anything — see [`STRATEGY.md`](./STRATEGY.md#key-metrics). |
-| CI          | **None**                                                       | See the gap below.                                                                                               |
-| API testing | Bruno collection in `FPL Draft/`                               | `prem/` = upstream, `app/` = localhost. Its env file still holds a dead league ID.                               |
+| Component   | Choice                                                            | Why                                                                                                              |
+| ----------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Hosting     | Vercel ([betterdraft.vercel.app](https://betterdraft.vercel.app)) | First-party Next.js hosting; push-to-deploy.                                                                     |
+| Analytics   | `@vercel/analytics` `2.0.1` + `@vercel/speed-insights` `2.0.0`    | Already wired in `layout.tsx`. Not yet used to answer anything — see [`STRATEGY.md`](./STRATEGY.md#key-metrics). |
+| CI          | **None**                                                          | See the gap below.                                                                                               |
+| API testing | Bruno collection in `FPL Draft/`                                  | `prem/` = upstream, `app/` = localhost. Its env file still holds a dead league ID.                               |
 
 ## Quality
 

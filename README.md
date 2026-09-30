@@ -4,7 +4,7 @@ A fairer league table for a Fantasy Premier League draft league. Every gameweek 
 1–8 and awarded Formula One points (20, 15, 12, 10, 8, 6, 4, 2), so the season rewards
 consistency rather than one enormous week — plus a permanent record of whoever finished last.
 
-Live at **[draftrank.vercel.app](https://draftrank.vercel.app)**.
+Live at **[betterdraft.vercel.app](https://betterdraft.vercel.app)**.
 
 ## Getting started
 

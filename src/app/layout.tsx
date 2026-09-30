@@ -23,7 +23,7 @@ import { type Metadata } from 'next';
 import type { Viewport } from 'next';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://draftrank.vercel.app'),
+  metadataBase: new URL('https://betterdraft.vercel.app'),
   title: {
     template: '%s - Better Draft | FPL Scoring',
     default: `Better Draft`,
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_GB',
-    url: 'https://draftrank.vercel.app',
+    url: 'https://betterdraft.vercel.app',
     siteName: 'Better Draft',
   },
   // No `icons` block on purpose: `src/app/favicon.ico` is picked up by Next's
