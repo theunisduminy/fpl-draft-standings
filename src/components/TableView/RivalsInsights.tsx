@@ -42,11 +42,13 @@ export default function RivalsInsights({
       <HeadToHeadGrid
         players={data.players}
         performances={data.gameweekPerformances}
+        provisionalGameweek={data.provisionalGameweek}
       />
 
       <PointsSpreadChart
         players={data.players}
         performances={data.gameweekPerformances}
+        provisionalGameweek={data.provisionalGameweek}
       />
     </div>
   );

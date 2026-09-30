@@ -77,9 +77,12 @@ const H2H_CELL = 'w-20 shrink-0 lg:w-auto lg:min-w-0 lg:flex-1';
 export function HeadToHeadGrid({
   players,
   performances,
+  provisionalGameweek,
 }: {
   players: PlayerDetails[];
   performances: GameweekPerformance[];
+  /** Every record here includes it, so the card has to say so. */
+  provisionalGameweek: number | null;
 }) {
   const names = nameLookup(players);
 
@@ -107,6 +110,7 @@ export function HeadToHeadGrid({
     <ChartCard
       title='Head to head'
       caption='Gameweeks each manager has outscored each other: won, drawn, lost'
+      provisionalGameweek={provisionalGameweek}
     >
       <CellTooltipProvider>
         {/* No horizontal padding on the scroll container: `left-0` pins to its

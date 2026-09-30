@@ -41,9 +41,12 @@ import { cn } from '@/lib/utils';
 export function PointsSpreadChart({
   players,
   performances,
+  provisionalGameweek,
 }: {
   players: PlayerDetails[];
   performances: GameweekPerformance[];
+  /** Its scores are in every spread, so the card has to say so. */
+  provisionalGameweek: number | null;
 }) {
   const spreads = buildPointsSpread(performances);
 
@@ -67,6 +70,7 @@ export function PointsSpreadChart({
     <ChartCard
       title='Weekly scores'
       caption='The middle half of each season, best and worst week at the ends'
+      provisionalGameweek={provisionalGameweek}
     >
       <CellTooltipProvider>
         <div className='space-y-2.5'>
