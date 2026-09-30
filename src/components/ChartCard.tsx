@@ -50,11 +50,13 @@ export function ChartCard({
         )}
       >
         <div>
-          <CardTitle className='text-base text-foreground md:text-lg'>
+          <CardTitle className='text-base leading-snug text-balance text-foreground md:text-lg'>
             {title}
           </CardTitle>
           {caption && (
-            <p className='text-xs text-muted-foreground'>{caption}</p>
+            <p className='text-xs leading-relaxed text-pretty text-muted-foreground'>
+              {caption}
+            </p>
           )}
         </div>
         {action}

@@ -21,7 +21,7 @@ export function ResultsSkeleton() {
           <SkeletonText size='title' width='md' />
         </div>
         <CardContent>
-          <div className='grid grid-cols-1 gap-3 md:grid-cols-4'>
+          <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className='rounded-lg bg-[#1a0520] p-3'>
                 <div className='mb-1 flex items-center gap-2'>

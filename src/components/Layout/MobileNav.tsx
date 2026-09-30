@@ -66,7 +66,7 @@ export default function MobileNav() {
                 href={link.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
+                  'relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none',
                   isActive
                     ? 'bg-white/10 text-white'
                     : 'text-white/60 hover:text-white',

@@ -64,10 +64,14 @@ export function PageShell({
         <div className='flex items-center gap-3'>
           {back}
           <div className='space-y-1'>
-            <h1 className='text-2xl font-bold text-white md:text-3xl'>
+            <h1 className='text-2xl font-bold tracking-tight text-balance text-white md:text-3xl'>
               {title}
             </h1>
-            {subtitle && <p className='text-sm text-white/60'>{subtitle}</p>}
+            {subtitle && (
+              <p className='text-sm leading-relaxed text-pretty text-white/60'>
+                {subtitle}
+              </p>
+            )}
           </div>
         </div>
         {action}

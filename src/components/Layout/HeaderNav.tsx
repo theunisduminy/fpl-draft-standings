@@ -51,7 +51,10 @@ export default function HeaderNav() {
     <header className='z-40 rounded-b-xl bg-gradient-to-t from-[#00edfd] from-10% to-[#75fa95] shadow-lg md:sticky md:top-0 lg:hidden'>
       <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
         <div className='flex h-16 items-center justify-between'>
-          <Link href='/' className='flex items-center gap-2.5'>
+          <Link
+            href='/'
+            className='flex items-center gap-2.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none'
+          >
             <img
               className='h-8 w-auto md:h-10'
               src='/better-draft.png'
@@ -63,7 +66,10 @@ export default function HeaderNav() {
           </Link>
 
           <div className='flex items-center gap-2'>
-            <nav className='hidden md:flex md:gap-1 lg:hidden'>
+            <nav
+              aria-label='Primary'
+              className='hidden md:flex md:gap-1 lg:hidden'
+            >
               {navigation.map((link) => {
                 const isActive = pathname === link.href;
                 return (
@@ -71,7 +77,7 @@ export default function HeaderNav() {
                     key={link.name}
                     href={link.href}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`relative rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                    className={`relative rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none ${
                       isActive
                         ? 'bg-[#310639] text-white'
                         : 'text-[#310639] hover:bg-[#310639]/10'
@@ -79,7 +85,7 @@ export default function HeaderNav() {
                   >
                     {link.name}
                     {isActive && (
-                      <span className='absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-[#310639]' />
+                      <span className='absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white/70' />
                     )}
                   </Link>
                 );
@@ -91,7 +97,7 @@ export default function HeaderNav() {
               aria-label='Profile'
               aria-current={isProfile ? 'page' : undefined}
               className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-full transition-colors',
+                'flex h-10 w-10 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none',
                 isProfile
                   ? 'bg-[#310639] text-white'
                   : 'bg-[#310639]/10 text-[#310639] hover:bg-[#310639]/20',

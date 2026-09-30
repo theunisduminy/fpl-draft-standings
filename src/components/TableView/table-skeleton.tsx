@@ -33,6 +33,8 @@ export function TableSkeleton({
   /** The first column of both real tables leads with a rank badge. */
   leadingBadge = true,
   hideBelowMd = [],
+  hideBelowSm = [],
+  hideBelowLg = [],
   widths = [],
 }: {
   columns?: number;
@@ -45,6 +47,16 @@ export function TableSkeleton({
    */
   hideBelowMd?: number[];
   /**
+   * Column indexes the real table hides below `sm`, so the placeholder hides
+   * the same ones. Whole literals only, never assembled at runtime.
+   */
+  hideBelowSm?: number[];
+  /**
+   * Column indexes the real table hides below `lg`, so the placeholder hides
+   * the same ones. Whole literals only, never assembled at runtime.
+   */
+  hideBelowLg?: number[];
+  /**
    * The real columns' width classes, in order — the same strings the table
    * config gives them, breakpoints included.
    *
@@ -56,8 +68,22 @@ export function TableSkeleton({
    */
   widths?: string[];
 }) {
-  const hidden = (col: number) =>
-    hideBelowMd.includes(col) ? 'hidden md:table-cell' : '';
+  // Literal lookup maps, spelled out so Tailwind's scanner sees every class.
+  // Never assemble these from a breakpoint variable at runtime.
+  const HIDDEN_BELOW = {
+    sm: 'hidden sm:table-cell',
+    md: 'hidden md:table-cell',
+    lg: 'hidden lg:table-cell',
+  } as const;
+  const HIDDEN_BELOW_SM = 'hidden sm:table-cell';
+  const HIDDEN_BELOW_LG = 'hidden lg:table-cell';
+
+  const hidden = (col: number) => {
+    if (hideBelowSm.includes(col)) return HIDDEN_BELOW_SM;
+    if (hideBelowMd.includes(col)) return HIDDEN_BELOW.md;
+    if (hideBelowLg.includes(col)) return HIDDEN_BELOW_LG;
+    return '';
+  };
 
   return (
     <div className='w-full space-y-4'>
@@ -98,7 +124,13 @@ export function TableSkeleton({
                           <Skeleton className='h-8 w-8 shrink-0 rounded-full' />
                           <div className='min-w-0 space-y-1.5'>
                             <SkeletonText size='body' width='md' />
-                            <SkeletonText size='label' width='sm' />
+                            {/* `md:hidden` mirrors the real cell: the team
+                                sub-line only exists below `md`. */}
+                            <SkeletonText
+                              size='label'
+                              width='sm'
+                              className='md:hidden'
+                            />
                           </div>
                         </div>
                       ) : (

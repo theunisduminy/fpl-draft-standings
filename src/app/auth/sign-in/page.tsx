@@ -39,7 +39,7 @@ export default async function SignInPage() {
             Better Draft
           </h1>
           <p className='text-sm text-white/50'>
-            A better FPL point system, for one league
+            A better points system for one league.
           </p>
         </div>
 
@@ -52,8 +52,8 @@ export default async function SignInPage() {
             <AuthPanel signedIn={false} callbackURL='/' className='w-full' />
 
             <p className='text-center text-xs text-white/40'>
-              Signed in and still seeing this? Your address is not mapped to a
-              manager yet. Ask the league admin to add you.
+              Signed in and still seeing this page. Your email address is not
+              linked to a manager yet. Ask the league admin to add you.
             </p>
           </CardContent>
         </Card>

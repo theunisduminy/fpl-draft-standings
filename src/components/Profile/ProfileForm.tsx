@@ -50,7 +50,9 @@ export function ProfileForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failedField, setFailedField] = useState<
+    'displayName' | 'favouriteTeam' | null
+  >(null);
   // Empty until they choose. Radix will not accept `''` as an item value, but
   // it accepts it as *no* value, which is what shows the placeholder.
   const [team, setTeam] = useState(
@@ -62,9 +64,20 @@ export function ProfileForm({
       action={(formData) => {
         startTransition(async () => {
           const result = await updateProfile(formData);
-          setFailed(!result.ok);
           setMessage(result.ok ? 'Profile saved.' : result.error);
-          if (result.ok && onboarding) router.push('/');
+          if (result.ok) {
+            setFailedField(null);
+            if (onboarding) router.push('/');
+          } else {
+            const error = result.error;
+            setFailedField(
+              /display name/i.test(error)
+                ? 'displayName'
+                : /club/i.test(error)
+                  ? 'favouriteTeam'
+                  : 'displayName',
+            );
+          }
         });
       }}
       className='space-y-4'
@@ -79,7 +92,11 @@ export function ProfileForm({
           required
           maxLength={60}
           defaultValue={displayName ?? ''}
-          placeholder='What the league should call you'
+          placeholder='Alex'
+          aria-invalid={failedField === 'displayName' ? true : undefined}
+          aria-describedby={
+            failedField === 'displayName' ? 'profile-form-message' : undefined
+          }
           className='w-full rounded-md border border-white/15 bg-[#1a0520] px-3 py-2 text-base text-white placeholder:text-white/30 md:text-sm'
         />
       </div>
@@ -95,6 +112,12 @@ export function ProfileForm({
           <SelectTrigger
             id='favouriteTeam'
             aria-label='Club you support'
+            aria-invalid={failedField === 'favouriteTeam' ? true : undefined}
+            aria-describedby={
+              failedField === 'favouriteTeam'
+                ? 'profile-form-message'
+                : undefined
+            }
             className='h-auto w-full rounded-md border-white/15 bg-[#1a0520] px-3 py-2.5 text-base text-white md:text-sm'
           >
             {/* No crest here: `SelectValue` renders the chosen item's own
@@ -118,7 +141,7 @@ export function ProfileForm({
         </Select>
       </div>
 
-      <div className='flex items-center gap-3'>
+      <div className='flex flex-wrap items-center gap-3'>
         <Button type='submit' disabled={pending}>
           {pending
             ? 'Saving…'
@@ -128,9 +151,10 @@ export function ProfileForm({
         </Button>
         {message && (
           <span
-            className={
-              failed ? 'text-sm text-red-400' : 'text-sm text-white/60'
-            }
+            id='profile-form-message'
+            role='status'
+            aria-live='polite'
+            className='min-w-0 text-sm text-muted-foreground'
           >
             {message}
           </span>

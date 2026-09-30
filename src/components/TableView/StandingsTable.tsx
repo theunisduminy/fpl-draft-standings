@@ -26,6 +26,7 @@ export default function StandingsTable({
       onRowClick={(player) => router.push(`/players/${player.id}`)}
       emptyMessage='No gameweeks played yet.'
       getRowKey={(player) => player.id}
+      getRowLabel={(player) => `View ${player.player_name}'s player page`}
     />
   );
 }

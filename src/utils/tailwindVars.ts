@@ -1,4 +1,4 @@
 export const bgGradient =
-  'bg-gradient-to-b from-[#00edfd] via-[#75fa95] to-[#00edfd]';
+  'bg-gradient-to-b from-primary via-positive to-primary';
 
-export const tableGradient = 'bg-gradient-to-br from-sky-500 to-sky-800';
+export const tableGradient = 'bg-gradient-to-br from-primary to-positive';

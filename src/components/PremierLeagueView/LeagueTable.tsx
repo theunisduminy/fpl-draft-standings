@@ -84,7 +84,7 @@ export function LeagueTable({ rows }: { rows: LeagueTableRow[] }) {
         title=''
         data={rows}
         columns={leagueTableColumns()}
-        emptyMessage='The table is not available right now.'
+        emptyMessage='Unable to load the table. Check your connection and try again.'
         getRowKey={(row) => row.club.code}
       />
 
@@ -119,7 +119,7 @@ function leagueTableColumns(): TableColumn<LeagueTableRow>[] {
       align: 'center',
       width: 'w-[12%] md:w-[7%]',
       // The stripe rides on this cell, so it lands at the left edge of the row.
-      cellClassName: (row) => railFor(row) ?? '',
+      cellClassName: (row) => cn(railFor(row), 'tabular-nums'),
     },
     {
       header: 'Club',
@@ -211,14 +211,19 @@ function FormGuide({ form, club }: { form: FormResult[]; club: string }) {
   }
 
   return (
-    <div className='flex gap-1'>
+    <div
+      className='flex gap-1'
+      role='img'
+      aria-label={`${club}: ${form.map((result) => FORM_LABELS[result]).join(', ')} in order`}
+    >
       {form.map((result, index) => (
         <span
           // Form is a fixed-length ordered run of five letters with no id of
           // its own, and it re-renders wholesale on every refresh, so the index
           // is a stable enough key here.
           key={index}
-          title={`${FORM_LABELS[result]} — ${club}`}
+          title={`${FORM_LABELS[result]}: ${club}`}
+          aria-hidden='true'
           className={cn(
             'flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold',
             FORM_STYLES[result],

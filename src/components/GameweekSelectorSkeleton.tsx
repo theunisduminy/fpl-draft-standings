@@ -15,7 +15,7 @@ export function GameweekSelectorSkeleton() {
   return (
     <div className='flex w-full gap-1.5 pb-2'>
       {Array.from({ length: 6 }).map((_, i) => (
-        <Skeleton key={i} className='h-9 w-[70px] shrink-0 rounded-lg' />
+        <Skeleton key={i} className='h-11 w-[70px] shrink-0 rounded-lg' />
       ))}
     </div>
   );

@@ -68,7 +68,7 @@ export default function Footer() {
         <div className='glass-panel relative rounded-xl border border-white/10 px-6 py-4'>
           <div className='flex flex-col items-center gap-4 md:flex-row md:justify-between'>
             <p className='text-center text-xs font-medium text-white/50'>
-              &copy; {year} Theunis Duminy. For the lads. All rights reserved.
+              &copy; {year} Theunis Duminy. For our league. All rights reserved.
             </p>
             <div className='flex items-center gap-4'>
               {navigation.map((item) => (
@@ -77,7 +77,7 @@ export default function Footer() {
                   href={item.href}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='text-white/45 transition-colors hover:text-white'
+                  className='text-white/45 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none'
                 >
                   <span className='sr-only'>{item.name}</span>
                   <item.icon aria-hidden='true' className='h-5 w-5' />

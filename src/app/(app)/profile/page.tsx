@@ -61,9 +61,9 @@ export default async function ProfilePage() {
         <Card className='max-w-4xl border-white/10 bg-[#2a0d33]'>
           <CardContent className='space-y-4 pt-4 md:pt-6'>
             <p className='text-sm text-white/60'>
-              You are signed in, but your address is not mapped to a manager
-              yet. Ask the league admin to add you, or sign out and try another
-              Google account.
+              You are signed in, but your email address is not linked to a
+              manager yet. Ask the league admin to add you, or sign out and try
+              another Google account.
             </p>
             <AuthPanel signedIn />
           </CardContent>
@@ -79,7 +79,7 @@ export default async function ProfilePage() {
       title={onboarding ? 'Finish your profile' : 'Your profile'}
       subtitle={
         onboarding
-          ? 'A display name and your club, and the league is yours'
+          ? 'Add a display name and your club to join the league.'
           : user.email
       }
     >
@@ -210,14 +210,15 @@ async function ProfileBody({
 
                 <Link
                   href={`/players/${user.leagueEntry}`}
-                  className='block pt-1 text-sm text-[#75fa95] hover:underline'
+                  className='block pt-1 text-sm text-[#75fa95] hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none'
                 >
                   See your full season
                 </Link>
               </>
             ) : (
               <p className='text-sm text-white/50'>
-                Nothing to show until this season has a finished gameweek in it.
+                No finished gameweeks yet. Your season appears here after
+                gameweek 1 is complete.
               </p>
             )}
           </CardContent>
