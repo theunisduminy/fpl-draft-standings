@@ -56,14 +56,22 @@ export default function SeasonInsights({
           grid's default stretch puts that difference *inside* the shorter card
           rather than as a gap below it. */}
       <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
-        <PositionHeatmap players={data.players} />
+        <PositionHeatmap
+          players={data.players}
+          provisionalGameweek={data.provisionalGameweek}
+        />
         <FormGuide
           performances={data.gameweekPerformances}
           playerNames={playerNames}
+          provisionalGameweek={data.provisionalGameweek}
         />
       </div>
 
-      <PositionBumpChart snapshots={snapshots} playerNames={playerNames} />
+      <PositionBumpChart
+        snapshots={snapshots}
+        playerNames={playerNames}
+        provisionalGameweek={data.provisionalGameweek}
+      />
     </div>
   );
 }

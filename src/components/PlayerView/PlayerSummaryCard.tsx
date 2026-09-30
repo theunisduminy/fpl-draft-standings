@@ -1,5 +1,6 @@
 // components/PlayerView/PlayerSummaryCard.tsx
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 import {
   Trophy,
   Zap,
@@ -14,9 +15,18 @@ import type { PlayerProfile } from '@/interfaces/players';
 
 interface PlayerSummaryCardProps {
   player: PlayerProfile;
+  /**
+   * The gameweek still being played, or `null`. The F1 score and ranking
+   * already include it, so the card says so rather than presenting them as
+   * settled.
+   */
+  provisionalGameweek: number | null;
 }
 
-export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
+export function PlayerSummaryCard({
+  player,
+  provisionalGameweek,
+}: PlayerSummaryCardProps) {
   const { stats } = player;
 
   const statItems = [
@@ -70,6 +80,12 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
         <CardTitle className='text-base text-white md:text-lg'>
           Player Stats
         </CardTitle>
+        {provisionalGameweek != null && (
+          <LiveGameweekBadge
+            gameweek={provisionalGameweek}
+            className='self-start'
+          />
+        )}
       </CardHeader>
       <CardContent>
         <div className='grid grid-cols-2 gap-3'>

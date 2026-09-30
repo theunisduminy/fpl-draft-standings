@@ -59,7 +59,14 @@ const HEAT_STEPS = [
 /** Above this step the fill is bright enough to need dark ink on it. */
 const DARK_INK_FROM = 4;
 
-export function PositionHeatmap({ players }: { players: PlayerDetails[] }) {
+export function PositionHeatmap({
+  players,
+  provisionalGameweek,
+}: {
+  players: PlayerDetails[];
+  /** Every place tallied here includes it, so the card has to say so. */
+  provisionalGameweek: number | null;
+}) {
   const rows = [...players].sort((a, b) => a.f1_ranking - b.f1_ranking);
 
   // The scale for the whole grid, so a cell's colour means the same thing in
@@ -73,7 +80,11 @@ export function PositionHeatmap({ players }: { players: PlayerDetails[] }) {
   );
 
   return (
-    <ChartCard title='Season shape' caption='Gameweeks finished in each place'>
+    <ChartCard
+      title='Season shape'
+      caption='Gameweeks finished in each place'
+      provisionalGameweek={provisionalGameweek}
+    >
       <CellTooltipProvider>
         <div className='space-y-2.5'>
           {/* Column headings share the row grammar below so the cells line up:

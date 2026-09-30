@@ -1,5 +1,6 @@
 // components/PlayerView/PositionStatsCard.tsx
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { LiveGameweekBadge } from '@/components/LiveGameweekBadge';
 import { Progress } from '@/components/ui/progress';
 import { Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
 
@@ -7,9 +8,14 @@ import type { PlayerStats } from '@/interfaces/players';
 
 interface PositionStatsCardProps {
   stats: PlayerStats;
+  /** The gameweek still being played, or `null`; every tally here includes it. */
+  provisionalGameweek: number | null;
 }
 
-export function PositionStatsCard({ stats }: PositionStatsCardProps) {
+export function PositionStatsCard({
+  stats,
+  provisionalGameweek,
+}: PositionStatsCardProps) {
   const positionData = [
     {
       position: '1st',
@@ -84,6 +90,12 @@ export function PositionStatsCard({ stats }: PositionStatsCardProps) {
         <CardTitle className='text-base text-white md:text-lg'>
           Position Statistics
         </CardTitle>
+        {provisionalGameweek != null && (
+          <LiveGameweekBadge
+            gameweek={provisionalGameweek}
+            className='self-start'
+          />
+        )}
       </CardHeader>
       <CardContent className='space-y-6'>
         {/* Key Stats */}
