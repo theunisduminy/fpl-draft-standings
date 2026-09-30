@@ -31,14 +31,12 @@ const COLUMN_WIDTHS = [
 ];
 
 /**
- * W, D, L, GF and GA are gone below `md`, and so is the form guide.
- *
- * `TableSkeleton` only offers a single `md` cut where the real table hides
- * W/D/L at `sm` and the form at `lg`. The mismatch is one column either side
- * of `md` on a narrow tablet, for the length of one load — worth it against a
- * second skeleton implementation that would drift from this one.
+ * W, D and L hide below `sm`, GF and GA below `md`, and the form guide below
+ * `lg`, matching the `hideBelow` values in `LeagueTable`.
  */
-const HIDDEN_BELOW_MD = [3, 4, 5, 6, 7, 10];
+const HIDDEN_BELOW_SM = [3, 4, 5];
+const HIDDEN_BELOW_MD = [6, 7];
+const HIDDEN_BELOW_LG = [10];
 
 export function PremierLeagueSkeleton() {
   return (
@@ -51,7 +49,9 @@ export function PremierLeagueSkeleton() {
         // The real first column is a plain position number, not the rank badge
         // the standings board leads with.
         leadingBadge={false}
+        hideBelowSm={HIDDEN_BELOW_SM}
         hideBelowMd={HIDDEN_BELOW_MD}
+        hideBelowLg={HIDDEN_BELOW_LG}
         widths={COLUMN_WIDTHS}
       />
     </div>

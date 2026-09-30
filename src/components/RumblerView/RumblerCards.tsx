@@ -41,7 +41,7 @@ export default function RumblerDataCards({
     return (
       <Card className='w-full border-white/10 bg-[#2a0d33]'>
         <CardHeader>
-          <CardTitle className='text-white'>Rumbler Victim</CardTitle>
+          <CardTitle className='text-white'>Rumbler victim</CardTitle>
           <CardDescription className='text-white/60'>
             No rumbler data available yet.
           </CardDescription>
@@ -82,7 +82,7 @@ export default function RumblerDataCards({
               Gameweek {activeGameweek}
             </CardTitle>
             <CardDescription className='text-white/60'>
-              No rumbler data for this gameweek
+              No rumbler data for this gameweek.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -109,13 +109,13 @@ export default function RumblerDataCards({
             </div>
             <Badge
               variant='outline'
-              className='border-amber-500/30 bg-amber-500/10 text-amber-400'
+              className='border-amber-500/30 bg-amber-500/10 text-amber-400 tabular-nums'
             >
               {selectedData.points} pts
             </Badge>
           </div>
           <div className='mt-1 flex items-center gap-2'>
-            <TrendingDown className='h-3 w-3 text-white/40' />
+            <TrendingDown className='h-3 w-3 text-white/40' strokeWidth={1.5} />
             <CardDescription className='text-xs text-white/50'>
               {selectedData.points < rumblerAverage
                 ? `${(rumblerAverage - selectedData.points).toFixed(1)} pts below average`
@@ -132,7 +132,7 @@ export default function RumblerDataCards({
               return (
                 <div
                   key={index}
-                  className='flex items-center justify-between rounded-lg bg-[#1a0520] p-3 transition-colors hover:bg-[#1a0520]/80'
+                  className='flex items-center justify-between rounded-md bg-[#1a0520] p-3 transition-colors hover:bg-[#1a0520]/80'
                 >
                   <div className='flex items-center gap-3'>
                     <Avatar className='h-10 w-10 border border-amber-500/30'>
@@ -152,7 +152,7 @@ export default function RumblerDataCards({
                   </div>
                   <Badge
                     variant='outline'
-                    className='border-white/10 bg-[#1a0520] text-xs text-white/60'
+                    className='border-white/10 bg-[#1a0520] text-xs text-white/60 tabular-nums'
                   >
                     {count} rumblers
                   </Badge>

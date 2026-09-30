@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 /**
- * "GW4 in progress" — the label on any number drawn from an unfinished gameweek.
+ * "GW 4 provisional" — the label on any number drawn from an unfinished gameweek.
  *
  * The season now includes the weekend being played, which is the whole point:
  * a league table that ignores Sunday afternoon is wrong on the one day everyone
@@ -23,7 +23,7 @@ export function LiveGameweekBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border border-positive/40 bg-positive/10 px-3 py-1 text-xs font-semibold text-positive',
+        'inline-flex items-center gap-2 rounded-full border border-positive/40 bg-positive/10 px-3 py-1 text-xs font-semibold whitespace-nowrap text-positive',
         className,
       )}
     >
@@ -31,7 +31,7 @@ export function LiveGameweekBadge({
         <span className='absolute inline-flex h-full w-full rounded-full bg-positive opacity-60 motion-safe:animate-ping' />
         <span className='relative inline-flex h-2 w-2 rounded-full bg-positive' />
       </span>
-      GW{gameweek} in progress
+      GW {gameweek} provisional
     </span>
   );
 }

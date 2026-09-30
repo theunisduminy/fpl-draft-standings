@@ -86,14 +86,18 @@ export function PositionHeatmap({
       provisionalGameweek={provisionalGameweek}
     >
       <CellTooltipProvider>
-        <div className='space-y-2.5'>
+        <div className='space-y-2.5' role='table' aria-label='Season shape'>
           {/* Column headings share the row grammar below so the cells line up:
               same name gutter, same gap, same flex-1 columns. */}
-          <div className={CARD_ROW}>
-            <span className={CARD_ROW_GUTTER} />
-            <div className={CARD_ROW_CELLS}>
+          <div className={CARD_ROW} role='row'>
+            <span className={CARD_ROW_GUTTER} role='columnheader' />
+            <div className={CARD_ROW_CELLS} role='presentation'>
               {POSITION_LABELS.map((label) => (
-                <span key={label} className={CARD_COLUMN_HEADING}>
+                <span
+                  key={label}
+                  className={CARD_COLUMN_HEADING}
+                  role='columnheader'
+                >
                   {label}
                 </span>
               ))}
@@ -101,11 +105,15 @@ export function PositionHeatmap({
           </div>
 
           {rows.map((player) => (
-            <div key={player.id} className={CARD_ROW}>
-              <span className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}>
+            <div key={player.id} className={CARD_ROW} role='row'>
+              <span
+                className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}
+                role='rowheader'
+                title={player.player_name}
+              >
                 {player.player_name}
               </span>
-              <div className={CARD_ROW_CELLS}>
+              <div className={CARD_ROW_CELLS} role='presentation'>
                 {POSITION_KEYS.map((key, index) => {
                   const count = player.position_placed[key];
                   const step = heatStep(count, busiest);
@@ -118,12 +126,13 @@ export function PositionHeatmap({
                       } in ${POSITION_LABELS[index]}`}
                     >
                       <div
+                        role='cell'
                         className={cn(
                           CARD_CELL,
                           'flex items-center justify-center rounded-md text-xs font-bold tabular-nums md:text-sm',
                           HEAT_STEPS[step],
                           step === 0
-                            ? 'text-muted-foreground/40'
+                            ? 'text-muted-foreground'
                             : step >= DARK_INK_FROM
                               ? 'text-primary-foreground'
                               : 'text-foreground',

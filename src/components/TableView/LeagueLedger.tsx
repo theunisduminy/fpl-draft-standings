@@ -48,37 +48,39 @@ export function LeagueLedger({
   const cells = [
     {
       label: 'Most wins',
-      icon: <Trophy className='h-3.5 w-3.5 text-yellow-400' />,
+      icon: (
+        <Trophy strokeWidth={1.5} className='h-3.5 w-3.5 text-yellow-400' />
+      ),
       fact: ledger.mostWins,
       detail: (fact: LedgerFact) => `${fact.value} gameweeks won`,
     },
     {
       label: 'Most podiums',
-      icon: <Medal className='h-3.5 w-3.5 text-amber-500' />,
+      icon: <Medal strokeWidth={1.5} className='h-3.5 w-3.5 text-amber-500' />,
       fact: ledger.mostPodiums,
       detail: (fact: LedgerFact) => `${fact.value} top-three finishes`,
     },
     {
       label: 'Best week',
-      icon: <Zap className='h-3.5 w-3.5 text-primary' />,
+      icon: <Zap strokeWidth={1.5} className='h-3.5 w-3.5 text-primary' />,
       fact: ledger.bestWeek,
       detail: (fact: LedgerFact) => `${fact.value} pts in GW${fact.gameweek}`,
     },
     {
       label: 'Steadiest',
-      icon: <Ruler className='h-3.5 w-3.5 text-positive' />,
+      icon: <Ruler strokeWidth={1.5} className='h-3.5 w-3.5 text-positive' />,
       fact: ledger.steadiest,
       detail: (fact: LedgerFact) => `±${fact.value.toFixed(1)} places`,
     },
     {
       label: 'Hot streak',
-      icon: <Flame className='h-3.5 w-3.5 text-orange-400' />,
+      icon: <Flame strokeWidth={1.5} className='h-3.5 w-3.5 text-orange-400' />,
       fact: ledger.hotStreak,
       detail: (fact: LedgerFact) => `${fact.value} podiums in a row`,
     },
     {
       label: 'Most rumblers',
-      icon: <Beer className='h-3.5 w-3.5 text-negative' />,
+      icon: <Beer strokeWidth={1.5} className='h-3.5 w-3.5 text-negative' />,
       fact: ledger.mostRumblers,
       detail: (fact: LedgerFact) => `${fact.value} last places`,
     },
@@ -94,11 +96,18 @@ export function LeagueLedger({
               {cell.label}
             </span>
           </div>
-          <p className='mt-1.5 truncate text-sm font-semibold text-foreground'>
+          <p
+            className='mt-1.5 truncate text-sm font-semibold text-foreground'
+            title={
+              cell.fact
+                ? (names.get(cell.fact.league_entry) ?? 'Unknown')
+                : undefined
+            }
+          >
             {cell.fact ? (names.get(cell.fact.league_entry) ?? 'Unknown') : '–'}
           </p>
-          <p className='truncate text-xs text-muted-foreground'>
-            {cell.fact ? cell.detail(cell.fact) : 'Not yet'}
+          <p className='truncate text-xs text-muted-foreground tabular-nums'>
+            {cell.fact ? cell.detail(cell.fact) : 'After gameweek 1'}
           </p>
         </div>
       ))}

@@ -51,11 +51,11 @@ export function SideNav() {
       aria-label='Main'
       // `glass-panel` for the same reason as `MobileNav`: the blur goes behind
       // the rail, not on it, so its contents stay out of the composited layer.
-      className='glass-panel fixed top-4 bottom-4 left-4 z-40 hidden w-56 flex-col rounded-2xl border border-white/10 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.4)] lg:flex'
+      className='glass-panel fixed top-4 bottom-4 left-4 z-40 hidden w-56 flex-col rounded-3xl border border-white/10 p-3 shadow-[0_8px_32px_rgba(0,0,0,0.4)] lg:flex'
     >
       <Link
         href='/'
-        className='mb-4 flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-white/5'
+        className='mb-4 flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none'
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src='/better-draft.png' alt='' className='h-8 w-auto' />
@@ -75,7 +75,7 @@ export function SideNav() {
                 href={link.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                  'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none',
                   isActive
                     ? 'bg-white/10 text-white'
                     : 'text-white/60 hover:bg-white/5 hover:text-white',

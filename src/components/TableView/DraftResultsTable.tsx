@@ -161,7 +161,7 @@ export default function DraftResultsTable({
             {/* Sentence case, per the UI display rules in AGENTS.md. */}
             <CardTitle className='text-base text-white md:text-lg'>
               Gameweek {activeGameweek} summary
-              {isProvisional && ' so far'}
+              {isProvisional && ' provisional'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -219,7 +219,9 @@ function StatCard({
         <span className='text-xs text-white/50'>{label}</span>
       </div>
       <div className='flex flex-wrap items-center justify-between gap-2'>
-        <p className='text-sm font-bold text-white md:text-base'>{value}</p>
+        <p className='text-sm font-bold text-white tabular-nums md:text-base'>
+          {value}
+        </p>
         <div className='flex min-w-0 flex-wrap justify-end gap-1'>
           {names?.map((name) => (
             <Badge

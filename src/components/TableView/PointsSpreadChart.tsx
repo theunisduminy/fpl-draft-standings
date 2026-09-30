@@ -72,19 +72,25 @@ export function PointsSpreadChart({
         <div className='space-y-2.5'>
           {ordered.map((spread) => {
             const name = nameFor(names, spread.league_entry);
+            // The tooltip sentence, repeated for screen readers: the trigger
+            // is a `div` no keyboard reaches, so this is the only way the
+            // summary is announced.
+            const summary = `${name}: usually ${Math.round(spread.q1)} to ${Math.round(
+              spread.q3,
+            )}, median ${Math.round(spread.median)}. Best week ${
+              spread.highest
+            }, worst ${spread.lowest}`;
 
             return (
               <div key={spread.league_entry} className={CARD_ROW}>
-                <span className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}>
+                <span
+                  className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}
+                  title={name}
+                >
                   {name}
                 </span>
-                <CellTooltip
-                  label={`${name}: usually ${Math.round(spread.q1)} to ${Math.round(
-                    spread.q3,
-                  )}, median ${Math.round(spread.median)}. Best week ${
-                    spread.highest
-                  }, worst ${spread.lowest}`}
-                >
+                <span className='sr-only'>{summary}</span>
+                <CellTooltip label={summary}>
                   <div className='relative h-8 flex-1 md:h-9'>
                     {/* Whisker: worst week to best week. */}
                     <span

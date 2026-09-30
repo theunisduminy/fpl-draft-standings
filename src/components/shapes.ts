@@ -46,6 +46,30 @@ function hiddenBelowMdIndexes(shapes: ColumnShape[]): number[] {
 }
 
 /**
+ * The indexes hidden below `sm`, for a skeleton that works in positions.
+ *
+ * Strings and arrays only, like everything else in this file: no components,
+ * and never `'use client'`.
+ */
+export function hiddenBelowSmIndexes(shapes: ColumnShape[]): number[] {
+  return shapes.flatMap((column, index) =>
+    column.hideBelow === 'sm' ? [index] : [],
+  );
+}
+
+/**
+ * The indexes hidden below `lg`, for a skeleton that works in positions.
+ *
+ * Strings and arrays only, like everything else in this file: no components,
+ * and never `'use client'`.
+ */
+export function hiddenBelowLgIndexes(shapes: ColumnShape[]): number[] {
+  return shapes.flatMap((column, index) =>
+    column.hideBelow === 'lg' ? [index] : [],
+  );
+}
+
+/**
  * The standings board's five columns, in order: manager, team, move, F1,
  * points.
  *
@@ -82,12 +106,11 @@ export const STANDINGS_HIDDEN_BELOW_MD = hiddenBelowMdIndexes(
  * no copy of its own.
  */
 export function rankBadgeClasses(rank: number): string {
-  if (rank === 1)
-    return 'bg-yellow-400/20 text-yellow-400 border-yellow-400/30';
-  if (rank === 2) return 'bg-gray-300/20 text-gray-300 border-gray-300/30';
-  if (rank === 3) return 'bg-amber-600/20 text-amber-500 border-amber-600/30';
-  if (rank === 8) return 'bg-red-600/20 text-red-400 border-red-600/30';
-  return 'bg-white/10 text-white/70 border-white/20';
+  if (rank === 1) return 'bg-rank-1/20 text-rank-1 border-rank-1/30';
+  if (rank === 2) return 'bg-rank-2/20 text-rank-2 border-rank-2/30';
+  if (rank === 3) return 'bg-rank-3/20 text-rank-3 border-rank-3/30';
+  if (rank === 8) return 'bg-rank-8/20 text-rank-8 border-rank-8/30';
+  return 'bg-muted text-muted-foreground border-border';
 }
 
 /**

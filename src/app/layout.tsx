@@ -11,8 +11,8 @@ config.autoAddCss = false;
 
 // Fonts & Head
 const inter = Inter({
-  weight: ['100', '200', '300', '400', '500', '600', '700', '900'],
-  style: ['normal'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
@@ -44,7 +44,6 @@ export const viewport: Viewport = {
   themeColor: '#1a0520',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({

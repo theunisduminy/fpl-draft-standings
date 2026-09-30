@@ -94,16 +94,20 @@ export function FormGuide({
       provisionalGameweek={provisionalGameweek}
     >
       <CellTooltipProvider>
-        <div className='space-y-2.5'>
+        <div className='space-y-2.5' role='table' aria-label='Form guide'>
           {/* Headings share the row grammar below — same name gutter, same gap,
               same flex-1 columns — so a chip sits under its gameweek. This row
               is also what levels the card against the heatmap beside it, which
               carries a heading row of its own. */}
-          <div className={CARD_ROW}>
-            <span className={CARD_ROW_GUTTER} />
-            <div className={CARD_ROW_CELLS}>
+          <div className={CARD_ROW} role='row'>
+            <span className={CARD_ROW_GUTTER} role='columnheader' />
+            <div className={CARD_ROW_CELLS} role='presentation'>
               {events.map((event) => (
-                <span key={event} className={CARD_COLUMN_HEADING}>
+                <span
+                  key={event}
+                  className={CARD_COLUMN_HEADING}
+                  role='columnheader'
+                >
                   GW{event}
                 </span>
               ))}
@@ -111,11 +115,15 @@ export function FormGuide({
           </div>
 
           {players.map((player) => (
-            <div key={player.playerId} className={CARD_ROW}>
-              <span className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}>
+            <div key={player.playerId} className={CARD_ROW} role='row'>
+              <span
+                className={cn(CARD_ROW_GUTTER, CARD_ROW_NAME)}
+                role='rowheader'
+                title={player.playerName}
+              >
                 {player.playerName}
               </span>
-              <div className={CARD_ROW_CELLS}>
+              <div className={CARD_ROW_CELLS} role='presentation'>
                 {player.last5.map((perf, i) => (
                   <CellTooltip
                     key={events[i]}
@@ -128,6 +136,7 @@ export function FormGuide({
                     }
                   >
                     <div
+                      role='cell'
                       className={cn(
                         CARD_CELL,
                         'flex items-center justify-center rounded-md text-xs font-bold md:text-sm',

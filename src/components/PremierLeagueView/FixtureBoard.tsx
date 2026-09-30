@@ -65,9 +65,9 @@ export function FixtureBoard({
           everywhere else football is published. */}
       {groupByDay(current.fixtures).map((matchday) => (
         <section key={matchday.day} className='space-y-2'>
-          <h3 className='px-1 text-xs font-semibold tracking-wide text-white/60 uppercase'>
+          <h2 className='px-1 text-xs font-semibold tracking-wide text-white/60 uppercase'>
             {matchday.day}
-          </h3>
+          </h2>
 
           <ul className='divide-y divide-border overflow-hidden rounded-xl border border-border bg-card'>
             {matchday.fixtures.map((fixture) => (
@@ -102,7 +102,10 @@ function FixtureRow({ fixture }: { fixture: PlFixture }) {
       {/* Home: name then crest, so the two crests meet in the middle either
           side of the score, the way a fixture list reads on a screen. */}
       <div className='flex flex-1 items-center justify-end gap-2 text-right'>
-        <span className={cn('truncate text-sm', outcomeWeight(fixture, 'H'))}>
+        <span
+          title={fixture.home.name}
+          className={cn('truncate text-sm', outcomeWeight(fixture, 'H'))}
+        >
           <span className='sm:hidden'>{fixture.home.abbr}</span>
           <span className='hidden sm:inline'>{fixture.home.shortName}</span>
         </span>
@@ -113,7 +116,10 @@ function FixtureRow({ fixture }: { fixture: PlFixture }) {
 
       <div className='flex flex-1 items-center gap-2'>
         <ClubCrest code={fixture.away.code} name={fixture.away.name} />
-        <span className={cn('truncate text-sm', outcomeWeight(fixture, 'A'))}>
+        <span
+          title={fixture.away.name}
+          className={cn('truncate text-sm', outcomeWeight(fixture, 'A'))}
+        >
           <span className='sm:hidden'>{fixture.away.abbr}</span>
           <span className='hidden sm:inline'>{fixture.away.shortName}</span>
         </span>
