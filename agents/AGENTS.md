@@ -128,6 +128,14 @@ really has no session. The rules are in `src/utils/session-renewal.ts`, with tes
 unwrap it, and never renew the token on `/api/auth/**`: riding on the sign-out POST, it
 would race the deletion.
 
+**Neon's session still dies after about a week unused, and Neon has no setting for that**
+(Managed Better Auth exposes no session lifetime). So a verified session also refreshes a
+400-day `bd-returning` flag, and `/auth/sign-in` uses it to start Google sign-in without a
+click; Google is already signed in, so the member bounces straight back. The flag grants
+nothing. Sign-out clears it in the browser, which is why it is not `HttpOnly`, and
+`AuthPanel` tries at most once per tab every five minutes, so a sign-in that cannot complete
+stops rather than loops.
+
 **`callbackURL` must be a path the matcher covers**, or the verifier lands somewhere the
 proxy never runs and you are back to the silent failure above.
 

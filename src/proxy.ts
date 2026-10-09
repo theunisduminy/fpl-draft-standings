@@ -6,6 +6,7 @@ import {
   findSetCookieValue,
   readRequestCookie,
   renewedSessionTokenCookie,
+  RETURNING_MEMBER_COOKIE_HEADER,
   SESSION_DATA_COOKIE,
   SESSION_TOKEN_COOKIE,
   sessionExpiryFromSessionData,
@@ -52,6 +53,12 @@ const neonGate = auth.middleware({ loginUrl: LOGIN_PATH });
  *   honoured once a fresh-connection check confirms Neon really has no session.
  *   If Neon cannot be reached the request goes through; the pages check
  *   membership again themselves.
+ *
+ * Neon's session still ends after about a week without a visit, and Neon has
+ * no setting to change that. So every verified session also refreshes a
+ * long-lived `bd-returning` flag, and `/auth/sign-in` reads it to start the
+ * Google sign-in by itself. Google is already signed in, so it bounces
+ * straight back: an expired session costs a redirect, not a click.
  */
 export default async function proxy(
   request: NextRequest,
@@ -61,6 +68,14 @@ export default async function proxy(
     request.headers.get('cookie') ?? '',
     SESSION_TOKEN_COOKIE,
   );
+
+  // The OAuth handshake just set a token: remember this browser has signed in,
+  // so an expired session later signs back in without a click.
+  if (
+    findSetCookieValue(response.headers.getSetCookie(), SESSION_TOKEN_COOKIE)
+  ) {
+    response.headers.append('Set-Cookie', RETURNING_MEMBER_COOKIE_HEADER);
+  }
 
   // Never touch the token on Neon's own routes: a renewal riding on the
   // sign-out POST would race the deletion and could undo the sign-out.
@@ -105,7 +120,9 @@ function renewToken(
   expiresAt: Date,
 ): void {
   const cookie = renewedSessionTokenCookie(token, expiresAt, new Date());
-  if (cookie) response.headers.append('Set-Cookie', cookie);
+  if (!cookie) return;
+  response.headers.append('Set-Cookie', cookie);
+  response.headers.append('Set-Cookie', RETURNING_MEMBER_COOKIE_HEADER);
 }
 
 export const config = {

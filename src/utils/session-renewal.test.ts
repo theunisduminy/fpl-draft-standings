@@ -5,9 +5,11 @@ import {
   findSetCookieValue,
   readRequestCookie,
   renewedSessionTokenCookie,
+  RETURNING_MEMBER_COOKIE_HEADER,
   SESSION_DATA_COOKIE,
   SESSION_TOKEN_COOKIE,
   sessionExpiryFromSessionData,
+  shouldAutoSignIn,
 } from './session-renewal';
 
 function jwtWith(payload: unknown): string {
@@ -116,5 +118,32 @@ describe('renewedSessionTokenCookie', () => {
     expect(
       renewedSessionTokenCookie('t', new Date(now.getTime() - 1000), now),
     ).toBeNull();
+  });
+});
+
+describe('shouldAutoSignIn', () => {
+  it('signs a returning browser straight back in', () => {
+    expect(
+      shouldAutoSignIn({ hasReturningFlag: true, hasAuthError: false }),
+    ).toBe(true);
+  });
+
+  it('waits for a click from a browser that has never signed in', () => {
+    expect(
+      shouldAutoSignIn({ hasReturningFlag: false, hasAuthError: false }),
+    ).toBe(false);
+  });
+
+  it('never retries straight after a failed attempt, which would loop', () => {
+    expect(
+      shouldAutoSignIn({ hasReturningFlag: true, hasAuthError: true }),
+    ).toBe(false);
+  });
+});
+
+describe('RETURNING_MEMBER_COOKIE_HEADER', () => {
+  it('is readable by script, so sign-out can clear it in the browser', () => {
+    expect(RETURNING_MEMBER_COOKIE_HEADER).not.toMatch(/HttpOnly/i);
+    expect(RETURNING_MEMBER_COOKIE_HEADER).toMatch(/^bd-returning=1;/);
   });
 });

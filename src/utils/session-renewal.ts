@@ -122,6 +122,37 @@ export function renewedSessionTokenCookie(
   return `${SESSION_TOKEN_COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 }
 
+/**
+ * A flag, not a credential: "this browser has signed in here before". It grants
+ * nothing. It only lets `/auth/sign-in` start Google sign-in without waiting
+ * for a click, which is what turns Neon's week-long session into one the member
+ * never notices ending. 400 days is the longest lifetime Chrome will honour.
+ *
+ * Readable by script on purpose, so a deliberate sign-out can clear it in the
+ * browser and nobody is signed straight back in after choosing to leave.
+ */
+export const RETURNING_MEMBER_COOKIE = 'bd-returning';
+export const RETURNING_MEMBER_COOKIE_HEADER = `${RETURNING_MEMBER_COOKIE}=1; Path=/; Max-Age=34560000; Secure; SameSite=Lax`;
+
+/**
+ * Whether `/auth/sign-in` should start Google sign-in by itself.
+ *
+ * Only for a browser that has signed in before, and never straight after a
+ * failed attempt (Neon returns those with an `error` param), which would loop.
+ * `AuthPanel` also tries at most once every few minutes per tab, so nothing
+ * this misses (a stranger whose Google account is not on the league list,
+ * say) can bounce forever.
+ */
+export function shouldAutoSignIn({
+  hasReturningFlag,
+  hasAuthError,
+}: {
+  hasReturningFlag: boolean;
+  hasAuthError: boolean;
+}): boolean {
+  return hasReturningFlag && !hasAuthError;
+}
+
 function parseExpiry(value: unknown): Date | null {
   if (typeof value !== 'string' && typeof value !== 'number') return null;
   const date = new Date(value);

@@ -1,8 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { getCurrentUser } from '@/server/auth/server';
+import {
+  RETURNING_MEMBER_COOKIE,
+  shouldAutoSignIn,
+} from '@/utils/session-renewal';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -27,8 +32,20 @@ export const dynamic = 'force-dynamic';
  * line up with. Signing in lands on `/`, not on `/profile` — a gated app's home
  * is the standings.
  */
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (await getCurrentUser()) redirect('/');
+
+  // A returning member whose session simply expired is sent straight back
+  // through Google rather than asked to click. See `shouldAutoSignIn`.
+  const [jar, params] = await Promise.all([cookies(), searchParams]);
+  const autoStart = shouldAutoSignIn({
+    hasReturningFlag: jar.has(RETURNING_MEMBER_COOKIE),
+    hasAuthError: params.error !== undefined,
+  });
 
   return (
     <main className='flex flex-1 items-center justify-center px-4 py-12'>
@@ -49,7 +66,12 @@ export default async function SignInPage() {
               Sign in with the Google account that is on the league list.
             </p>
 
-            <AuthPanel signedIn={false} callbackURL='/' className='w-full' />
+            <AuthPanel
+              signedIn={false}
+              callbackURL='/'
+              autoStart={autoStart}
+              className='w-full'
+            />
 
             <p className='text-center text-xs text-white/40'>
               Signed in and still seeing this page. Your email address is not
