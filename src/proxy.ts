@@ -1,4 +1,19 @@
+import { NextResponse, type NextRequest } from 'next/server';
+
 import { auth } from '@/server/auth/server';
+import { checkSessionToken } from '@/server/auth/session-check';
+import {
+  findSetCookieValue,
+  readRequestCookie,
+  renewedSessionTokenCookie,
+  SESSION_DATA_COOKIE,
+  SESSION_TOKEN_COOKIE,
+  sessionExpiryFromSessionData,
+} from '@/utils/session-renewal';
+
+const LOGIN_PATH = '/auth/sign-in';
+
+const neonGate = auth.middleware({ loginUrl: LOGIN_PATH });
 
 /**
  * The Neon Auth gate. **The app does not work without this file.**
@@ -24,8 +39,74 @@ import { auth } from '@/server/auth/server';
  * **The gate is authentication, not membership.** Any Google account passes it.
  * `league_members` is enforced by `getCurrentUser()`, which is what `/profile`
  * reads — see `src/server/auth/server.ts`.
+ *
+ * **Signed in once means signed in.** The library's gate, left alone, signs
+ * members out twice over: it never renews the session cookie, so the cookie
+ * dies on the date Neon first set it however often someone visits, and it
+ * reads any failed check against Neon as "signed out". This wrapper fixes both
+ * (the rules, and why, are in `src/utils/session-renewal.ts`):
+ *
+ * - whenever the library has just re-checked the session with Neon, the token
+ *   cookie is re-issued with Neon's current, rolling expiry;
+ * - a redirect to sign-in for a request that still carries a token is only
+ *   honoured once a fresh-connection check confirms Neon really has no session.
+ *   If Neon cannot be reached the request goes through; the pages check
+ *   membership again themselves.
  */
-export default auth.middleware({ loginUrl: '/auth/sign-in' });
+export default async function proxy(
+  request: NextRequest,
+): Promise<NextResponse> {
+  const response = await neonGate(request);
+  const token = readRequestCookie(
+    request.headers.get('cookie') ?? '',
+    SESSION_TOKEN_COOKIE,
+  );
+
+  // Never touch the token on Neon's own routes: a renewal riding on the
+  // sign-out POST would race the deletion and could undo the sign-out.
+  if (!token || request.nextUrl.pathname.startsWith('/api/auth'))
+    return response;
+
+  if (isLoginRedirect(response, request)) {
+    const check = await checkSessionToken(token);
+    if (check.kind === 'signed-out') return response;
+
+    const through = NextResponse.next();
+    if (check.kind === 'valid' && check.expiresAt) {
+      renewToken(through, token, check.expiresAt);
+    }
+    return through;
+  }
+
+  const minted = findSetCookieValue(
+    response.headers.getSetCookie(),
+    SESSION_DATA_COOKIE,
+  );
+  const expiresAt = minted ? sessionExpiryFromSessionData(minted) : null;
+  if (expiresAt) renewToken(response, token, expiresAt);
+
+  return response;
+}
+
+function isLoginRedirect(
+  response: NextResponse,
+  request: NextRequest,
+): boolean {
+  const location = response.headers.get('location');
+  if (!location || response.status < 300 || response.status >= 400)
+    return false;
+
+  return new URL(location, request.url).pathname === LOGIN_PATH;
+}
+
+function renewToken(
+  response: NextResponse,
+  token: string,
+  expiresAt: Date,
+): void {
+  const cookie = renewedSessionTokenCookie(token, expiresAt, new Date());
+  if (cookie) response.headers.append('Set-Cookie', cookie);
+}
 
 export const config = {
   /**
