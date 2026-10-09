@@ -26,14 +26,14 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
       </a>
       {/* Three navigation surfaces, each owning one breakpoint band:
           HeaderNav is the brand bar below `lg` and carries Profile at every
-          width it is on screen, MobileNav the bottom bar below `md`, and
+          width it is on screen, MobileNav the floating menu pill below `md`, and
           SideNav the floating panel from `lg` up. */}
       <HeaderNav />
       <SideNav />
 
-      {/* `pb-24` below `md` clears `MobileNav`: 64px of bar plus its padding.
-          The bar sits flush on the bottom edge and carries the iOS safe-area
-          inset itself, so nothing extra is owed here. */}
+      {/* `pb-24` below `md` clears `MobileNav`: a 48px pill floating at least
+          32px off the bottom edge, plus a little air. The pill carries the iOS
+          safe-area inset itself, so nothing extra is owed here. */}
       <main
         id='main-content'
         className='flex-1 pt-4 pb-24 md:pt-8 md:pb-8 lg:pt-4 lg:pl-64'

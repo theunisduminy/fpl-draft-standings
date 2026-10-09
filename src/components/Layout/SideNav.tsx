@@ -2,24 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Trophy, BarChart3, Beer, Users, Shield, User } from 'lucide-react';
-
 import { cn } from '@/lib/utils';
-
-/**
- * Six here against `MobileNav`'s five: this rail has vertical room, so it
- * carries Profile as well and spells "Premier League" out in full where the
- * bottom bar has to say "Prem". (Live is a standings tab while a gameweek is
- * in flight, not a destination.)
- */
-const navigation = [
-  { name: 'Standings', href: '/', icon: Trophy },
-  { name: 'Results', href: '/results', icon: BarChart3 },
-  { name: 'Rumblers', href: '/rumblers', icon: Beer },
-  { name: 'Squads', href: '/squads', icon: Users },
-  { name: 'Premier League', href: '/premier-league', icon: Shield },
-  { name: 'Profile', href: '/profile', icon: User },
-];
+import { FULL_PREFETCH, NAVIGATION } from '@/components/Layout/navigation';
 
 /**
  * The desktop navigation: a floating panel, not a flush rail.
@@ -31,11 +15,9 @@ const navigation = [
  * newer generation of `button`/`sheet`/`tooltip`, which would have restyled
  * every button on the site. Five links did not justify that.
  *
- * Below `lg` this is hidden entirely — `MobileNav` and the `HeaderNav` avatar
- * already reach the same five destinations between them, and two mechanisms for
- * one set of links is one too many. This rail keeps Profile in the list that
- * `MobileNav` drops, because from `lg` up the header is hidden and this is the
- * only navigation on the page.
+ * Below `lg` this is hidden entirely: `HeaderNav` carries the links at `md`
+ * and `MobileNav`'s menu below it, and two mechanisms for one set of links is
+ * one too many. It lists the same `NAVIGATION` as that menu.
  *
  * **The gradient is the signature, moved.** It used to run across the full
  * width of the top bar, which made the loudest thing on every page a piece of
@@ -65,7 +47,7 @@ export function SideNav() {
       </Link>
 
       <ul className='flex flex-1 flex-col gap-1'>
-        {navigation.map((link) => {
+        {NAVIGATION.map((link) => {
           const isActive = pathname === link.href;
           const Icon = link.icon;
 
@@ -73,6 +55,7 @@ export function SideNav() {
             <li key={link.name}>
               <Link
                 href={link.href}
+                {...FULL_PREFETCH}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none',
