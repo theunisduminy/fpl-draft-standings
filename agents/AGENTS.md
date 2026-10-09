@@ -117,6 +117,25 @@ That file is not just route protection, and this is the part that bites:
   out, and the person signs in again. The only symptom is duplicate session rows seconds
   apart. This cost a debugging session; do not re-learn it.
 
+**The library's gate also signs people out, so `src/proxy.ts` wraps it.** Left alone,
+`auth.middleware()` never renews `__Secure-neon-auth.session_token`: Neon extends the session
+on every check, but the middleware checks with a bare `fetch` and drops the response's
+`Set-Cookie`, so the cookie dies on the date it was first set however often someone visits.
+It also reads any failed check (a timeout, a dead pooled socket) as "signed out". The
+wrapper re-issues the token with Neon's current expiry whenever the library has just
+re-checked, and only honours a redirect to sign-in once a fresh-connection check says Neon
+really has no session. The rules are in `src/utils/session-renewal.ts`, with tests. Do not
+unwrap it, and never renew the token on `/api/auth/**`: riding on the sign-out POST, it
+would race the deletion.
+
+**Neon's session still dies after about a week unused, and Neon has no setting for that**
+(Managed Better Auth exposes no session lifetime). So a verified session also refreshes a
+400-day `bd-returning` flag, and `/auth/sign-in` uses it to start Google sign-in without a
+click; Google is already signed in, so the member bounces straight back. The flag grants
+nothing. Sign-out clears it in the browser, which is why it is not `HttpOnly`, and
+`AuthPanel` tries at most once per tab every five minutes, so a sign-in that cannot complete
+stops rather than loops.
+
 **`callbackURL` must be a path the matcher covers**, or the verifier lands somewhere the
 proxy never runs and you are back to the silent failure above.
 

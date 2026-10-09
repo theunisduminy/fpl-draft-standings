@@ -1,8 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from 'next';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { getCurrentUser } from '@/server/auth/server';
+import {
+  RETURNING_MEMBER_COOKIE,
+  shouldAutoSignIn,
+} from '@/utils/session-renewal';
+import { isEmbeddedBrowser, signInErrorMessage } from '@/utils/sign-in-help';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -27,8 +33,27 @@ export const dynamic = 'force-dynamic';
  * line up with. Signing in lands on `/`, not on `/profile` — a gated app's home
  * is the standings.
  */
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (await getCurrentUser()) redirect('/');
+
+  // A returning member whose session simply expired is sent straight back
+  // through Google rather than asked to click. See `shouldAutoSignIn`.
+  const [jar, params, requestHeaders] = await Promise.all([
+    cookies(),
+    searchParams,
+    headers(),
+  ]);
+  const errorCode = typeof params.error === 'string' ? params.error : undefined;
+  const autoStart = shouldAutoSignIn({
+    hasReturningFlag: jar.has(RETURNING_MEMBER_COOKIE),
+    hasAuthError: params.error !== undefined,
+  });
+  const errorMessage = signInErrorMessage(errorCode);
+  const embedded = isEmbeddedBrowser(requestHeaders.get('user-agent'));
 
   return (
     <main className='flex flex-1 items-center justify-center px-4 py-12'>
@@ -49,7 +74,28 @@ export default async function SignInPage() {
               Sign in with the Google account that is on the league list.
             </p>
 
-            <AuthPanel signedIn={false} callbackURL='/' className='w-full' />
+            {errorMessage && (
+              <p
+                role='alert'
+                className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-white/80'
+              >
+                {errorMessage}
+              </p>
+            )}
+
+            {embedded && (
+              <p className='rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/70'>
+                You opened this inside another app. Google sign-in often fails
+                here. Open betterdraft.vercel.app in Chrome or Safari instead.
+              </p>
+            )}
+
+            <AuthPanel
+              signedIn={false}
+              callbackURL='/'
+              autoStart={autoStart && !embedded}
+              className='w-full'
+            />
 
             <p className='text-center text-xs text-white/40'>
               Signed in and still seeing this page. Your email address is not

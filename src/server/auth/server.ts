@@ -71,7 +71,11 @@ export type SignedInUser = {
  * round trip's worth of latency, not two.
  */
 export async function getCurrentUser(): Promise<SignedInUser | null> {
-  const session = await auth.getSession();
+  let session = await auth.getSession();
+  // An error is Neon failing to answer, not the member being signed out, and
+  // the failed attempt has already destroyed whatever dead pooled socket it
+  // used. Ask once more before rendering a member as a stranger.
+  if (session?.error && !session.data) session = await auth.getSession();
   const user = session?.data?.user;
 
   if (!user?.email) return null;
