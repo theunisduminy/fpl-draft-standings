@@ -25,15 +25,20 @@ import { cn } from '@/lib/utils';
  * the card. `AppChrome` pads `<main>` below `md` so the end of a page clears it.
  */
 
-// The bar sits one unit above the safe area. The safe area has a 1.25rem floor:
-// without `viewport-fit=cover` iOS reports the inset as 0, and 12px off the
-// bottom edge puts the bar in the screen's curved corners and cuts off its
-// shadow. The card's cap keeps the top of the page visible above it, so it reads
-// as a card over the page rather than a new screen.
-const BAR_BOTTOM =
-  'bottom-[calc(max(env(safe-area-inset-bottom),1.25rem)+0.75rem)]';
+// The bar sits one unit above the safe area, and no higher: a taller floor
+// (Veldboek's 1.25rem) left a band of dead page under it. The card's cap keeps
+// the top of the page visible above it, so it reads as a card over the page
+// rather than a new screen.
+const BAR_BOTTOM = 'bottom-[calc(env(safe-area-inset-bottom)+0.75rem)]';
 const CARD_MAX_H =
-  'max-h-[calc(100dvh-max(env(safe-area-inset-bottom),1.25rem)-4.5rem-4.5rem)]';
+  'max-h-[calc(100dvh-env(safe-area-inset-bottom)-3.75rem-4.5rem)]';
+
+// Solid surfaces with a cyan edge, not glass. On this near-black purple a
+// translucent panel took on the page behind it and vanished into it; the bar
+// has to read as the control at a glance. `muted` is the lightest purple in the
+// theme, a clear step up from `card` and `background`.
+const SURFACE =
+  'border border-primary bg-muted text-white shadow-[0_8px_24px_rgba(0,0,0,0.6)]';
 
 // One tempo for everything that opens and closes here (the card, the scrim, the
 // chevron): in on the sheet curve, out in half the time on a plain ease-out.
@@ -113,20 +118,6 @@ export default function MobileNav() {
 
   return (
     <div ref={rootRef} className='md:hidden'>
-      {/* A shade behind the bar, reaching a little above it: the page fades and
-          blurs out as it scrolls under, so the bar reads as a control floating
-          over the content rather than one more card in it. Masked so the blur
-          eases in with the colour instead of stopping at a hard edge. */}
-      <div
-        aria-hidden='true'
-        className={cn(
-          'pointer-events-none fixed inset-x-0 bottom-0 z-30 h-[calc(max(env(safe-area-inset-bottom),1.25rem)+5.5rem)]',
-          'bg-gradient-to-t from-background via-background/80 to-transparent backdrop-blur-sm',
-          '[mask-image:linear-gradient(to_top,black_50%,transparent)]',
-          'transition-opacity duration-200 motion-reduce:transition-none',
-          typing && 'opacity-0',
-        )}
-      />
       {/* Dims and blurs the page while the card is open; tapping it closes. */}
       <div
         aria-hidden='true'
@@ -163,7 +154,7 @@ export default function MobileNav() {
                     className={cn(
                       MENU_ROW,
                       isActive
-                        ? 'bg-white/10 font-semibold text-white'
+                        ? 'bg-primary/15 font-semibold text-white'
                         : 'text-white active:bg-white/10',
                     )}
                   >
@@ -179,7 +170,7 @@ export default function MobileNav() {
                       aria-hidden='true'
                       className={cn(
                         'size-5 shrink-0',
-                        isActive ? 'text-[#00edfd]' : 'text-white/60',
+                        isActive ? 'text-primary' : 'text-white/70',
                       )}
                       strokeWidth={isActive ? 2 : 1.75}
                     />
@@ -197,13 +188,13 @@ export default function MobileNav() {
           aria-expanded={open}
           aria-controls={cardId}
           aria-label={`Menu: ${currentLabel}`}
-          // `glass-panel`, not `glass`: the blur is painted behind the pill
-          // rather than on it, so the label is not inside a composited layer.
-          // See the comment on the utility in `globals.css`.
-          className='glass-panel relative flex h-12 w-full items-center gap-2.5 rounded-full border border-white/10 ps-2 pe-4 text-white shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-transform duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none active:scale-[0.96] motion-reduce:transition-none'
+          className={cn(
+            SURFACE,
+            'relative flex h-12 w-full items-center gap-2.5 rounded-full ps-2 pe-4 transition-transform duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none active:scale-[0.96] motion-reduce:transition-none',
+          )}
         >
-          <span className='flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10'>
-            <CurrentIcon aria-hidden='true' className='size-4 text-[#00edfd]' />
+          <span className='flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground'>
+            <CurrentIcon aria-hidden='true' className='size-4' />
           </span>
           <span className='min-w-0 flex-1 truncate text-start text-sm font-semibold'>
             {currentLabel}
@@ -211,7 +202,7 @@ export default function MobileNav() {
           <ChevronUp
             aria-hidden='true'
             className={cn(
-              'size-4 shrink-0 text-white/60 transition-transform motion-reduce:transition-none',
+              'size-4 shrink-0 text-white/80 transition-transform motion-reduce:transition-none',
               open ? cn('rotate-180', OPEN_MOTION) : CLOSE_MOTION,
             )}
           />
@@ -248,7 +239,8 @@ function MenuCard({
       aria-hidden={!open}
       inert={!open}
       className={cn(
-        'glass-panel absolute inset-x-0 bottom-[calc(100%+0.75rem)] flex origin-bottom flex-col overflow-hidden rounded-[1.75rem] border border-white/10 shadow-2xl',
+        SURFACE,
+        'absolute inset-x-0 bottom-[calc(100%+0.75rem)] flex origin-bottom flex-col overflow-hidden rounded-[1.75rem]',
         'transition-[opacity,scale,translate] motion-reduce:transition-opacity',
         CARD_MAX_H,
         open
