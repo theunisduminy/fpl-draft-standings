@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { getCurrentUser } from '@/server/auth/server';
@@ -8,6 +8,7 @@ import {
   RETURNING_MEMBER_COOKIE,
   shouldAutoSignIn,
 } from '@/utils/session-renewal';
+import { isEmbeddedBrowser, signInErrorMessage } from '@/utils/sign-in-help';
 import { AuthPanel } from '@/components/Profile/AuthPanel';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -41,11 +42,18 @@ export default async function SignInPage({
 
   // A returning member whose session simply expired is sent straight back
   // through Google rather than asked to click. See `shouldAutoSignIn`.
-  const [jar, params] = await Promise.all([cookies(), searchParams]);
+  const [jar, params, requestHeaders] = await Promise.all([
+    cookies(),
+    searchParams,
+    headers(),
+  ]);
+  const errorCode = typeof params.error === 'string' ? params.error : undefined;
   const autoStart = shouldAutoSignIn({
     hasReturningFlag: jar.has(RETURNING_MEMBER_COOKIE),
     hasAuthError: params.error !== undefined,
   });
+  const errorMessage = signInErrorMessage(errorCode);
+  const embedded = isEmbeddedBrowser(requestHeaders.get('user-agent'));
 
   return (
     <main className='flex flex-1 items-center justify-center px-4 py-12'>
@@ -66,10 +74,26 @@ export default async function SignInPage({
               Sign in with the Google account that is on the league list.
             </p>
 
+            {errorMessage && (
+              <p
+                role='alert'
+                className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-white/80'
+              >
+                {errorMessage}
+              </p>
+            )}
+
+            {embedded && (
+              <p className='rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/70'>
+                You opened this inside another app. Google sign-in often fails
+                here. Open betterdraft.vercel.app in Chrome or Safari instead.
+              </p>
+            )}
+
             <AuthPanel
               signedIn={false}
               callbackURL='/'
-              autoStart={autoStart}
+              autoStart={autoStart && !embedded}
               className='w-full'
             />
 
