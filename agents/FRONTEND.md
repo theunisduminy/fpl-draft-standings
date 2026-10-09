@@ -132,6 +132,28 @@ data as a prop has no loading state and no error state to render.
 - **Missing → `notFound()`**, which renders `src/app/not-found.tsx` with a real 404.
 - **Empty is not an error.** Pre-season the API legitimately returns zero gameweeks. Empty
   states say what is happening ("No gameweeks played yet"), not "Something went wrong".
+- **A loader wraps only its own page.** A `loading.tsx` covers every page below its
+  folder, so a page with routes beneath it needs a route group (`(home)`) to keep its
+  skeleton to itself; otherwise one click shows two skeletons. `loading-contract.test.ts`
+  in `src/app/(app)/` pins this, and the 404 rule above.
+
+## Navigation
+
+- **One list of destinations**, `NAVIGATION` in `src/components/Layout/navigation.ts`.
+  `SideNav` and the phone menu both draw it; `HeaderNav`'s `md` strip is the same list
+  less Profile.
+- **Navigation links prefetch the whole page** (`{...FULL_PREFETCH}`), so a click paints
+  from the router cache with no skeleton. Next's default stops at the `loading.tsx`. This
+  is for the navigation only: each such link is one server render per page load.
+- **The phone menu is a floating pill that names the current page** and opens a card of
+  every destination above it. Ported from Veldboek. Its rows are thumb targets: 48px tall
+  with 4px between them, `text-base` with 20px icons. Not `SideNav`'s `text-sm` rows;
+  that is cursor density.
+- **Chrome opens on one tempo**: in over 300ms on `ease-sheet`, out in half that on
+  `ease-out`. A card rises 8px out of its control at a uniform 0.96 scale, the fade running
+  alongside. Never scale one axis more than the other, and never delay the fade.
+- **Nested radii are concentric**: an inner corner is the outer corner less the padding
+  between them (a 20px row in a 28px card with 8px of padding).
 
 ## Charts
 

@@ -5,10 +5,11 @@ import { usePathname } from 'next/navigation';
 import { User } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { FULL_PREFETCH } from '@/components/Layout/navigation';
 
 /**
- * The same five as `MobileNav`, in the same order. This strip only shows at
- * `md`, where there is room for the full name rather than the bar's "Prem".
+ * `NAVIGATION` less Profile, in the same order. This strip only shows at `md`,
+ * where Profile is the avatar button beside it.
  * (Live is a standings tab while a gameweek is in flight, not a destination.)
  */
 const navigation = [
@@ -22,16 +23,14 @@ const navigation = [
 /**
  * The top bar: brand on the left, links from `md` up, profile always.
  *
- * There is deliberately no mobile menu here. `MobileNav` already puts every
- * destination in a fixed bottom bar below `md`, so a hamburger would be a
- * second way to reach the same links — more chrome, nothing new behind it.
+ * There is deliberately no hamburger here. `MobileNav`'s menu already reaches
+ * every destination from the bottom of the screen below `md`, so a second menu
+ * up here would be more chrome with nothing new behind it.
  *
- * **Profile lives here rather than in the bottom bar.** It is a destination
- * people open twice a season, and a bottom bar comfortably holds about five
- * items; spending one of those on the profile crowds out the pages that get
- * opened every gameweek. It is an avatar button on the right instead, present
- * at every width below `lg` — at `lg` and up `SideNav` carries it, because
- * this header is hidden there and nothing else would.
+ * **Profile is an avatar button on the right**, at every width below `lg`. At
+ * `md` it is the only way to Profile; below `md` the phone menu lists it too,
+ * and the avatar stays as the conventional place to look for it. At `lg` and
+ * up `SideNav` carries it, because this header is hidden there.
  *
  * **It only sticks from `md` up**, where it carries the links. Below that it is
  * a brand mark and nothing else, so pinning it would spend 64px of a phone
@@ -76,6 +75,7 @@ export default function HeaderNav() {
                   <Link
                     key={link.name}
                     href={link.href}
+                    {...FULL_PREFETCH}
                     aria-current={isActive ? 'page' : undefined}
                     className={`relative rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none ${
                       isActive

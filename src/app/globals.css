@@ -203,6 +203,10 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
 
+  /* A drawer's curve (vaul's): fast out of the gate, long soft landing. The
+     phone menu opens on it; see `MobileNav`. */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 
